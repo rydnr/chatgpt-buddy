@@ -1,20 +1,36 @@
 {
   "name": "chatgpt-buddy",
-  "version": "1.0.0",
-  "description": "This sample demonstrates using the `inspectedWindow` API to collect and use data on the resouces used in a webpage.",
-  "main": "index.js",
+  "version": "2.0.0",
+  "description": "Event-driven ChatGPT automation tool with browser extension and client SDKs",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "pnpm --filter='./packages/*' build",
+    "test": "jest",
+    "test:unit": "pnpm --filter='./packages/*' test",
+    "test:integration": "jest tests/integration",
+    "dev:server": "pnpm --filter='@chatgpt-buddy/server' dev",
+    "lint": "pnpm --filter='./packages/*' lint",
+    "typecheck": "pnpm --filter='./packages/*' typecheck"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/rydnr/chatgpt-buddy.git"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "keywords": ["chatgpt", "automation", "browser-extension", "typescript", "event-driven"],
+  "author": "rydnr",
+  "license": "GPL-3.0",
   "bugs": {
     "url": "https://github.com/rydnr/chatgpt-buddy/issues"
   },
-  "homepage": "https://github.com/rydnr/chatgpt-buddy#readme"
+  "homepage": "https://github.com/rydnr/chatgpt-buddy#readme",
+  "devDependencies": {
+    "@types/jest": "^29.5.0",
+    "@types/node": "^20.0.0",
+    "jest": "^29.5.0",
+    "ts-jest": "^29.1.0",
+    "typescript": "^5.0.0",
+    "axios": "^1.6.0"
+  },
+  "workspaces": [
+    "packages/*"
+  ]
 }
