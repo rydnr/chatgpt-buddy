@@ -1,0 +1,647 @@
+#+TITLE: ATDD with Google Example: Web-Buddy Framework in Action
+#+AUTHOR: Claude Code (Anthropic)
+#+DATE: 2025-06-29
+
+* Introduction: Web-Buddy Generic Framework
+
+** The Layered Architecture Philosophy
+The Web-Buddy framework demonstrates a crucial architectural principle: *separation between generic infrastructure and domain-specific convenience*. This example shows how to implement Google search automation using this layered approach.
+
+#+BEGIN_QUOTE
+"The core framework provides the plumbing; domain implementations provide the porcelain."
+#+END_QUOTE
+
+** Three Layers Explained
+1. **Core Layer**: Generic message-passing infrastructure (=WebBuddyClient.sendMessage()=)
+2. **Domain Layer**: Site-specific messages and handlers (=ENTER_SEARCH_TERM=, =GET_RESULTS=)
+3. **API Layer**: Developer-friendly wrappers (=googleClient.enterSearchTerm()=)
+
+* Google-Buddy: A Complete Implementation Example
+
+** The Google Domain Messages
+Unlike generic ping-pong, Google automation requires specific domain messages:
+
+#+BEGIN_SRC typescript
+// implementations/google-buddy/messages.ts
+export const GoogleMessages = {
+  ENTER_SEARCH_TERM: 'ENTER_SEARCH_TERM',
+  GET_SEARCH_RESULTS: 'GET_SEARCH_RESULTS', 
+  GET_FIRST_RESULT: 'GET_FIRST_RESULT',
+  CLICK_RESULT: 'CLICK_RESULT',
+  EXTRACT_PAGE_TITLE: 'EXTRACT_PAGE_TITLE'
+} as const;
+
+export type GoogleMessageType = typeof GoogleMessages[keyof typeof GoogleMessages];
+#+END_SRC
+
+** Domain-Specific Message Classes
+#+BEGIN_SRC typescript
+// implementations/google-buddy/messages.ts
+import { BaseMessage } from '@web-buddy/core';
+
+export class EnterSearchTermMessage extends BaseMessage {
+  public readonly type = GoogleMessages.ENTER_SEARCH_TERM;
+  
+  constructor(searchTerm: string, correlationId: string) {
+    super({ searchTerm }, correlationId, 'google.com');
+  }
+}
+
+export class GetSearchResultsMessage extends BaseMessage {
+  public readonly type = GoogleMessages.GET_SEARCH_RESULTS;
+  
+  constructor(correlationId: string) {
+    super({}, correlationId, 'google.com');
+  }
+}
+
+export class GetFirstResultMessage extends BaseMessage {
+  public readonly type = GoogleMessages.GET_FIRST_RESULT;
+  
+  constructor(correlationId: string) {
+    super({}, correlationId, 'google.com');
+  }
+}
+#+END_SRC
+
+* ATDD Process: Specification-First Development
+
+** Step 1: Write Failing Playwright Test (🧪 Red)
+The test *defines* how Google automation should work:
+
+#+BEGIN_SRC typescript
+// implementations/google-buddy/tests/google-search.spec.ts
+import { test, expect, Page } from '@playwright/test';
+import { WebBuddyClient } from '@web-buddy/core';
+import { GoogleBuddyClient } from '../client';
+import { WebBuddyTestEnvironment } from '@web-buddy/testing';
+
+test.describe('Google Search Automation', () => {
+  let testEnv: WebBuddyTestEnvironment;
+  let webClient: WebBuddyClient;
+  let googleClient: GoogleBuddyClient;
+  
+  test.beforeAll(async () => {
+    testEnv = new WebBuddyTestEnvironment('google-buddy');
+    const serverUrl = await testEnv.setupServer();
+    webClient = new WebBuddyClient({ serverUrl });
+    googleClient = new GoogleBuddyClient(webClient);
+  });
+
+  test.afterAll(async () => {
+    await testEnv.teardown();
+  });
+
+  /**
+   * SPECIFICATION: Complete Google Search Flow
+   * This test defines exactly how Google automation should work
+   */
+  test('should perform complete Google search automation', async ({ page }) => {
+    // GIVEN: Google homepage is loaded with web-buddy extension
+    await page.goto('https://google.com');
+    await testEnv.loadExtension(page);
+    
+    // WHEN: Developer uses convenient API
+    await googleClient.enterSearchTerm('TypeScript EDA patterns');
+    const results = await googleClient.getSearchResults();
+    const firstResult = await googleClient.getFirstResult();
+    
+    // THEN: Browser state reflects the automation
+    await expect(page.locator('input[name="q"]')).toHaveValue('TypeScript EDA patterns');
+    await expect(page.locator('#search .g')).toHaveCount.greaterThan(0);
+    
+    // AND: Client received structured data
+    expect(results.length).toBeGreaterThan(0);
+    expect(firstResult.title).toBeDefined();
+    expect(firstResult.url).toMatch(/^https?:\/\//);
+    expect(firstResult.description).toBeDefined();
+  });
+
+  /**
+   * SPECIFICATION: Generic Message API Support
+   * Power users should be able to use low-level API
+   */
+  test('should support generic message API for power users', async ({ page }) => {
+    // GIVEN: Google page is ready
+    await page.goto('https://google.com');
+    await testEnv.loadExtension(page);
+    
+    // WHEN: Using generic web-buddy API directly
+    const response = await webClient.sendMessage({
+      [GoogleMessages.ENTER_SEARCH_TERM]: { 
+        searchTerm: 'generic API test',
+        correlationId: 'test-123'
+      }
+    });
+    
+    // THEN: Low-level automation succeeds
+    expect(response.success).toBe(true);
+    await expect(page.locator('input[name="q"]')).toHaveValue('generic API test');
+  });
+
+  /**
+   * SPECIFICATION: Error Handling
+   * System should gracefully handle Google UI changes
+   */
+  test('should handle missing elements gracefully', async ({ page }) => {
+    // GIVEN: Google page with modified DOM (simulating UI changes)
+    await page.goto('https://google.com');
+    await page.addStyleTag({ content: 'input[name="q"] { display: none; }' });
+    
+    // WHEN: Attempting search term entry
+    const result = await googleClient.enterSearchTerm('test').catch(error => error);
+    
+    // THEN: Meaningful error is returned
+    expect(result).toBeInstanceOf(Error);
+    expect(result.message).toContain('Search input not found');
+  });
+  
+  /**
+   * SPECIFICATION: Multiple Search Terms
+   * Should support batch operations
+   */
+  test('should handle multiple search operations', async ({ page }) => {
+    // GIVEN: Google page is ready
+    await page.goto('https://google.com');
+    await testEnv.loadExtension(page);
+    
+    // WHEN: Performing multiple searches
+    const searchTerms = ['TypeScript', 'JavaScript', 'React'];
+    const searchPromises = searchTerms.map(term => 
+      googleClient.search(term)
+    );
+    const allResults = await Promise.all(searchPromises);
+    
+    // THEN: All searches completed successfully
+    expect(allResults).toHaveLength(3);
+    allResults.forEach((results, index) => {
+      expect(results.length).toBeGreaterThan(0);
+      expect(results[0].title.toLowerCase()).toContain(searchTerms[index].toLowerCase());
+    });
+  });
+});
+#+END_SRC
+
+** Step 2: Implement Domain Handlers (✅ Green)
+The failing test drives us to implement actual Google DOM manipulation:
+
+#+BEGIN_SRC typescript
+// implementations/google-buddy/handlers.ts
+import { MessageHandler, WebBuddyMessage } from '@web-buddy/core';
+import { GoogleMessages } from './messages';
+
+export class GoogleSearchHandler implements MessageHandler {
+  async handle(message: WebBuddyMessage): Promise<any> {
+    switch (message.type) {
+      case GoogleMessages.ENTER_SEARCH_TERM:
+        return await this.enterSearchTerm(message.payload.searchTerm);
+      
+      case GoogleMessages.GET_SEARCH_RESULTS:
+        return await this.getSearchResults();
+        
+      case GoogleMessages.GET_FIRST_RESULT:
+        return await this.getFirstResult();
+        
+      case GoogleMessages.CLICK_RESULT:
+        return await this.clickResult(message.payload.index || 0);
+        
+      default:
+        throw new Error(`Unknown Google message type: ${message.type}`);
+    }
+  }
+  
+  /**
+   * Enters search term in Google search box
+   * Specification: Should type in search box and trigger search
+   */
+  private async enterSearchTerm(term: string): Promise<{ success: boolean }> {
+    const searchInput = document.querySelector('input[name="q"]') as HTMLInputElement;
+    if (!searchInput) {
+      throw new Error('Search input not found');
+    }
+    
+    // Clear existing value and enter new term
+    searchInput.value = '';
+    searchInput.focus();
+    
+    // Simulate typing for realistic behavior
+    for (const char of term) {
+      searchInput.value += char;
+      searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+      await this.delay(50); // Realistic typing speed
+    }
+    
+    // Trigger search
+    const searchForm = searchInput.closest('form');
+    if (searchForm) {
+      searchForm.submit();
+    } else {
+      // Fallback: press Enter
+      searchInput.dispatchEvent(new KeyboardEvent('keydown', { 
+        key: 'Enter', 
+        bubbles: true 
+      }));
+    }
+    
+    // Wait for search results to load
+    await this.waitForElement('#search', 5000);
+    
+    return { success: true };
+  }
+  
+  /**
+   * Extracts search results from Google results page
+   * Specification: Should return array of structured result objects
+   */
+  private async getSearchResults(): Promise<SearchResult[]> {
+    await this.waitForElement('#search .g', 3000);
+    
+    const resultElements = document.querySelectorAll('#search .g');
+    const results: SearchResult[] = [];
+    
+    for (const element of Array.from(resultElements)) {
+      const titleElement = element.querySelector('h3');
+      const linkElement = element.querySelector('a[href]') as HTMLAnchorElement;
+      const descElement = element.querySelector('[data-sncf="1"]') || 
+                         element.querySelector('.VwiC3b');
+      
+      if (titleElement && linkElement) {
+        results.push({
+          title: titleElement.textContent?.trim() || '',
+          url: linkElement.href,
+          description: descElement?.textContent?.trim() || ''
+        });
+      }
+    }
+    
+    return results;
+  }
+  
+  /**
+   * Gets the first search result
+   * Specification: Should return the top result with title, URL, description
+   */
+  private async getFirstResult(): Promise<SearchResult> {
+    const results = await this.getSearchResults();
+    if (results.length === 0) {
+      throw new Error('No search results found');
+    }
+    return results[0];
+  }
+  
+  /**
+   * Clicks on a specific search result
+   * Specification: Should click the nth result and navigate to target page
+   */
+  private async clickResult(index: number): Promise<{ success: boolean; url: string }> {
+    const resultElements = document.querySelectorAll('#search .g a[href]');
+    if (index >= resultElements.length) {
+      throw new Error(`Result index ${index} not found (only ${resultElements.length} results)`);
+    }
+    
+    const linkElement = resultElements[index] as HTMLAnchorElement;
+    const targetUrl = linkElement.href;
+    
+    linkElement.click();
+    
+    return { success: true, url: targetUrl };
+  }
+  
+  /**
+   * Utility: Wait for element to appear
+   */
+  private async waitForElement(selector: string, timeout = 5000): Promise<Element> {
+    return new Promise((resolve, reject) => {
+      const element = document.querySelector(selector);
+      if (element) return resolve(element);
+      
+      const observer = new MutationObserver(() => {
+        const element = document.querySelector(selector);
+        if (element) {
+          observer.disconnect();
+          resolve(element);
+        }
+      });
+      
+      observer.observe(document.body, { 
+        childList: true, 
+        subtree: true 
+      });
+      
+      setTimeout(() => {
+        observer.disconnect();
+        reject(new Error(`Element ${selector} not found within ${timeout}ms`));
+      }, timeout);
+    });
+  }
+  
+  /**
+   * Utility: Add realistic delay
+   */
+  private async delay(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+}
+
+export interface SearchResult {
+  title: string;
+  url: string;
+  description: string;
+}
+#+END_SRC
+
+** Step 3: Create Developer-Friendly Client Wrapper
+#+BEGIN_SRC typescript
+// implementations/google-buddy/client.ts
+import { WebBuddyClient } from '@web-buddy/core';
+import { GoogleMessages } from './messages';
+import { SearchResult } from './handlers';
+
+/**
+ * Google-specific client that provides convenient methods
+ * Built on top of the generic WebBuddyClient
+ */
+export class GoogleBuddyClient {
+  constructor(private webBuddyClient: WebBuddyClient) {}
+  
+  /**
+   * Enter search term in Google search box
+   * Convenient wrapper around ENTER_SEARCH_TERM message
+   */
+  async enterSearchTerm(term: string): Promise<{ success: boolean }> {
+    return this.webBuddyClient.sendMessage({
+      [GoogleMessages.ENTER_SEARCH_TERM]: { searchTerm: term }
+    });
+  }
+  
+  /**
+   * Get all search results from current page
+   * Convenient wrapper around GET_SEARCH_RESULTS message
+   */
+  async getSearchResults(): Promise<SearchResult[]> {
+    return this.webBuddyClient.sendMessage({
+      [GoogleMessages.GET_SEARCH_RESULTS]: {}
+    });
+  }
+  
+  /**
+   * Get the first search result
+   * Convenient wrapper around GET_FIRST_RESULT message
+   */
+  async getFirstResult(): Promise<SearchResult> {
+    return this.webBuddyClient.sendMessage({
+      [GoogleMessages.GET_FIRST_RESULT]: {}
+    });
+  }
+  
+  /**
+   * Click on a specific search result
+   * Convenient wrapper around CLICK_RESULT message
+   */
+  async clickResult(index: number = 0): Promise<{ success: boolean; url: string }> {
+    return this.webBuddyClient.sendMessage({
+      [GoogleMessages.CLICK_RESULT]: { index }
+    });
+  }
+  
+  /**
+   * Convenience method: Complete search flow
+   * Combines multiple operations into a single method
+   */
+  async search(term: string): Promise<SearchResult[]> {
+    await this.enterSearchTerm(term);
+    return this.getSearchResults();
+  }
+  
+  /**
+   * Convenience method: Search and click first result
+   * Common workflow for "I'm feeling lucky" behavior
+   */
+  async searchAndClickFirst(term: string): Promise<{ success: boolean; url: string }> {
+    await this.enterSearchTerm(term);
+    return this.clickResult(0);
+  }
+  
+  /**
+   * Advanced: Batch search multiple terms
+   * Returns results for all terms
+   */
+  async batchSearch(terms: string[]): Promise<SearchResult[][]> {
+    const searchPromises = terms.map(term => this.search(term));
+    return Promise.all(searchPromises);
+  }
+}
+#+END_SRC
+
+** Step 4: Content Script Integration
+#+BEGIN_SRC typescript
+// implementations/google-buddy/content-script.ts
+import { GoogleSearchHandler } from './handlers';
+import { GoogleMessages } from './messages';
+
+/**
+ * Content script that runs in Google pages
+ * Receives messages from web-buddy extension and executes DOM manipulation
+ */
+class GoogleContentScript {
+  private handler = new GoogleSearchHandler();
+  
+  constructor() {
+    this.setupMessageListener();
+  }
+  
+  private setupMessageListener(): void {
+    // Listen for messages from web-buddy extension
+    chrome.runtime.onMessage.addListener(async (message, sender, sendResponse) => {
+      try {
+        // Verify this is a Google message
+        if (!Object.values(GoogleMessages).includes(message.type)) {
+          return; // Not a Google message, ignore
+        }
+        
+        console.log(`Google content script received: ${message.type}`, message);
+        
+        // Process the message through our domain handler
+        const result = await this.handler.handle(message);
+        
+        // Send response back to extension
+        sendResponse({
+          success: true,
+          data: result,
+          correlationId: message.correlationId
+        });
+        
+      } catch (error) {
+        console.error('Google content script error:', error);
+        sendResponse({
+          success: false,
+          error: error.message,
+          correlationId: message.correlationId
+        });
+      }
+      
+      return true; // Indicate async response
+    });
+  }
+}
+
+// Initialize content script when DOM is ready
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => new GoogleContentScript());
+} else {
+  new GoogleContentScript();
+}
+#+END_SRC
+
+* Usage Examples: Both APIs in Action
+
+** For Most Developers: Convenient API
+#+BEGIN_SRC typescript
+import { WebBuddyClient } from '@web-buddy/core';
+import { GoogleBuddyClient } from '@google-buddy/client';
+
+// Setup
+const webClient = new WebBuddyClient({ serverUrl: 'http://localhost:3000' });
+const googleClient = new GoogleBuddyClient(webClient);
+
+// Simple search
+const results = await googleClient.search('TypeScript EDA patterns');
+console.log(`Found ${results.length} results`);
+
+// Search and click first result
+const clickResult = await googleClient.searchAndClickFirst('TypeScript tutorial');
+console.log(`Navigated to: ${clickResult.url}`);
+
+// Batch search multiple terms
+const batchResults = await googleClient.batchSearch([
+  'TypeScript', 'JavaScript', 'React'
+]);
+console.log(`Batch search completed: ${batchResults.length} result sets`);
+#+END_SRC
+
+** For Power Users: Generic Message API
+#+BEGIN_SRC typescript
+import { WebBuddyClient } from '@web-buddy/core';
+import { GoogleMessages } from '@google-buddy/messages';
+
+const webClient = new WebBuddyClient({ serverUrl: 'http://localhost:3000' });
+
+// Direct message sending - more control, more verbose
+const searchResponse = await webClient.sendMessage({
+  [GoogleMessages.ENTER_SEARCH_TERM]: {
+    searchTerm: 'advanced search query',
+    correlationId: 'my-custom-id-123'
+  }
+});
+
+const resultsResponse = await webClient.sendMessage({
+  [GoogleMessages.GET_SEARCH_RESULTS]: {
+    correlationId: 'my-custom-id-124'
+  }
+});
+
+// Batch messages for efficiency
+const responses = await webClient.sendMessages([
+  { [GoogleMessages.ENTER_SEARCH_TERM]: { searchTerm: 'term1' } },
+  { [GoogleMessages.GET_SEARCH_RESULTS]: {} },
+  { [GoogleMessages.GET_FIRST_RESULT]: {} }
+]);
+#+END_SRC
+
+* ATDD Benefits Demonstrated
+
+** 1. Specification-Driven Development
+The Playwright tests *define* exactly how Google automation should work:
+- What elements should be interacted with
+- What data should be returned
+- How errors should be handled
+- What the final browser state should be
+
+** 2. Multiple API Levels
+The implementation supports both convenience and power:
+- =googleClient.search()= for simple use cases
+- =webClient.sendMessage()= for advanced scenarios
+- Both APIs tested with the same ATDD tests
+
+** 3. Error Handling Specification
+Tests define how the system should behave when:
+- Google changes its DOM structure
+- Network requests fail
+- Elements are not found
+- Multiple operations are performed concurrently
+
+** 4. Realistic Browser Behavior
+The implementation includes realistic patterns:
+- Typing delays for natural behavior
+- Proper event dispatching
+- Waiting for dynamic content
+- Handling of modern web app patterns
+
+* Extending to Other Websites
+
+** The Pattern is Repeatable
+This same ATDD approach works for any website:
+
+1. **Define domain messages** (=ENTER_SEARCH_TERM= → =SUBMIT_FORM=, =CLICK_BUTTON=)
+2. **Write failing Playwright tests** that specify automation behavior
+3. **Implement domain handlers** for actual DOM manipulation
+4. **Create client wrappers** for developer convenience
+5. **Integrate content scripts** for browser execution
+
+** Example: Adding Twitter Automation
+#+BEGIN_SRC typescript
+// twitter-buddy/messages.ts
+export const TwitterMessages = {
+  COMPOSE_TWEET: 'COMPOSE_TWEET',
+  SEND_TWEET: 'SEND_TWEET',
+  GET_TIMELINE: 'GET_TIMELINE',
+  LIKE_TWEET: 'LIKE_TWEET'
+} as const;
+
+// twitter-buddy/client.ts
+export class TwitterBuddyClient {
+  async composeTweet(content: string): Promise<{ success: boolean }> {
+    return this.webBuddyClient.sendMessage({
+      [TwitterMessages.COMPOSE_TWEET]: { content }
+    });
+  }
+}
+#+END_SRC
+
+* Architecture Benefits Realized
+
+** 1. Clear Separation of Concerns
+- **Core**: Generic messaging and correlation
+- **Domain**: Site-specific business logic  
+- **API**: Developer experience layer
+
+** 2. Flexible Usage Patterns
+- Beginners use convenient wrapper methods
+- Advanced users access low-level message API
+- Both approaches fully tested and supported
+
+** 3. Extensible Framework
+- Adding new websites requires only domain implementation
+- Core framework remains unchanged
+- Shared testing utilities reduce implementation time
+
+** 4. Specification-First Development
+- ATDD tests define exact automation behavior
+- Implementation driven by failing tests
+- Clear acceptance criteria for each feature
+
+* Conclusion
+
+The Google example demonstrates how the Web-Buddy framework achieves the perfect balance:
+
+#+BEGIN_QUOTE
+"The framework provides the infrastructure; implementations provide the intelligence; wrappers provide the convenience."
+#+END_QUOTE
+
+** Key Insights
+1. **Generic infrastructure** handles correlation IDs, message routing, and browser communication
+2. **Domain implementations** provide site-specific logic (=ENTER_SEARCH_TERM= vs =SELECT_PROJECT=)
+3. **Client wrappers** offer developer-friendly APIs (=search()= vs =sendMessage()=)
+4. **ATDD tests** specify exact behavior and drive implementation
+
+This approach transforms web automation from ad-hoc scripting into systematic, testable, and maintainable software engineering. The same patterns demonstrated with Google apply to any website, making Web-Buddy a truly generic and powerful automation framework.
