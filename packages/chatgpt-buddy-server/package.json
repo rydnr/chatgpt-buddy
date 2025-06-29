@@ -1,0 +1,36 @@
+{
+  "name": "@chatgpt-buddy/server",
+  "version": "0.1.0",
+  "description": "Event-driven server for ChatGPT Buddy automation",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "ts-node src/index.ts",
+    "test": "jest",
+    "lint": "eslint src --ext .ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@chatgpt-buddy/core": "workspace:*",
+    "express": "^4.18.0",
+    "ws": "^8.14.0"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.0",
+    "@types/jest": "^29.5.0",
+    "@types/node": "^20.0.0",
+    "@types/ws": "^8.5.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "eslint": "^8.0.0",
+    "jest": "^29.5.0",
+    "supertest": "^6.3.0",
+    "ts-jest": "^29.1.0",
+    "ts-node": "^10.9.0",
+    "typescript": "^5.0.0"
+  },
+  "keywords": ["chatgpt", "automation", "server", "events"],
+  "author": "rydnr",
+  "license": "GPL-3.0"
+}
