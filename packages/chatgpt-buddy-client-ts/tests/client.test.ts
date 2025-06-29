@@ -33,16 +33,28 @@
  *   - ChatGPTBuddyClient: The client being tested
  */
 
+import axios from 'axios';
 import { ChatGPTBuddyClient } from '../src/client';
+
+// Mock axios
+jest.mock('axios');
+const mockedAxios = axios as jest.Mocked<typeof axios>;
 
 describe('ChatGPTBuddyClient', () => {
   let client: ChatGPTBuddyClient;
+  let mockPost: jest.Mock;
   const mockServerUrl = 'http://localhost:3000';
 
   beforeEach(() => {
+    mockPost = jest.fn();
+    mockedAxios.create.mockReturnValue({
+      post: mockPost
+    } as any);
+    
     client = new ChatGPTBuddyClient({ 
       serverUrl: mockServerUrl 
     });
+    jest.clearAllMocks();
   });
 
   /**
@@ -51,6 +63,19 @@ describe('ChatGPTBuddyClient', () => {
   it('should send ping and receive pong response', async () => {
     // Arrange
     const message = 'Hello from client test';
+    const mockResponse = {
+      data: {
+        type: 'PongEvent',
+        correlationId: 'mock-correlation-123',
+        payload: {
+          originalMessage: message,
+          responseMessage: `Pong: ${message}`
+        },
+        timestamp: new Date().toISOString()
+      }
+    };
+    
+    mockPost.mockResolvedValue(mockResponse);
 
     // Act
     const response = await client.ping(message);
@@ -68,6 +93,14 @@ describe('ChatGPTBuddyClient', () => {
   it('should generate unique correlation IDs for each request', async () => {
     // Arrange
     const message = 'Test message';
+    
+    mockPost
+      .mockResolvedValueOnce({ 
+        data: { type: 'PongEvent', correlationId: 'id-1', payload: { originalMessage: message, responseMessage: `Pong: ${message}` }, timestamp: new Date().toISOString() }
+      })
+      .mockResolvedValueOnce({ 
+        data: { type: 'PongEvent', correlationId: 'id-2', payload: { originalMessage: message, responseMessage: `Pong: ${message}` }, timestamp: new Date().toISOString() }
+      });
 
     // Act
     const response1 = await client.ping(message);
@@ -85,6 +118,19 @@ describe('ChatGPTBuddyClient', () => {
   it('should handle empty message in ping request', async () => {
     // Arrange
     const message = '';
+    const mockResponse = {
+      data: {
+        type: 'PongEvent',
+        correlationId: 'empty-test-123',
+        payload: {
+          originalMessage: '',
+          responseMessage: 'Pong: '
+        },
+        timestamp: new Date().toISOString()
+      }
+    };
+    
+    mockPost.mockResolvedValue(mockResponse);
 
     // Act
     const response = await client.ping(message);
