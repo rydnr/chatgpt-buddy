@@ -1,0 +1,29 @@
+{
+  "name": "@chatgpt-buddy/core",
+  "version": "0.1.0",
+  "description": "Shared domain events and types for ChatGPT Buddy",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "jest",
+    "lint": "eslint src --ext .ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "typescript-eda": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.0",
+    "@types/node": "^20.0.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "eslint": "^8.0.0",
+    "jest": "^29.5.0",
+    "ts-jest": "^29.1.0",
+    "typescript": "^5.0.0"
+  },
+  "keywords": ["chatgpt", "automation", "domain", "events"],
+  "author": "rydnr",
+  "license": "GPL-3.0"
+}

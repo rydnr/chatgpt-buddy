@@ -34,3 +34,14 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# TypeScript EDA (embedded repo)
+typescript-eda/
+
+# Claude AI
+.claude/
+
+# Monorepo
+.pnpm-debug.log*
+packages/*/dist/
+packages/*/node_modules/

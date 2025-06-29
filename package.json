@@ -1,0 +1,20 @@
+{
+  "name": "chatgpt-buddy",
+  "version": "1.0.0",
+  "description": "This sample demonstrates using the `inspectedWindow` API to collect and use data on the resouces used in a webpage.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rydnr/chatgpt-buddy.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/rydnr/chatgpt-buddy/issues"
+  },
+  "homepage": "https://github.com/rydnr/chatgpt-buddy#readme"
+}
