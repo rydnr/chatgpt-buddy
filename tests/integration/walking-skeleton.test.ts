@@ -35,8 +35,8 @@
  *   - Events: PingEvent and PongEvent
  */
 
-import { createApp } from '@chatgpt-buddy/server/src/infrastructure/express-app';
-import { ChatGPTBuddyClient } from '@chatgpt-buddy/client-ts/src/client';
+import { createApp } from '../../packages/chatgpt-buddy-server/src/infrastructure/express-app';
+import { ChatGPTBuddyClient } from '../../packages/chatgpt-buddy-client-ts/src/client';
 import { Server } from 'http';
 
 describe('Walking Skeleton End-to-End Tests', () => {
