@@ -1,28 +1,24 @@
 {
   "compilerOptions": {
-    "target": "es2018",
-    "module": "esnext",
-    "lib": [
-      "es2018",
-      "dom"
-    ],
-    "jsx": "react-jsx",
+    "target": "ES2020",
+    "module": "ES2020",
+    "lib": ["ES2020", "DOM"],
+    "outDir": "./build",
+    "rootDir": "./src",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "moduleResolution": "node",
     "resolveJsonModule": true,
-    "isolatedModules": true,
-    "noEmit": true
+    "allowSyntheticDefaultImports": true,
+    "types": ["chrome"]
   },
   "include": [
-    ".plasmo/index.d.ts",
-    "src/**/*.ts",
-    "src/**/*.tsx",
-    "../shared/**/*.ts"
+    "src/**/*.ts"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    "build"
   ]
 }

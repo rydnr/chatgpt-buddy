@@ -36,6 +36,8 @@
 
 const express = require('express');
 import { Request, Response, Application } from 'express';
+import { Server } from 'http';
+import { WebSocketServer } from 'ws';
 import { PingEvent } from '../../../chatgpt-buddy-core/src/events/ping.event';
 import { PingHandler } from '../domain/ping.handler';
 
@@ -117,6 +119,9 @@ interface PingRequest {
   message: string;
   correlationId: string;
 }
+
+// Store WebSocket connections for browser extensions
+const extensionConnections = new Map<string, any>();
 
 /**
  * Creates and configures the Express application with all routes and middleware
@@ -602,4 +607,110 @@ export function createApp(): Application {
   });
 
   return app;
+}
+
+/**
+ * Creates server with WebSocket support for browser extension communication
+ * 
+ * @param port Port to listen on
+ * @returns HTTP server with WebSocket support
+ */
+export function createServerWithWebSocket(port: number): Server {
+  const app = createApp();
+  const server = new Server(app);
+  
+  // Create WebSocket server
+  const wsServer = new WebSocketServer({ 
+    server,
+    path: '/ws'
+  });
+  
+  wsServer.on('connection', (ws, request) => {
+    console.log('🔌 Browser extension connected to WebSocket');
+    let extensionId: string | null = null;
+    
+    ws.on('message', (data) => {
+      try {
+        const message = JSON.parse(data.toString());
+        console.log('📨 Received from extension:', message);
+        
+        // Handle extension registration
+        if (message.type === 'extensionRegistered') {
+          extensionId = message.payload.extensionId;
+          extensionConnections.set(extensionId, ws);
+          console.log(`✅ Extension registered: ${extensionId}`);
+          
+          // Send acknowledgment
+          ws.send(JSON.stringify({
+            type: 'registrationAck',
+            correlationId: message.correlationId,
+            payload: {
+              status: 'registered',
+              extensionId: extensionId
+            }
+          }));
+        }
+        
+        // Handle heartbeat
+        else if (message.type === 'heartbeat') {
+          ws.send(JSON.stringify({
+            type: 'heartbeatAck',
+            correlationId: message.correlationId,
+            timestamp: new Date().toISOString()
+          }));
+        }
+        
+        // Handle automation responses from extension
+        else if (message.correlationId && message.status) {
+          console.log('✅ Automation response from extension:', message);
+          // In a real implementation, this would be forwarded back to the waiting client
+        }
+        
+        // Handle other message types
+        else {
+          console.log('⚠️ Unknown message type from extension:', message.type);
+        }
+        
+      } catch (error) {
+        console.error('❌ Error parsing WebSocket message:', error);
+      }
+    });
+    
+    ws.on('close', () => {
+      if (extensionId) {
+        extensionConnections.delete(extensionId);
+        console.log(`🔌 Extension disconnected: ${extensionId}`);
+      }
+    });
+    
+    ws.on('error', (error) => {
+      console.error('❌ WebSocket error:', error);
+    });
+  });
+  
+  // Start server
+  server.listen(port, () => {
+    console.log(`🚀 Server running on port ${port} with WebSocket support`);
+  });
+  
+  return server;
+}
+
+/**
+ * Send automation command to browser extension
+ * 
+ * @param extensionId Target extension ID
+ * @param message Automation message to send
+ */
+export function sendToExtension(extensionId: string, message: any): boolean {
+  const ws = extensionConnections.get(extensionId);
+  
+  if (ws && ws.readyState === ws.OPEN) {
+    ws.send(JSON.stringify(message));
+    console.log(`📤 Sent message to extension ${extensionId}:`, message);
+    return true;
+  } else {
+    console.error(`❌ Extension ${extensionId} not connected or not ready`);
+    return false;
+  }
 }
