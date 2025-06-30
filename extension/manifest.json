@@ -4,17 +4,22 @@
   "version": "1.0",
   "description": "A browser extension to programmatically interact with ChatGPT tabs.",
   "background": {
-    "service_worker": "src/background.ts"
+    "service_worker": "build/background.js"
   },
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["src/content_script.ts"]
+      "js": ["build/storage.js", "build/content_script.js"]
     }
   ],
+  "action": {
+    "default_popup": "src/popup.html",
+    "default_title": "Web-Buddy Extension"
+  },
   "permissions": [
     "activeTab",
-    "scripting"
+    "scripting",
+    "storage"
   ],
   "host_permissions": [
     "<all_urls>"

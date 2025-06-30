@@ -1,10 +1,8 @@
-// Web-Buddy content script for DOM automation
-// Handles automation commands from the background script
-
-import { webBuddyStorage, AutomationPattern, UserInteraction } from './storage';
+// Web-Buddy content script for DOM automation with IndexedDB storage
+// Handles automation commands from the background script and persists patterns
 
 // Store test data for E2E testing
-(window as any).extensionTestData = {
+window.extensionTestData = {
   lastReceivedMessage: null,
   lastResponse: null,
   webSocketMessages: []
@@ -15,13 +13,45 @@ const sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 
 const currentDomain = window.location.hostname;
 const currentUrl = window.location.href;
 
-chrome.runtime.onMessage.addListener(async (message: any, sender, sendResponse) => {
+console.log('🚀 Web-Buddy content script with storage loaded on:', window.location.href);
+
+// Wait for storage to initialize and add debugging
+let storageCheckAttempts = 0;
+const maxStorageCheckAttempts = 10;
+
+function checkStorageReady() {
+  storageCheckAttempts++;
+  console.log(`💾 Storage check attempt ${storageCheckAttempts}:`, !!window.webBuddyStorage);
+  
+  if (window.webBuddyStorage) {
+    console.log('✅ Storage system ready');
+    return true;
+  } else if (storageCheckAttempts < maxStorageCheckAttempts) {
+    setTimeout(checkStorageReady, 500);
+    return false;
+  } else {
+    console.error('❌ Storage system failed to initialize after 5 seconds');
+    return false;
+  }
+}
+
+// Start storage check
+setTimeout(checkStorageReady, 100);
+
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   console.log('📨 Content script received message:', message);
   
   // Store for E2E testing
-  (window as any).extensionTestData.lastReceivedMessage = message;
+  window.extensionTestData.lastReceivedMessage = message;
   
-  let response: any;
+  // Handle the message asynchronously
+  handleMessageAsync(message, sender, sendResponse);
+  
+  return true; // Keep message channel open for async responses
+});
+
+async function handleMessageAsync(message, sender, sendResponse) {
+  let response;
 
   try {
     // Handle different event types
@@ -36,7 +66,7 @@ chrome.runtime.onMessage.addListener(async (message: any, sender, sendResponse) 
       response = await handleLegacyAction(message);
     }
     
-  } catch (error: any) {
+  } catch (error) {
     console.error('❌ Error in content script:', error);
     response = {
       correlationId: message.correlationId,
@@ -47,24 +77,33 @@ chrome.runtime.onMessage.addListener(async (message: any, sender, sendResponse) 
   }
 
   // Store response for E2E testing
-  (window as any).extensionTestData.lastResponse = response;
+  window.extensionTestData.lastResponse = response;
   
   // Persist automation pattern if it was successful
-  if (response.status === 'success' && message.type === 'automationRequested') {
-    await persistAutomationPattern(message, response);
+  if (response && response.status === 'success' && message.type === 'automationRequested') {
+    try {
+      await persistAutomationPattern(message, response);
+    } catch (persistError) {
+      console.error('❌ Failed to persist pattern:', persistError);
+    }
   }
   
+  console.log('📤 Content script sending response:', response);
   sendResponse(response);
-  return true; // Keep message channel open for async responses
-});
+}
 
 // Helper function to persist automation patterns
-async function persistAutomationPattern(message: any, response: any): Promise<void> {
+async function persistAutomationPattern(message, response) {
   try {
+    if (!window.webBuddyStorage) {
+      console.warn('⚠️ Storage not available, skipping pattern persistence');
+      return;
+    }
+    
     const { payload } = message;
     const { action, parameters } = payload;
     
-    const pattern: Omit<AutomationPattern, 'id' | 'timestamp'> = {
+    const pattern = {
       url: currentUrl,
       domain: currentDomain,
       action: action,
@@ -75,7 +114,7 @@ async function persistAutomationPattern(message: any, response: any): Promise<vo
       userConfirmed: false // Will be updated when user confirms the pattern
     };
 
-    await webBuddyStorage.saveAutomationPattern(pattern);
+    await window.webBuddyStorage.saveAutomationPattern(pattern);
     console.log('💾 Automation pattern persisted:', action);
   } catch (error) {
     console.error('❌ Failed to persist automation pattern:', error);
@@ -83,9 +122,14 @@ async function persistAutomationPattern(message: any, response: any): Promise<vo
 }
 
 // Helper function to save user interactions
-async function saveUserInteraction(eventType: string, target: string, success: boolean, context: Record<string, any> = {}): Promise<void> {
+async function saveUserInteraction(eventType, target, success, context = {}) {
   try {
-    const interaction: Omit<UserInteraction, 'id' | 'timestamp'> = {
+    if (!window.webBuddyStorage) {
+      console.warn('⚠️ Storage not available, skipping interaction save');
+      return;
+    }
+    
+    const interaction = {
       sessionId,
       url: currentUrl,
       domain: currentDomain,
@@ -102,7 +146,7 @@ async function saveUserInteraction(eventType: string, target: string, success: b
       }
     };
 
-    await webBuddyStorage.saveUserInteraction(interaction);
+    await window.webBuddyStorage.saveUserInteraction(interaction);
     console.log('📊 User interaction saved:', eventType);
   } catch (error) {
     console.error('❌ Failed to save user interaction:', error);
@@ -110,13 +154,13 @@ async function saveUserInteraction(eventType: string, target: string, success: b
 }
 
 // Generate context hash for pattern matching
-function generateContextHash(): string {
+function generateContextHash() {
   const context = {
     domain: currentDomain,
     path: window.location.pathname,
     title: document.title,
     bodyClasses: Array.from(document.body.classList).sort().join(' '),
-    metaDescription: (document.querySelector('meta[name="description"]') as HTMLMetaElement)?.content || '',
+    metaDescription: (document.querySelector('meta[name="description"]'))?.content || '',
     elementCount: document.querySelectorAll('*').length
   };
   
@@ -124,34 +168,40 @@ function generateContextHash(): string {
 }
 
 // Enhanced automation handler with pattern matching
-async function handleAutomationRequest(message: any): Promise<any> {
+async function handleAutomationRequest(message) {
   const { payload, correlationId } = message;
   const { action, parameters } = payload;
   
   console.log(`🎯 Executing automation: ${action}`, parameters);
   
   // Check for existing patterns for this action
-  const existingPatterns = await webBuddyStorage.getAutomationPatterns({
-    domain: currentDomain,
-    action: action,
-    successOnly: true,
-    limit: 5
-  });
-  
-  if (existingPatterns.length > 0) {
-    console.log(`📚 Found ${existingPatterns.length} existing patterns for ${action}`);
-    
-    // Try to apply the most successful pattern first
-    for (const pattern of existingPatterns) {
-      try {
-        const result = await applyAutomationPattern(pattern, parameters, correlationId);
-        if (result.status === 'success') {
-          console.log('✅ Applied existing pattern successfully');
-          return result;
+  if (window.webBuddyStorage) {
+    try {
+      const existingPatterns = await window.webBuddyStorage.getAutomationPatterns({
+        domain: currentDomain,
+        action: action,
+        successOnly: true,
+        limit: 5
+      });
+      
+      if (existingPatterns.length > 0) {
+        console.log(`📚 Found ${existingPatterns.length} existing patterns for ${action}`);
+        
+        // Try to apply the most successful pattern first
+        for (const pattern of existingPatterns) {
+          try {
+            const result = await applyAutomationPattern(pattern, parameters, correlationId);
+            if (result.status === 'success') {
+              console.log('✅ Applied existing pattern successfully');
+              return result;
+            }
+          } catch (error) {
+            console.log('⚠️ Existing pattern failed, trying next...');
+          }
         }
-      } catch (error) {
-        console.log('⚠️ Existing pattern failed, trying next...');
       }
+    } catch (error) {
+      console.warn('⚠️ Error checking existing patterns:', error);
     }
   }
   
@@ -160,15 +210,15 @@ async function handleAutomationRequest(message: any): Promise<any> {
 }
 
 // Apply an existing automation pattern
-async function applyAutomationPattern(pattern: AutomationPattern, newParameters: any, correlationId: string): Promise<any> {
+async function applyAutomationPattern(pattern, newParameters, correlationId) {
   // Merge pattern parameters with new parameters (new parameters take precedence)
   const mergedParameters = { ...pattern.parameters, ...newParameters };
   
   return handleStandardAction(pattern.action, mergedParameters, correlationId);
 }
 
-// Standard action handler (existing logic)
-async function handleStandardAction(action: string, parameters: any, correlationId: string): Promise<any> {
+// Standard action handler
+async function handleStandardAction(action, parameters, correlationId) {
   try {
     switch (action) {
       case 'fillInput':
@@ -186,7 +236,7 @@ async function handleStandardAction(action: string, parameters: any, correlation
       default:
         throw new Error(`Unknown automation action: ${action}`);
     }
-  } catch (error: any) {
+  } catch (error) {
     return {
       correlationId,
       status: 'error',
@@ -196,10 +246,10 @@ async function handleStandardAction(action: string, parameters: any, correlation
   }
 }
 
-async function handleFillInput(parameters: any, correlationId: string): Promise<any> {
+async function handleFillInput(parameters, correlationId) {
   const { selector, value } = parameters;
   
-  const element = document.querySelector(selector) as HTMLInputElement;
+  const element = document.querySelector(selector);
   if (!element) {
     // Save failed interaction
     await saveUserInteraction('fillInput', selector, false, { 
@@ -247,10 +297,10 @@ async function handleFillInput(parameters: any, correlationId: string): Promise<
   };
 }
 
-async function handleClickElement(parameters: any, correlationId: string): Promise<any> {
+async function handleClickElement(parameters, correlationId) {
   const { selector } = parameters;
   
-  const element = document.querySelector(selector) as HTMLElement;
+  const element = document.querySelector(selector);
   if (!element) {
     // Save failed interaction
     await saveUserInteraction('clickElement', selector, false, { 
@@ -265,8 +315,8 @@ async function handleClickElement(parameters: any, correlationId: string): Promi
     text: element.textContent?.slice(0, 100) || '',
     className: element.className,
     id: element.id,
-    href: (element as HTMLAnchorElement).href || undefined,
-    disabled: (element as HTMLButtonElement).disabled || false
+    href: element.href || undefined,
+    disabled: element.disabled || false
   };
   
   // Perform the click
@@ -291,7 +341,7 @@ async function handleClickElement(parameters: any, correlationId: string): Promi
   };
 }
 
-async function handleGetText(parameters: any, correlationId: string): Promise<any> {
+async function handleGetText(parameters, correlationId) {
   const { selector } = parameters;
   
   const element = document.querySelector(selector);
@@ -326,7 +376,7 @@ async function handleGetText(parameters: any, correlationId: string): Promise<an
   };
 }
 
-async function handleTestAction(parameters: any, correlationId: string): Promise<any> {
+async function handleTestAction(parameters, correlationId) {
   // Simple test action for E2E verification
   
   // Save test interaction
@@ -349,28 +399,27 @@ async function handleTestAction(parameters: any, correlationId: string): Promise
   };
 }
 
-function handlePingMessage(message: any): any {
-  return {
-    type: 'pong',
-    correlationId: message.correlationId,
-    payload: {
-      originalMessage: message.payload || 'ping',
-      url: window.location.href,
-      title: document.title,
-      timestamp: new Date().toISOString()
-    }
-  };
-}
-
-async function handleStorageRequest(message: any): Promise<any> {
+async function handleStorageRequest(message) {
   const { action, payload, correlationId } = message;
   
-  console.log(`💾 Handling storage request: ${action}`);
+  console.log(`💾 Handling storage request: ${action}`, message);
+  console.log(`💾 Storage available:`, !!window.webBuddyStorage);
+  console.log(`💾 Storage DB state:`, window.webBuddyStorage?.db ? 'ready' : 'not ready');
+  
+  if (!window.webBuddyStorage) {
+    console.error('❌ Storage system not available');
+    return {
+      correlationId,
+      success: false,
+      error: 'Storage system not available',
+      timestamp: new Date().toISOString()
+    };
+  }
   
   try {
     switch (action) {
       case 'getStorageStats':
-        const stats = await webBuddyStorage.getStorageStats();
+        const stats = await window.webBuddyStorage.getStorageStats();
         return {
           correlationId,
           success: true,
@@ -379,7 +428,7 @@ async function handleStorageRequest(message: any): Promise<any> {
         };
       
       case 'getAutomationPatterns':
-        const patterns = await webBuddyStorage.getAutomationPatterns({
+        const patterns = await window.webBuddyStorage.getAutomationPatterns({
           domain: currentDomain,
           limit: payload.limit || 10
         });
@@ -391,7 +440,7 @@ async function handleStorageRequest(message: any): Promise<any> {
         };
       
       case 'clearOldData':
-        await webBuddyStorage.clearOldData(payload.days || 30);
+        await window.webBuddyStorage.clearOldData(payload.days || 30);
         return {
           correlationId,
           success: true,
@@ -402,7 +451,7 @@ async function handleStorageRequest(message: any): Promise<any> {
       default:
         throw new Error(`Unknown storage action: ${action}`);
     }
-  } catch (error: any) {
+  } catch (error) {
     console.error('❌ Storage request failed:', error);
     return {
       correlationId,
@@ -413,7 +462,7 @@ async function handleStorageRequest(message: any): Promise<any> {
   }
 }
 
-async function handleLegacyAction(message: any): Promise<any> {
+async function handleLegacyAction(message) {
   // Handle legacy action-based messages for backward compatibility
   const { action, correlationId } = message;
   
@@ -433,11 +482,40 @@ async function handleLegacyAction(message: any): Promise<any> {
   };
 }
 
-// Notify background script that content script is ready
-chrome.runtime.sendMessage({ 
-  type: "CONTENT_SCRIPT_READY", 
-  url: window.location.href,
-  timestamp: new Date().toISOString()
-});
+function handlePingMessage(message) {
+  return {
+    type: 'pong',
+    correlationId: message.correlationId,
+    payload: {
+      originalMessage: message.payload || 'ping',
+      url: window.location.href,
+      title: document.title,
+      timestamp: new Date().toISOString()
+    }
+  };
+}
 
-console.log('🚀 Web-Buddy content script loaded on:', window.location.href);
+// Notify background script that content script is ready
+function notifyBackgroundReady() {
+  chrome.runtime.sendMessage({ 
+    type: "CONTENT_SCRIPT_READY", 
+    url: window.location.href,
+    timestamp: new Date().toISOString(),
+    storageReady: !!window.webBuddyStorage
+  }, (response) => {
+    if (chrome.runtime.lastError) {
+      console.log('📨 Background script not ready yet:', chrome.runtime.lastError.message);
+    } else {
+      console.log('✅ Background script notified of content script readiness');
+    }
+  });
+}
+
+// Send ready notification after storage is initialized
+setTimeout(() => {
+  notifyBackgroundReady();
+  // Send again after a delay to ensure background script is ready
+  setTimeout(notifyBackgroundReady, 2000);
+}, 1000);
+
+console.log('🚀 Web-Buddy content script with IndexedDB storage loaded on:', window.location.href);
