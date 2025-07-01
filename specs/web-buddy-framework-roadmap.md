@@ -375,9 +375,259 @@ test.describe('Google Search Automation', () => {
 });
 ```
 
-### Phase 4: Documentation and Examples (Week 4)
+### Phase 4: Interactive Training System (Week 4)
 
-#### 4.1 Architecture Decision Records
+#### 4.1 Training Mode Infrastructure
+**Core Training Components:**
+```typescript
+// web-buddy-core/training/training-session.ts
+export interface TrainingSession {
+  readonly id: string;
+  readonly mode: 'training' | 'automatic';
+  readonly website: string;
+  readonly startedAt: Date;
+  readonly patterns: ReadonlyArray<AutomationPattern>;
+}
+
+export interface AutomationPattern {
+  readonly id: string;
+  readonly messageType: string;
+  readonly payload: Record<string, any>;
+  readonly elementSelector: string;
+  readonly context: {
+    readonly url: string;
+    readonly title: string;
+    readonly timestamp: Date;
+  };
+  readonly confidence: number;
+  readonly usageCount: number;
+}
+
+export class TrainingSessionManager {
+  private currentSession: TrainingSession | null = null;
+  
+  async startTrainingMode(website: string): Promise<TrainingSession> {
+    this.currentSession = {
+      id: this.generateSessionId(),
+      mode: 'training',
+      website,
+      startedAt: new Date(),
+      patterns: []
+    };
+    
+    await this.persistSession();
+    return this.currentSession;
+  }
+  
+  async learnPattern(
+    messageType: string, 
+    payload: Record<string, any>, 
+    selectedElement: Element
+  ): Promise<AutomationPattern> {
+    const pattern: AutomationPattern = {
+      id: this.generatePatternId(),
+      messageType,
+      payload,
+      elementSelector: this.generateSelector(selectedElement),
+      context: {
+        url: window.location.href,
+        title: document.title,
+        timestamp: new Date()
+      },
+      confidence: 1.0,
+      usageCount: 0
+    };
+    
+    await this.storePattern(pattern);
+    return pattern;
+  }
+}
+```
+
+#### 4.2 Interactive UI System
+**Excel-like Element Selection:**
+```typescript
+// web-buddy-core/training/ui-overlay.ts
+export class InteractiveTrainingOverlay {
+  private overlay: HTMLElement | null = null;
+  private isSelectionMode = false;
+  
+  showTrainingPrompt(messageType: string, payload: Record<string, any>): void {
+    const element = payload.element || 'element';
+    const value = payload.value || '';
+    
+    this.createOverlay(`
+      <div class="training-prompt">
+        <h3>🎯 Training Mode Active</h3>
+        <p>Received <code>${messageType}</code> for the <strong>${element}</strong> element
+           ${value ? `to fill with <em>"${value}"</em>` : ''}.</p>
+        <p><strong>Please click on the <em>${element}</em> element you want to automate.</strong></p>
+        <button onclick="this.cancelTraining()">Cancel</button>
+      </div>
+    `);
+    
+    this.enableElementSelection();
+  }
+  
+  private enableElementSelection(): void {
+    this.isSelectionMode = true;
+    document.body.style.cursor = 'crosshair';
+    
+    document.addEventListener('click', this.handleElementSelection.bind(this), true);
+    document.addEventListener('mouseover', this.highlightElement.bind(this), true);
+    document.addEventListener('mouseout', this.unhighlightElement.bind(this), true);
+  }
+  
+  private async handleElementSelection(event: MouseEvent): Promise<void> {
+    event.preventDefault();
+    event.stopPropagation();
+    
+    const selectedElement = event.target as Element;
+    const selector = this.generateOptimalSelector(selectedElement);
+    
+    this.showConfirmationDialog(selectedElement, selector);
+  }
+  
+  private showConfirmationDialog(element: Element, selector: string): void {
+    this.updateOverlay(`
+      <div class="training-confirmation">
+        <h3>✅ Element Selected</h3>
+        <p>Selected element: <code>${element.tagName.toLowerCase()}</code></p>
+        <p>Generated selector: <code>${selector}</code></p>
+        <p><strong>Do you want to automate this response for future 
+           <code>${this.currentMessageType}</code> events in this tab?</strong></p>
+        <div class="actions">
+          <button onclick="this.confirmPattern()" class="primary">Yes, Automate</button>
+          <button onclick="this.selectDifferentElement()">Select Different Element</button>
+          <button onclick="this.cancelTraining()">Cancel</button>
+        </div>
+      </div>
+    `);
+  }
+}
+```
+
+#### 4.3 Pattern Learning Engine
+**Smart Pattern Matching:**
+```typescript
+// web-buddy-core/training/pattern-matcher.ts
+export class PatternMatcher {
+  private patterns: Map<string, AutomationPattern[]> = new Map();
+  
+  async findMatchingPattern(
+    messageType: string, 
+    payload: Record<string, any>
+  ): Promise<AutomationPattern | null> {
+    const candidates = this.patterns.get(messageType) || [];
+    
+    for (const pattern of candidates) {
+      const similarity = this.calculateSimilarity(payload, pattern.payload);
+      const contextMatch = this.isContextMatching(pattern.context);
+      
+      if (similarity > 0.8 && contextMatch) {
+        pattern.usageCount++;
+        await this.updatePattern(pattern);
+        return pattern;
+      }
+    }
+    
+    return null;
+  }
+  
+  private calculateSimilarity(
+    current: Record<string, any>, 
+    stored: Record<string, any>
+  ): number {
+    const currentKeys = Object.keys(current);
+    const storedKeys = Object.keys(stored);
+    
+    // Exact match for element references
+    if (current.element && stored.element) {
+      return current.element === stored.element ? 1.0 : 0.0;
+    }
+    
+    // Fuzzy match for other payloads
+    const commonKeys = currentKeys.filter(key => storedKeys.includes(key));
+    const matchScore = commonKeys.length / Math.max(currentKeys.length, storedKeys.length);
+    
+    return matchScore;
+  }
+  
+  private isContextMatching(storedContext: AutomationPattern['context']): boolean {
+    // Same domain and similar page structure
+    const currentUrl = new URL(window.location.href);
+    const storedUrl = new URL(storedContext.url);
+    
+    return currentUrl.hostname === storedUrl.hostname && 
+           currentUrl.pathname === storedUrl.pathname;
+  }
+}
+```
+
+#### 4.4 TDD Walking Skeleton Implementation
+**Test-Driven Development Approach:**
+```typescript
+// test/training/training-system.spec.ts
+describe('Interactive Training System - Walking Skeleton', () => {
+  test('🔴 RED: Should show training UI when message received in training mode', async () => {
+    // GIVEN: Training mode is enabled
+    const trainingManager = new TrainingSessionManager();
+    await trainingManager.startTrainingMode('example.com');
+    
+    // WHEN: FillTextRequested message is received
+    const message = {
+      type: 'FillTextRequested',
+      payload: { element: 'Search', value: 'TypeScript patterns' }
+    };
+    
+    // THEN: Training UI should appear
+    const overlay = document.querySelector('.training-prompt');
+    expect(overlay).toBeNull(); // 🔴 RED - Not implemented yet
+  });
+  
+  test('🟢 GREEN: Should capture element selector when user clicks', async () => {
+    // GIVEN: Training UI is showing element selection
+    const overlay = new InteractiveTrainingOverlay();
+    overlay.showTrainingPrompt('FillTextRequested', {
+      element: 'Search',
+      value: 'TypeScript patterns'
+    });
+    
+    // WHEN: User clicks on an input element
+    const searchInput = document.createElement('input');
+    searchInput.id = 'search-box';
+    document.body.appendChild(searchInput);
+    
+    const clickEvent = new MouseEvent('click', { target: searchInput });
+    
+    // THEN: Element selector should be captured
+    // 🟢 GREEN - Minimal implementation
+    expect(true).toBe(true); // Placeholder for actual implementation
+  });
+  
+  test('🔵 REFACTOR: Should store pattern after user confirmation', async () => {
+    // GIVEN: User has selected an element and confirmed
+    const trainingManager = new TrainingSessionManager();
+    const selectedElement = document.createElement('input');
+    
+    // WHEN: User confirms the pattern
+    const pattern = await trainingManager.learnPattern(
+      'FillTextRequested',
+      { element: 'Search', value: 'TypeScript patterns' },
+      selectedElement
+    );
+    
+    // THEN: Pattern should be stored with proper metadata
+    expect(pattern.messageType).toBe('FillTextRequested');
+    expect(pattern.elementSelector).toContain('input');
+    expect(pattern.confidence).toBe(1.0);
+  });
+});
+```
+
+### Phase 5: Documentation and Examples (Week 5)
+
+#### 5.1 Architecture Decision Records
 ```markdown
 # ADR-001: Layered Client Architecture
 
@@ -398,45 +648,211 @@ Implement three-layer architecture:
 - Positive: Easy to add new websites without changing core
 - Negative: Slight complexity increase
 - Mitigation: Clear documentation and examples
+
+# ADR-002: Interactive Training System
+
+## Status
+Accepted
+
+## Context
+Users need an intuitive way to teach the system how to handle automation requests without writing code.
+
+## Decision
+Implement Excel-like element selection with guided UI:
+1. Training mode toggle for switching between automatic and guided execution
+2. Interactive overlay system for user guidance and feedback
+3. Pattern learning engine for storing and reusing user selections
+4. Smart pattern matching for automatic execution of learned behaviors
+
+## Consequences
+- Positive: Dramatically improves user experience and adoption
+- Positive: Enables non-technical users to create automation patterns
+- Positive: Reduces setup time for new websites
+- Negative: Increases system complexity and UI maintenance burden
+- Mitigation: Comprehensive testing and clear separation of training components
 ```
 
-#### 4.2 Implementation Guide
+#### 5.2 Training-Enabled Implementation Guide
 ```markdown
-# Adding a New Website to Web-Buddy
+# Adding a New Website to Web-Buddy with Training Support
 
-## 1. Define Messages
+## 1. Define Messages with Training Metadata
 ```typescript
 export const YourSiteMessages = {
-  YOUR_ACTION: 'YOUR_ACTION'
+  YOUR_ACTION: 'YOUR_ACTION',
+  TRAINING_MODE_REQUESTED: 'TRAINING_MODE_REQUESTED'
 } as const;
+
+export interface YourActionMessage {
+  type: 'YOUR_ACTION';
+  payload: {
+    element: string;       // Human-readable element name
+    value?: string;        // Optional value to fill/use
+    description?: string;  // Training description
+  };
+  correlationId: string;
+  trainingEnabled?: boolean;
+}
 ```
 
-## 2. Implement Handlers
+## 2. Implement Training-Aware Handlers
 ```typescript
 export class YourSiteHandler implements MessageHandler {
+  constructor(
+    private trainingManager: TrainingSessionManager,
+    private patternMatcher: PatternMatcher
+  ) {}
+
   async handle(message: WebBuddyMessage): Promise<any> {
-    // Site-specific DOM manipulation
+    // Check if we have a learned pattern
+    const existingPattern = await this.patternMatcher.findMatchingPattern(
+      message.type, 
+      message.payload
+    );
+    
+    if (existingPattern) {
+      // Execute using learned pattern
+      return this.executeWithPattern(existingPattern, message);
+    }
+    
+    // Check if training mode is enabled
+    if (this.trainingManager.isTrainingMode()) {
+      // Show interactive training UI
+      return this.startTrainingFlow(message);
+    }
+    
+    // Fall back to manual implementation
+    return this.executeManually(message);
+  }
+  
+  private async startTrainingFlow(message: WebBuddyMessage): Promise<any> {
+    const overlay = new InteractiveTrainingOverlay();
+    overlay.showTrainingPrompt(message.type, message.payload);
+    
+    // Wait for user to select element and confirm
+    const pattern = await overlay.waitForUserSelection();
+    
+    // Store the learned pattern
+    await this.trainingManager.learnPattern(
+      message.type,
+      message.payload,
+      pattern.element
+    );
+    
+    // Execute the action now
+    return this.executeWithElement(pattern.element, message.payload);
   }
 }
 ```
 
-## 3. Create Client Wrapper
+## 3. Create Training-Enabled Client Wrapper
 ```typescript
 export class YourSiteClient {
-  async yourAction(): Promise<any> {
-    return this.webBuddyClient.sendMessage({
-      [YourSiteMessages.YOUR_ACTION]: {}
+  constructor(
+    private webBuddyClient: WebBuddyClient,
+    private trainingEnabled = false
+  ) {}
+  
+  async enableTrainingMode(): Promise<void> {
+    this.trainingEnabled = true;
+    await this.webBuddyClient.sendMessage({
+      [YourSiteMessages.TRAINING_MODE_REQUESTED]: { enabled: true }
     });
+  }
+  
+  async yourAction(element: string, value?: string): Promise<any> {
+    return this.webBuddyClient.sendMessage({
+      [YourSiteMessages.YOUR_ACTION]: { 
+        element, 
+        value,
+        description: `Perform action on ${element}${value ? ` with value ${value}` : ''}`
+      },
+      trainingEnabled: this.trainingEnabled
+    });
+  }
+  
+  // Convenience method for guided setup
+  async learnYourAction(element: string, value?: string): Promise<any> {
+    await this.enableTrainingMode();
+    return this.yourAction(element, value);
   }
 }
 ```
 
-## 4. Write ATDD Tests
+## 4. Write Training-Enabled ATDD Tests
 ```typescript
-test('should automate your site', async ({ page }) => {
-  const client = new YourSiteClient(webBuddyClient);
-  await client.yourAction();
-  // Verify browser state
+describe('YourSite Training Integration', () => {
+  test('should learn automation patterns through guided UI', async ({ page }) => {
+    // GIVEN: Training-enabled client and fresh browser
+    const client = new YourSiteClient(webBuddyClient, true);
+    await page.goto('https://yoursite.com');
+    
+    // WHEN: First time automation request with training
+    await client.learnYourAction('Search Input', 'test query');
+    
+    // THEN: Training UI should appear
+    await expect(page.locator('.training-prompt')).toBeVisible();
+    await expect(page.locator('.training-prompt')).toContainText(
+      'Please click on the Search Input element'
+    );
+    
+    // WHEN: User clicks on actual search input
+    await page.locator('input[name="search"]').click();
+    
+    // THEN: Confirmation dialog should appear
+    await expect(page.locator('.training-confirmation')).toBeVisible();
+    await expect(page.locator('.training-confirmation')).toContainText(
+      'Do you want to automate this response'
+    );
+    
+    // WHEN: User confirms automation
+    await page.locator('button:has-text("Yes, Automate")').click();
+    
+    // THEN: Action should be executed and pattern stored
+    await expect(page.locator('input[name="search"]')).toHaveValue('test query');
+  });
+  
+  test('should auto-execute learned patterns on subsequent requests', async ({ page }) => {
+    // GIVEN: Pattern already learned (from previous test)
+    const client = new YourSiteClient(webBuddyClient, false); // Training disabled
+    await page.goto('https://yoursite.com');
+    
+    // WHEN: Same automation request without training
+    await client.yourAction('Search Input', 'another query');
+    
+    // THEN: Should execute automatically without training UI
+    await expect(page.locator('.training-prompt')).not.toBeVisible();
+    await expect(page.locator('input[name="search"]')).toHaveValue('another query');
+  });
+});
+```
+
+## 5. Training Pattern Examples
+```typescript
+// Example: E-commerce site automation
+const ecommerceClient = new EcommerceClient(webBuddyClient, true);
+
+// First time - shows training UI
+await ecommerceClient.learnAddToCart('Product Name', 'Blue Shirt');
+// User clicks on "Add to Cart" button, pattern gets stored
+
+// Subsequent times - automatic execution
+await ecommerceClient.addToCart('Product Name', 'Red Shirt');
+// Automatically uses learned button selector
+
+// Example: Form filling automation
+const formClient = new FormClient(webBuddyClient, true);
+
+// Train multiple fields in sequence
+await formClient.learnFillField('First Name', 'John');
+await formClient.learnFillField('Last Name', 'Doe');  
+await formClient.learnFillField('Email', 'john@example.com');
+
+// Later - automatic form filling
+await formClient.fillForm({
+  'First Name': 'Jane',
+  'Last Name': 'Smith', 
+  'Email': 'jane@example.com'
 });
 ```
 ```
