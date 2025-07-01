@@ -1,6 +1,9 @@
 // Browser extension background script for Web-Buddy integration
 // Handles WebSocket communication with Web-Buddy server
 
+import { globalMessageStore, messageStoreActions } from './message-store.js';
+import { globalTimeTravelUI } from './time-travel-ui.js';
+
 let DEFAULT_SERVER_URL = 'ws://localhost:3003/ws';
 let ws: WebSocket | null = null;
 let extensionId: string = '';
@@ -71,7 +74,7 @@ function connectWebSocket(serverUrl?: string) {
     startHeartbeat();
   };
 
-  ws.onmessage = (event) => {
+  ws.onmessage = async (event) => {
     try {
       const message = JSON.parse(event.data);
       console.log('📨 Received message from server:', message);
@@ -83,18 +86,24 @@ function connectWebSocket(serverUrl?: string) {
       (globalThis as any).extensionTestData.lastReceivedMessage = message;
       (globalThis as any).extensionTestData.webSocketMessages.push(message);
       
-      // Handle different message types
-      if (message.type === 'automationRequested') {
-        handleAutomationRequest(message);
-      } else if (message.type === 'ping') {
-        handlePingMessage(message);
-      } else if (message.type === 'registrationAck') {
-        console.log('✅ Registration acknowledged by server');
-        connectionStatus.lastMessage = 'Registered with server';
-        updateStatus();
-      } else {
-        console.log('⚠️ Unknown message type:', message.type);
-      }
+      // Add inbound message to message store for time-travel debugging
+      const metadata = {
+        extensionId: chrome.runtime.id,
+        tabId: message.tabId,
+        windowId: undefined,
+        url: undefined,
+        userAgent: navigator.userAgent
+      };
+      
+      globalMessageStore.addInboundMessage(
+        message.type || 'UNKNOWN_MESSAGE_TYPE',
+        message,
+        message.correlationId || `inbound-${Date.now()}`,
+        metadata
+      );
+      
+      // Handle different message types using double dispatch
+      await messageDispatcher.dispatch(message);
       
     } catch (error) {
       console.error('❌ Error parsing WebSocket message:', error);
@@ -187,65 +196,258 @@ function updateStatus() {
   });
 }
 
-async function handleAutomationRequest(message: any) {
-  try {
-    // Get active tab
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    
-    if (!tab.id) {
-      throw new Error('No active tab found');
+// Message Handler Classes using Double Dispatch Pattern
+abstract class MessageHandler {
+  abstract handle(message: any): Promise<void> | void;
+  
+  // Helper method to send response and track in message store
+  protected sendResponse(response: any, correlationId: string): void {
+    try {
+      // Add outbound message to message store
+      const metadata = {
+        extensionId: chrome.runtime.id,
+        tabId: undefined,
+        windowId: undefined,
+        url: undefined,
+        userAgent: navigator.userAgent
+      };
+      
+      globalMessageStore.addOutboundMessage(
+        response.type || 'RESPONSE',
+        response,
+        correlationId,
+        metadata
+      );
+      
+      // Send WebSocket response
+      ws?.send(JSON.stringify(response));
+      (globalThis as any).extensionTestData.lastResponse = response;
+      
+      // Mark the original message as successful
+      globalMessageStore.markMessageSuccess(correlationId, response);
+      
+      console.log('📤 Response sent and tracked:', response);
+      
+    } catch (error) {
+      console.error('❌ Failed to send response:', error);
+      globalMessageStore.markMessageError(correlationId, error instanceof Error ? error.message : 'Unknown error');
     }
-    
-    // Forward to content script
-    chrome.tabs.sendMessage(tab.id, message, (response) => {
-      if (chrome.runtime.lastError) {
-        console.error('❌ Error sending to content script:', chrome.runtime.lastError.message);
-        
-        const errorResponse = {
-          correlationId: message.correlationId,
-          status: 'error',
-          error: chrome.runtime.lastError.message || 'Content script not reachable',
-          timestamp: new Date().toISOString()
-        };
-        
-        ws?.send(JSON.stringify(errorResponse));
-        (globalThis as any).extensionTestData.lastResponse = errorResponse;
-      } else {
-        console.log('✅ Received response from content script:', response);
-        ws?.send(JSON.stringify(response));
-        (globalThis as any).extensionTestData.lastResponse = response;
-      }
-    });
-    
-  } catch (error) {
-    console.error('❌ Error handling automation request:', error);
-    
+  }
+  
+  // Helper method to send error response and track in message store
+  protected sendErrorResponse(correlationId: string, error: string, additionalData?: any): void {
     const errorResponse = {
-      correlationId: message.correlationId,
+      correlationId,
       status: 'error',
-      error: error instanceof Error ? error.message : 'Unknown error',
-      timestamp: new Date().toISOString()
+      error,
+      timestamp: new Date().toISOString(),
+      ...additionalData
     };
     
-    ws?.send(JSON.stringify(errorResponse));
-    (globalThis as any).extensionTestData.lastResponse = errorResponse;
+    try {
+      // Add outbound error to message store
+      const metadata = {
+        extensionId: chrome.runtime.id,
+        tabId: undefined,
+        windowId: undefined,
+        url: undefined,
+        userAgent: navigator.userAgent
+      };
+      
+      globalMessageStore.addOutboundMessage(
+        'ERROR_RESPONSE',
+        errorResponse,
+        correlationId,
+        metadata
+      );
+      
+      // Send WebSocket error response
+      ws?.send(JSON.stringify(errorResponse));
+      (globalThis as any).extensionTestData.lastResponse = errorResponse;
+      
+      // Mark the original message as failed
+      globalMessageStore.markMessageError(correlationId, error);
+      
+      console.log('📤 Error response sent and tracked:', errorResponse);
+      
+    } catch (sendError) {
+      console.error('❌ Failed to send error response:', sendError);
+    }
   }
 }
 
-function handlePingMessage(message: any) {
-  const pongResponse = {
-    type: 'pong',
-    correlationId: message.correlationId,
-    payload: {
-      originalMessage: message.payload || 'ping',
-      extensionId: extensionId,
-      timestamp: new Date().toISOString()
+class AutomationRequestedHandler extends MessageHandler {
+  async handle(message: any): Promise<void> {
+    try {
+      // Get active tab
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      
+      if (!tab.id) {
+        throw new Error('No active tab found');
+      }
+      
+      // Forward to content script
+      chrome.tabs.sendMessage(tab.id, message, (response) => {
+        if (chrome.runtime.lastError) {
+          console.error('❌ Error sending to content script:', chrome.runtime.lastError.message);
+          this.sendErrorResponse(
+            message.correlationId,
+            chrome.runtime.lastError.message || 'Content script not reachable'
+          );
+        } else {
+          console.log('✅ Received response from content script:', response);
+          this.sendResponse(response, message.correlationId);
+        }
+      });
+      
+    } catch (error) {
+      console.error('❌ Error handling automation request:', error);
+      this.sendErrorResponse(
+        message.correlationId,
+        error instanceof Error ? error.message : 'Unknown error'
+      );
     }
-  };
-  
-  ws?.send(JSON.stringify(pongResponse));
-  (globalThis as any).extensionTestData.lastResponse = pongResponse;
+  }
 }
+
+class TabSwitchRequestedHandler extends MessageHandler {
+  async handle(message: any): Promise<void> {
+    try {
+      const { payload, correlationId } = message;
+      const { title } = payload;
+      
+      console.log(`🔄 Switching to tab with title: "${title}"`);
+      
+      // Query all tabs to find the one with matching title
+      const tabs = await chrome.tabs.query({});
+      console.log(`🔍 Found ${tabs.length} total tabs`);
+      
+      // Find tab with matching title (case-insensitive partial match)
+      const matchingTabs = tabs.filter(tab => 
+        tab.title && tab.title.toLowerCase().includes(title.toLowerCase())
+      );
+      
+      if (matchingTabs.length === 0) {
+        this.sendErrorResponse(
+          correlationId,
+          `No tab found with title containing: "${title}"`,
+          { availableTabs: tabs.map(tab => ({ id: tab.id, title: tab.title, url: tab.url })) }
+        );
+        return;
+      }
+      
+      // Use the first matching tab
+      const targetTab = matchingTabs[0];
+      console.log(`✅ Found matching tab: "${targetTab.title}" (ID: ${targetTab.id})`);
+      
+      // Switch to the tab by updating it (making it active) and focusing its window
+      await chrome.tabs.update(targetTab.id!, { active: true });
+      await chrome.windows.update(targetTab.windowId!, { focused: true });
+      
+      console.log(`🎯 Successfully switched to tab: "${targetTab.title}"`);
+      
+      const successResponse = {
+        correlationId: correlationId,
+        status: 'success',
+        data: {
+          action: 'TabSwitchRequested',
+          switchedTo: {
+            id: targetTab.id,
+            title: targetTab.title,
+            url: targetTab.url,
+            windowId: targetTab.windowId
+          },
+          totalMatches: matchingTabs.length
+        },
+        timestamp: new Date().toISOString()
+      };
+      
+      this.sendResponse(successResponse, correlationId);
+      
+    } catch (error) {
+      console.error('❌ Error handling tab switch request:', error);
+      this.sendErrorResponse(
+        message.correlationId,
+        error instanceof Error ? error.message : 'Unknown tab switch error'
+      );
+    }
+  }
+}
+
+class PingHandler extends MessageHandler {
+  handle(message: any): void {
+    const pongResponse = {
+      type: 'pong',
+      correlationId: message.correlationId,
+      payload: {
+        originalMessage: message.payload || 'ping',
+        extensionId: extensionId,
+        timestamp: new Date().toISOString()
+      }
+    };
+    ws?.send(JSON.stringify(pongResponse));
+    (globalThis as any).extensionTestData.lastResponse = pongResponse;
+  }
+}
+
+class RegistrationAckHandler extends MessageHandler {
+  handle(message: any): void {
+    console.log('✅ Registration acknowledged by server');
+    connectionStatus.lastMessage = 'Registered with server';
+    updateStatus();
+  }
+}
+
+class HeartbeatAckHandler extends MessageHandler {
+  handle(message: any): void {
+    console.log('💓 Heartbeat acknowledged by server');
+    connectionStatus.lastMessage = `Heartbeat (${new Date().toLocaleTimeString()})`;
+    updateStatus();
+  }
+}
+
+class MessageDispatcher {
+  private handlers: Map<string, MessageHandler> = new Map();
+
+  constructor() {
+    this.registerHandlers();
+  }
+
+  private registerHandlers(): void {
+    // Using camel case for consistency
+    this.handlers.set('AutomationRequested', new AutomationRequestedHandler());
+    this.handlers.set('TabSwitchRequested', new TabSwitchRequestedHandler());
+    this.handlers.set('Ping', new PingHandler());
+    this.handlers.set('RegistrationAck', new RegistrationAckHandler());
+    this.handlers.set('HeartbeatAck', new HeartbeatAckHandler());
+    
+    // Keep legacy names for backward compatibility
+    this.handlers.set('automationRequested', new AutomationRequestedHandler());
+    this.handlers.set('ping', new PingHandler());
+    this.handlers.set('registrationAck', new RegistrationAckHandler());
+    this.handlers.set('heartbeatAck', new HeartbeatAckHandler());
+  }
+
+  async dispatch(message: any): Promise<void> {
+    const handler = this.handlers.get(message.type);
+    
+    if (handler) {
+      await handler.handle(message);
+    } else {
+      console.log('⚠️ Unknown message type:', message.type);
+      console.log('📋 Available handlers:', Array.from(this.handlers.keys()));
+    }
+  }
+
+  // Method to register new handlers dynamically
+  registerHandler(messageType: string, handler: MessageHandler): void {
+    this.handlers.set(messageType, handler);
+    console.log(`📝 Registered new handler for: ${messageType}`);
+  }
+}
+
+// Initialize the message dispatcher
+const messageDispatcher = new MessageDispatcher();
 
 // Initialize extension (don't auto-connect)
 extensionId = chrome.runtime.id;
@@ -264,6 +466,37 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === 'disconnect') {
     disconnectWebSocket();
     sendResponse({ success: true });
+    return true;
+  }
+  
+  if (message.action === 'showTimeTravelUI') {
+    // Inject time travel UI into the active tab
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (tabs[0]?.id) {
+        chrome.tabs.sendMessage(tabs[0].id, { action: 'showTimeTravelUI' });
+        sendResponse({ success: true });
+      } else {
+        sendResponse({ success: false, error: 'No active tab found' });
+      }
+    });
+    return true;
+  }
+  
+  if (message.action === 'getMessageStoreState') {
+    sendResponse({ 
+      success: true, 
+      state: globalMessageStore.getState(),
+      statistics: globalMessageStore.getState().messages.length > 0 ? 
+        (() => {
+          const stats = { total: 0, success: 0, error: 0, pending: 0, inbound: 0, outbound: 0 };
+          globalMessageStore.getState().messages.forEach(msg => {
+            stats.total++;
+            stats[msg.status]++;
+            stats[msg.direction]++;
+          });
+          return stats;
+        })() : { total: 0, success: 0, error: 0, pending: 0, inbound: 0, outbound: 0 }
+    });
     return true;
   }
   
