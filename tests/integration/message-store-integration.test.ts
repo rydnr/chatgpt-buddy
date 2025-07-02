@@ -443,7 +443,7 @@ describe('🔄 Message Store Integration Tests', () => {
 
       currentState = {
         ...currentState,
-        messages: [...(currentState.messages as any[]), newMessage],
+        messages: [...currentState.messages, newMessage] as any[],
         currentIndex: 0
       };
 

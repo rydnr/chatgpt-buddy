@@ -637,7 +637,9 @@ export function createServerWithWebSocket(port: number): Server {
         // Handle extension registration
         if (message.type === 'extensionRegistered') {
           extensionId = message.payload.extensionId;
-          extensionConnections.set(extensionId, ws);
+          if (extensionId) {
+            extensionConnections.set(extensionId, ws);
+          }
           console.log(`✅ Extension registered: ${extensionId}`);
           
           // Send acknowledgment
