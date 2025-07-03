@@ -1,0 +1,946 @@
+#+TITLE: Getting Started with TypeScript-EDA Infrastructure
+#+SUBTITLE: Building Adapters that Connect Domain Logic to External Systems
+#+AUTHOR: TypeScript-EDA Infrastructure Team
+#+DATE: 2025-07-03
+#+LAYOUT: project
+#+PROJECT: typescript-eda-infrastructure
+
+* Quick Start Guide
+
+TypeScript-EDA Infrastructure provides the tools and patterns for building adapters that connect your pure domain logic to external systems. This guide will walk you through creating your first infrastructure adapters.
+
+** Prerequisites
+
+- Node.js 18+ and npm/pnpm
+- TypeScript 5+ knowledge
+- Basic understanding of dependency injection and adapters
+- Familiarity with @typescript-eda/domain package
+
+** Installation
+
+#+BEGIN_SRC bash
+npm install @typescript-eda/infrastructure @typescript-eda/domain
+# or with pnpm
+pnpm add @typescript-eda/infrastructure @typescript-eda/domain
+#+END_SRC
+
+* Your First Infrastructure Adapter
+
+Let's build a complete set of infrastructure adapters for a user management system.
+
+** Step 1: Review Your Domain Contracts
+
+First, let's look at the domain contracts (ports) we need to implement:
+
+#+BEGIN_SRC typescript
+// Domain layer defines the contracts
+import { Repository, Port } from '@typescript-eda/domain';
+
+export abstract class UserRepository extends Repository<User, UserId> {
+  public abstract findByEmail(email: Email): Promise<User | null>;
+  public abstract findActiveUsers(): Promise<User[]>;
+  public abstract existsByEmail(email: Email): Promise<boolean>;
+}
+
+export abstract class NotificationPort extends Port {
+  public readonly name = 'NotificationPort';
+  
+  public abstract sendEmail(to: Email, subject: string, body: string): Promise<void>;
+  public abstract sendSMS(to: PhoneNumber, message: string): Promise<void>;
+}
+
+export abstract class AuthenticationPort extends Port {
+  public readonly name = 'AuthenticationPort';
+  
+  public abstract authenticateUser(credentials: UserCredentials): Promise<AuthenticationResult>;
+  public abstract validateToken(token: AuthenticationToken): Promise<User | null>;
+}
+#+END_SRC
+
+** Step 2: Create Your First Repository Adapter
+
+Repository adapters handle data persistence with domain-friendly interfaces:
+
+#+BEGIN_SRC typescript
+// src/infrastructure/database/postgres-user-repository.ts
+import { AdapterFor } from '@typescript-eda/infrastructure';
+import { UserRepository } from '../../domain/repositories/user-repository';
+import { User } from '../../domain/entities/user';
+import { UserId } from '../../domain/value-objects/user-id';
+import { Email } from '../../domain/value-objects/email';
+
+@AdapterFor(UserRepository)
+export class PostgresUserRepository extends UserRepository {
+  constructor(private connection: PostgresConnection) {
+    super();
+  }
+
+  public async findById(id: UserId): Promise<User | null> {
+    try {
+      const result = await this.connection.query(
+        'SELECT * FROM users WHERE id = $1',
+        [id.getValue()]
+      );
+
+      return result.rows.length > 0 
+        ? this.mapRowToUser(result.rows[0]) 
+        : null;
+    } catch (error) {
+      throw new UserRepositoryError('Failed to find user by ID', error);
+    }
+  }
+
+  public async findByEmail(email: Email): Promise<User | null> {
+    try {
+      const result = await this.connection.query(
+        'SELECT * FROM users WHERE email = $1',
+        [email.getValue()]
+      );
+
+      return result.rows.length > 0 
+        ? this.mapRowToUser(result.rows[0]) 
+        : null;
+    } catch (error) {
+      throw new UserRepositoryError('Failed to find user by email', error);
+    }
+  }
+
+  public async save(user: User): Promise<void> {
+    const query = `
+      INSERT INTO users (id, email, first_name, last_name, status, email_verified, created_at, updated_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      ON CONFLICT (id) 
+      DO UPDATE SET 
+        email = EXCLUDED.email,
+        first_name = EXCLUDED.first_name,
+        last_name = EXCLUDED.last_name,
+        status = EXCLUDED.status,
+        email_verified = EXCLUDED.email_verified,
+        updated_at = EXCLUDED.updated_at
+    `;
+
+    try {
+      await this.connection.query(query, [
+        user.id.getValue(),
+        user.getEmail().getValue(),
+        user.getName().getFirstName(),
+        user.getName().getLastName(),
+        user.getStatus().getStatus(),
+        user.isEmailVerified(),
+        user.getCreatedAt(),
+        new Date()
+      ]);
+    } catch (error) {
+      throw new UserRepositoryError('Failed to save user', error);
+    }
+  }
+
+  public async delete(id: UserId): Promise<void> {
+    try {
+      await this.connection.query(
+        'DELETE FROM users WHERE id = $1',
+        [id.getValue()]
+      );
+    } catch (error) {
+      throw new UserRepositoryError('Failed to delete user', error);
+    }
+  }
+
+  public async findAll(): Promise<User[]> {
+    try {
+      const result = await this.connection.query('SELECT * FROM users ORDER BY created_at DESC');
+      return result.rows.map(row => this.mapRowToUser(row));
+    } catch (error) {
+      throw new UserRepositoryError('Failed to find all users', error);
+    }
+  }
+
+  public async findActiveUsers(): Promise<User[]> {
+    try {
+      const result = await this.connection.query(
+        'SELECT * FROM users WHERE status = $1 AND email_verified = true ORDER BY created_at DESC',
+        ['active']
+      );
+      return result.rows.map(row => this.mapRowToUser(row));
+    } catch (error) {
+      throw new UserRepositoryError('Failed to find active users', error);
+    }
+  }
+
+  public async existsByEmail(email: Email): Promise<boolean> {
+    try {
+      const result = await this.connection.query(
+        'SELECT 1 FROM users WHERE email = $1 LIMIT 1',
+        [email.getValue()]
+      );
+      return result.rows.length > 0;
+    } catch (error) {
+      throw new UserRepositoryError('Failed to check email existence', error);
+    }
+  }
+
+  private mapRowToUser(row: any): User {
+    return new User(
+      new UserId(row.id),
+      new Email(row.email),
+      new UserName(row.first_name, row.last_name),
+      new UserStatus(row.status),
+      row.created_at
+    );
+  }
+}
+
+// Custom error for repository operations
+export class UserRepositoryError extends Error {
+  constructor(message: string, public readonly cause?: Error) {
+    super(message);
+    this.name = 'UserRepositoryError';
+  }
+}
+#+END_SRC
+
+** Step 3: Create a Notification Adapter
+
+External service adapters handle communication with third-party systems:
+
+#+BEGIN_SRC typescript
+// src/infrastructure/notifications/sendgrid-notification-adapter.ts
+import { AdapterFor } from '@typescript-eda/infrastructure';
+import { NotificationPort } from '../../domain/ports/notification-port';
+import { Email } from '../../domain/value-objects/email';
+import { PhoneNumber } from '../../domain/value-objects/phone-number';
+
+@AdapterFor(NotificationPort)
+export class SendGridNotificationAdapter extends NotificationPort {
+  constructor(
+    private apiKey: string,
+    private httpClient: HttpClient,
+    private fromEmail: string = 'noreply@example.com'
+  ) {
+    super();
+  }
+
+  public async initialize(): Promise<void> {
+    // Verify API key and connection
+    try {
+      await this.httpClient.get('https://api.sendgrid.com/v3/user/profile', {
+        headers: {
+          'Authorization': `Bearer ${this.apiKey}`
+        }
+      });
+      console.log('✅ SendGrid notification adapter initialized');
+    } catch (error) {
+      throw new NotificationAdapterError('Failed to initialize SendGrid adapter', error);
+    }
+  }
+
+  public async sendEmail(to: Email, subject: string, body: string): Promise<void> {
+    const payload = {
+      personalizations: [{
+        to: [{ email: to.getValue() }],
+        subject: subject
+      }],
+      from: { 
+        email: this.fromEmail,
+        name: 'Our Application'
+      },
+      content: [{
+        type: 'text/html',
+        value: body
+      }]
+    };
+
+    try {
+      const response = await this.httpClient.post('https://api.sendgrid.com/v3/mail/send', {
+        headers: {
+          'Authorization': `Bearer ${this.apiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        throw new Error(`SendGrid API error: ${response.status} ${response.statusText}`);
+      }
+
+      console.log(`📧 Email sent successfully to ${to.getValue()}`);
+    } catch (error) {
+      throw new NotificationDeliveryError(`Failed to send email to ${to.getValue()}`, error);
+    }
+  }
+
+  public async sendSMS(to: PhoneNumber, message: string): Promise<void> {
+    // SendGrid doesn't support SMS, so we'll throw an error
+    throw new NotificationAdapterError('SMS not supported by SendGrid adapter');
+  }
+
+  public async shutdown(): Promise<void> {
+    // No cleanup needed for HTTP-based adapter
+    console.log('📧 SendGrid notification adapter shutdown');
+  }
+
+  public async isHealthy(): Promise<boolean> {
+    try {
+      const response = await this.httpClient.get('https://api.sendgrid.com/v3/user/profile', {
+        headers: {
+          'Authorization': `Bearer ${this.apiKey}`
+        }
+      });
+      return response.ok;
+    } catch {
+      return false;
+    }
+  }
+}
+
+// Custom errors for notification operations
+export class NotificationAdapterError extends Error {
+  constructor(message: string, public readonly cause?: Error) {
+    super(message);
+    this.name = 'NotificationAdapterError';
+  }
+}
+
+export class NotificationDeliveryError extends Error {
+  constructor(message: string, public readonly cause?: Error) {
+    super(message);
+    this.name = 'NotificationDeliveryError';
+  }
+}
+#+END_SRC
+
+** Step 4: Create an Authentication Adapter
+
+Authentication adapters handle security and identity verification:
+
+#+BEGIN_SRC typescript
+// src/infrastructure/auth/jwt-authentication-adapter.ts
+import { AdapterFor } from '@typescript-eda/infrastructure';
+import { AuthenticationPort } from '../../domain/ports/authentication-port';
+import { User } from '../../domain/entities/user';
+import { UserCredentials } from '../../domain/value-objects/user-credentials';
+import { AuthenticationResult } from '../../domain/value-objects/authentication-result';
+import { AuthenticationToken } from '../../domain/value-objects/authentication-token';
+import { UserRepository } from '../../domain/repositories/user-repository';
+import * as jwt from 'jsonwebtoken';
+import * as bcrypt from 'bcrypt';
+
+@AdapterFor(AuthenticationPort)
+export class JWTAuthenticationAdapter extends AuthenticationPort {
+  constructor(
+    private secretKey: string,
+    private userRepository: UserRepository,
+    private tokenExpirationHours: number = 24
+  ) {
+    super();
+  }
+
+  public async initialize(): Promise<void> {
+    if (!this.secretKey) {
+      throw new AuthenticationAdapterError('JWT secret key is required');
+    }
+    
+    if (this.secretKey.length < 32) {
+      throw new AuthenticationAdapterError('JWT secret key must be at least 32 characters');
+    }
+
+    console.log('🔐 JWT authentication adapter initialized');
+  }
+
+  public async authenticateUser(credentials: UserCredentials): Promise<AuthenticationResult> {
+    try {
+      // Find user in domain
+      const user = await this.userRepository.findByEmail(credentials.getEmail());
+      
+      if (!user) {
+        throw new AuthenticationError('Invalid credentials');
+      }
+
+      // Verify password
+      const isValidPassword = await this.verifyPassword(
+        credentials.getPassword(),
+        user.getPasswordHash()
+      );
+
+      if (!isValidPassword) {
+        throw new AuthenticationError('Invalid credentials');
+      }
+
+      // Check user status
+      if (!user.isActive()) {
+        throw new AuthenticationError('User account is not active');
+      }
+
+      if (!user.isEmailVerified()) {
+        throw new AuthenticationError('Please verify your email address');
+      }
+
+      // Generate JWT token
+      const token = this.generateJWT(user);
+      const expiresAt = new Date(Date.now() + this.tokenExpirationHours * 60 * 60 * 1000);
+
+      return new AuthenticationResult(
+        user,
+        new AuthenticationToken(token),
+        expiresAt
+      );
+    } catch (error) {
+      if (error instanceof AuthenticationError) {
+        throw error;
+      }
+      throw new AuthenticationAdapterError('Authentication failed', error);
+    }
+  }
+
+  public async validateToken(token: AuthenticationToken): Promise<User | null> {
+    try {
+      const payload = this.verifyJWT(token.getValue());
+      
+      if (typeof payload === 'string') {
+        return null; // Invalid token format
+      }
+
+      const userId = new UserId(payload.sub as string);
+      const user = await this.userRepository.findById(userId);
+      
+      // Return user only if they're still active and verified
+      return user && user.isActive() && user.isEmailVerified() ? user : null;
+    } catch (error) {
+      console.warn('Token validation failed:', error.message);
+      return null;
+    }
+  }
+
+  public async refreshToken(token: AuthenticationToken): Promise<AuthenticationResult | null> {
+    const user = await this.validateToken(token);
+    
+    if (!user) {
+      return null;
+    }
+
+    // Generate new token
+    const newToken = this.generateJWT(user);
+    const expiresAt = new Date(Date.now() + this.tokenExpirationHours * 60 * 60 * 1000);
+
+    return new AuthenticationResult(
+      user,
+      new AuthenticationToken(newToken),
+      expiresAt
+    );
+  }
+
+  private generateJWT(user: User): string {
+    const payload = {
+      sub: user.id.getValue(),
+      email: user.getEmail().getValue(),
+      name: user.getName().getFullName(),
+      status: user.getStatus().getStatus(),
+      iat: Math.floor(Date.now() / 1000),
+      exp: Math.floor(Date.now() / 1000) + (this.tokenExpirationHours * 60 * 60)
+    };
+
+    return jwt.sign(payload, this.secretKey, { algorithm: 'HS256' });
+  }
+
+  private verifyJWT(token: string): jwt.JwtPayload | string {
+    return jwt.verify(token, this.secretKey, { algorithms: ['HS256'] });
+  }
+
+  private async verifyPassword(plaintext: string, hash: string): Promise<boolean> {
+    return bcrypt.compare(plaintext, hash);
+  }
+
+  public async hashPassword(password: string): Promise<string> {
+    const saltRounds = 12;
+    return bcrypt.hash(password, saltRounds);
+  }
+
+  public async shutdown(): Promise<void> {
+    console.log('🔐 JWT authentication adapter shutdown');
+  }
+
+  public async isHealthy(): Promise<boolean> {
+    return true; // JWT adapter doesn't depend on external services
+  }
+}
+
+// Custom errors for authentication operations
+export class AuthenticationAdapterError extends Error {
+  constructor(message: string, public readonly cause?: Error) {
+    super(message);
+    this.name = 'AuthenticationAdapterError';
+  }
+}
+
+export class AuthenticationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'AuthenticationError';
+  }
+}
+#+END_SRC
+
+** Step 5: Create Configuration Management
+
+Infrastructure adapters need proper configuration management:
+
+#+BEGIN_SRC typescript
+// src/infrastructure/config/infrastructure-config.ts
+export interface DatabaseConfig {
+  host: string;
+  port: number;
+  database: string;
+  username: string;
+  password: string;
+  ssl?: boolean;
+  maxConnections?: number;
+  connectionTimeout?: number;
+}
+
+export interface NotificationConfig {
+  provider: 'sendgrid' | 'smtp' | 'console';
+  apiKey?: string;
+  fromEmail?: string;
+  smtpHost?: string;
+  smtpPort?: number;
+  smtpUsername?: string;
+  smtpPassword?: string;
+}
+
+export interface AuthenticationConfig {
+  secretKey: string;
+  tokenExpirationHours: number;
+  refreshTokenEnabled: boolean;
+}
+
+export class InfrastructureConfig {
+  public readonly database: DatabaseConfig;
+  public readonly notification: NotificationConfig;
+  public readonly authentication: AuthenticationConfig;
+
+  constructor() {
+    this.database = this.loadDatabaseConfig();
+    this.notification = this.loadNotificationConfig();
+    this.authentication = this.loadAuthenticationConfig();
+    
+    this.validate();
+  }
+
+  private loadDatabaseConfig(): DatabaseConfig {
+    return {
+      host: process.env.DB_HOST || 'localhost',
+      port: parseInt(process.env.DB_PORT || '5432'),
+      database: process.env.DB_NAME || 'app_db',
+      username: process.env.DB_USERNAME || 'app_user',
+      password: process.env.DB_PASSWORD || '',
+      ssl: process.env.DB_SSL === 'true',
+      maxConnections: parseInt(process.env.DB_MAX_CONNECTIONS || '10'),
+      connectionTimeout: parseInt(process.env.DB_CONNECTION_TIMEOUT || '30000')
+    };
+  }
+
+  private loadNotificationConfig(): NotificationConfig {
+    const provider = (process.env.NOTIFICATION_PROVIDER as any) || 'console';
+    
+    return {
+      provider,
+      apiKey: process.env.NOTIFICATION_API_KEY,
+      fromEmail: process.env.NOTIFICATION_FROM_EMAIL || 'noreply@example.com',
+      smtpHost: process.env.SMTP_HOST,
+      smtpPort: parseInt(process.env.SMTP_PORT || '587'),
+      smtpUsername: process.env.SMTP_USERNAME,
+      smtpPassword: process.env.SMTP_PASSWORD
+    };
+  }
+
+  private loadAuthenticationConfig(): AuthenticationConfig {
+    return {
+      secretKey: process.env.JWT_SECRET_KEY || '',
+      tokenExpirationHours: parseInt(process.env.JWT_EXPIRATION_HOURS || '24'),
+      refreshTokenEnabled: process.env.JWT_REFRESH_ENABLED === 'true'
+    };
+  }
+
+  private validate(): void {
+    // Database validation
+    if (!this.database.password) {
+      throw new ConfigurationError('Database password is required');
+    }
+
+    // Authentication validation
+    if (!this.authentication.secretKey) {
+      throw new ConfigurationError('JWT secret key is required');
+    }
+
+    if (this.authentication.secretKey.length < 32) {
+      throw new ConfigurationError('JWT secret key must be at least 32 characters');
+    }
+
+    // Notification validation
+    if (this.notification.provider === 'sendgrid' && !this.notification.apiKey) {
+      throw new ConfigurationError('SendGrid API key is required when using SendGrid provider');
+    }
+
+    if (this.notification.provider === 'smtp') {
+      const requiredSmtp = ['smtpHost', 'smtpUsername', 'smtpPassword'];
+      const missing = requiredSmtp.filter(key => !this.notification[key as keyof NotificationConfig]);
+      
+      if (missing.length > 0) {
+        throw new ConfigurationError(`SMTP configuration missing: ${missing.join(', ')}`);
+      }
+    }
+  }
+}
+
+export class ConfigurationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ConfigurationError';
+  }
+}
+#+END_SRC
+
+** Step 6: Create Adapter Factory
+
+A factory helps create adapters based on configuration:
+
+#+BEGIN_SRC typescript
+// src/infrastructure/factories/adapter-factory.ts
+import { InfrastructureConfig } from '../config/infrastructure-config';
+import { PostgresUserRepository } from '../database/postgres-user-repository';
+import { SendGridNotificationAdapter } from '../notifications/sendgrid-notification-adapter';
+import { SMTPNotificationAdapter } from '../notifications/smtp-notification-adapter';
+import { ConsoleNotificationAdapter } from '../notifications/console-notification-adapter';
+import { JWTAuthenticationAdapter } from '../auth/jwt-authentication-adapter';
+import { UserRepository } from '../../domain/repositories/user-repository';
+import { NotificationPort } from '../../domain/ports/notification-port';
+import { AuthenticationPort } from '../../domain/ports/authentication-port';
+
+export class AdapterFactory {
+  constructor(private config: InfrastructureConfig) {}
+
+  public createUserRepository(): UserRepository {
+    const connection = new PostgresConnection(this.config.database);
+    return new PostgresUserRepository(connection);
+  }
+
+  public createNotificationAdapter(): NotificationPort {
+    switch (this.config.notification.provider) {
+      case 'sendgrid':
+        return new SendGridNotificationAdapter(
+          this.config.notification.apiKey!,
+          new HttpClient(),
+          this.config.notification.fromEmail
+        );
+        
+      case 'smtp':
+        return new SMTPNotificationAdapter({
+          host: this.config.notification.smtpHost!,
+          port: this.config.notification.smtpPort!,
+          username: this.config.notification.smtpUsername!,
+          password: this.config.notification.smtpPassword!,
+          fromEmail: this.config.notification.fromEmail!
+        });
+        
+      case 'console':
+      default:
+        return new ConsoleNotificationAdapter();
+    }
+  }
+
+  public createAuthenticationAdapter(userRepository: UserRepository): AuthenticationPort {
+    return new JWTAuthenticationAdapter(
+      this.config.authentication.secretKey,
+      userRepository,
+      this.config.authentication.tokenExpirationHours
+    );
+  }
+
+  public async createAllAdapters(): Promise<{
+    userRepository: UserRepository;
+    notificationAdapter: NotificationPort;
+    authenticationAdapter: AuthenticationPort;
+  }> {
+    const userRepository = this.createUserRepository();
+    const notificationAdapter = this.createNotificationAdapter();
+    const authenticationAdapter = this.createAuthenticationAdapter(userRepository);
+
+    // Initialize all adapters
+    await userRepository.initialize();
+    await notificationAdapter.initialize();
+    await authenticationAdapter.initialize();
+
+    return {
+      userRepository,
+      notificationAdapter,
+      authenticationAdapter
+    };
+  }
+}
+#+END_SRC
+
+* Testing Your Infrastructure Adapters
+
+Infrastructure adapters require different testing strategies than domain logic.
+
+** Step 7: Integration Testing with Real Systems
+
+#+BEGIN_SRC typescript
+// tests/infrastructure/postgres-user-repository.integration.test.ts
+import { PostgresUserRepository } from '../../src/infrastructure/database/postgres-user-repository';
+import { User } from '../../src/domain/entities/user';
+import { UserId } from '../../src/domain/value-objects/user-id';
+import { Email } from '../../src/domain/value-objects/email';
+import { UserName } from '../../src/domain/value-objects/user-name';
+import { UserStatus } from '../../src/domain/value-objects/user-status';
+import { PostgreSqlContainer, StartedTestContainer } from 'testcontainers';
+
+describe('PostgresUserRepository Integration Tests', () => {
+  let repository: PostgresUserRepository;
+  let container: StartedTestContainer;
+  let connection: PostgresConnection;
+
+  beforeAll(async () => {
+    // Start test database container
+    container = await new PostgreSqlContainer()
+      .withDatabase('test_db')
+      .withUsername('test_user')
+      .withPassword('test_pass')
+      .start();
+
+    // Create connection
+    connection = new PostgresConnection({
+      host: container.getHost(),
+      port: container.getFirstMappedPort(),
+      database: container.getDatabase(),
+      username: container.getUsername(),
+      password: container.getPassword()
+    });
+
+    // Run migrations
+    await runMigrations(connection);
+
+    repository = new PostgresUserRepository(connection);
+    await repository.initialize();
+  });
+
+  afterAll(async () => {
+    await connection.close();
+    await container.stop();
+  });
+
+  beforeEach(async () => {
+    // Clean database before each test
+    await connection.query('TRUNCATE TABLE users CASCADE');
+  });
+
+  it('should save and retrieve user with all properties', async () => {
+    // Given: A complete user entity
+    const user = new User(
+      new UserId('test-123'),
+      new Email('test@example.com'),
+      new UserName('John', 'Doe'),
+      UserStatus.active()
+    );
+
+    // When: User is saved and retrieved
+    await repository.save(user);
+    const retrievedUser = await repository.findById(user.id);
+
+    // Then: All properties are preserved
+    expect(retrievedUser).not.toBeNull();
+    expect(retrievedUser!.id.equals(user.id)).toBe(true);
+    expect(retrievedUser!.getEmail().equals(user.getEmail())).toBe(true);
+    expect(retrievedUser!.getName().equals(user.getName())).toBe(true);
+    expect(retrievedUser!.getStatus().equals(user.getStatus())).toBe(true);
+  });
+
+  it('should find users by email', async () => {
+    // Given: Users with different emails
+    const user1 = createTestUser('user1@example.com');
+    const user2 = createTestUser('user2@example.com');
+    
+    await repository.save(user1);
+    await repository.save(user2);
+
+    // When: Finding user by email
+    const foundUser = await repository.findByEmail(user1.getEmail());
+
+    // Then: Correct user is returned
+    expect(foundUser).not.toBeNull();
+    expect(foundUser!.id.equals(user1.id)).toBe(true);
+  });
+
+  it('should find only active users', async () => {
+    // Given: Users with different statuses
+    const activeUser = createTestUser('active@example.com', UserStatus.active());
+    const pendingUser = createTestUser('pending@example.com', UserStatus.pending());
+    
+    await repository.save(activeUser);
+    await repository.save(pendingUser);
+
+    // When: Finding active users
+    const activeUsers = await repository.findActiveUsers();
+
+    // Then: Only active users are returned
+    expect(activeUsers).toHaveLength(1);
+    expect(activeUsers[0].getStatus().isActive()).toBe(true);
+  });
+
+  function createTestUser(email: string, status = UserStatus.active()): User {
+    return new User(
+      UserId.generate(),
+      new Email(email),
+      new UserName('Test', 'User'),
+      status
+    );
+  }
+});
+#+END_SRC
+
+** Step 8: Contract Testing
+
+Contract tests ensure adapters fulfill their port contracts:
+
+#+BEGIN_SRC typescript
+// tests/infrastructure/notification-adapter.contract.test.ts
+import { NotificationPort } from '../../src/domain/ports/notification-port';
+import { SendGridNotificationAdapter } from '../../src/infrastructure/notifications/sendgrid-notification-adapter';
+import { ConsoleNotificationAdapter } from '../../src/infrastructure/notifications/console-notification-adapter';
+import { Email } from '../../src/domain/value-objects/email';
+
+describe('NotificationAdapter Contract Tests', () => {
+  const adapters: Array<{ name: string; adapter: NotificationPort }> = [
+    {
+      name: 'SendGridNotificationAdapter',
+      adapter: new SendGridNotificationAdapter('test-key', new MockHttpClient(), 'test@example.com')
+    },
+    {
+      name: 'ConsoleNotificationAdapter',
+      adapter: new ConsoleNotificationAdapter()
+    }
+  ];
+
+  adapters.forEach(({ name, adapter }) => {
+    describe(`${name} Contract`, () => {
+      it('should implement NotificationPort interface', () => {
+        expect(adapter).toBeInstanceOf(NotificationPort);
+        expect(adapter.name).toBe('NotificationPort');
+      });
+
+      it('should have required methods', () => {
+        expect(typeof adapter.sendEmail).toBe('function');
+        expect(typeof adapter.initialize).toBe('function');
+        expect(typeof adapter.shutdown).toBe('function');
+        expect(typeof adapter.isHealthy).toBe('function');
+      });
+
+      it('should handle email sending', async () => {
+        await adapter.initialize();
+        
+        const email = new Email('test@example.com');
+        const subject = 'Test Subject';
+        const body = 'Test Body';
+
+        // Should not throw for valid inputs
+        await expect(
+          adapter.sendEmail(email, subject, body)
+        ).resolves.not.toThrow();
+      });
+
+      it('should report health status', async () => {
+        await adapter.initialize();
+        
+        const isHealthy = await adapter.isHealthy();
+        expect(typeof isHealthy).toBe('boolean');
+      });
+    });
+  });
+});
+#+END_SRC
+
+* Best Practices and Patterns
+
+** Adapter Design Guidelines
+
+1. **Single Responsibility**: Each adapter should handle one external system
+2. **Error Translation**: Convert external errors to domain-specific errors
+3. **Configuration Validation**: Validate configuration at startup
+4. **Health Monitoring**: Implement health checks for external dependencies
+5. **Graceful Degradation**: Handle failures gracefully when possible
+
+** Error Handling Strategy
+
+#+BEGIN_SRC typescript
+// Good: Domain-specific error handling
+@AdapterFor(PaymentPort)
+export class StripePaymentAdapter extends PaymentPort {
+  public async processPayment(payment: Payment): Promise<PaymentResult> {
+    try {
+      const result = await this.stripeClient.charges.create({
+        amount: payment.getAmount().getAmount() * 100,
+        currency: payment.getAmount().getCurrency(),
+        source: payment.getPaymentMethod().getValue()
+      });
+
+      return new PaymentResult(
+        new PaymentId(result.id),
+        PaymentStatus.SUCCESSFUL,
+        payment.getAmount()
+      );
+    } catch (error) {
+      return this.handleStripeError(error, payment);
+    }
+  }
+
+  private handleStripeError(error: any, payment: Payment): never {
+    if (error.type === 'StripeCardError') {
+      throw new PaymentDeclinedError(
+        `Payment declined: ${error.message}`,
+        payment.getPaymentMethod()
+      );
+    }
+
+    if (error.type === 'StripeRateLimitError') {
+      throw new PaymentServiceUnavailableError(
+        'Payment service rate limit exceeded'
+      );
+    }
+
+    throw new PaymentProcessingError(
+      `Unexpected payment error: ${error.message}`,
+      error
+    );
+  }
+}
+#+END_SRC
+
+** Configuration Management
+
+#+BEGIN_SRC typescript
+// Good: Environment-aware configuration
+export class EnvironmentAwareAdapterFactory extends AdapterFactory {
+  protected createNotificationAdapter(): NotificationPort {
+    const environment = process.env.NODE_ENV || 'development';
+
+    switch (environment) {
+      case 'production':
+        return new SendGridNotificationAdapter(
+          this.config.notification.apiKey!,
+          new HttpClient()
+        );
+        
+      case 'staging':
+        return new SMTPNotificationAdapter(this.config.notification);
+        
+      case 'test':
+        return new InMemoryNotificationAdapter();
+        
+      default:
+        return new ConsoleNotificationAdapter();
+    }
+  }
+}
+#+END_SRC
+
+You now have a complete foundation for building infrastructure adapters that connect your domain logic to external systems while maintaining clean architecture boundaries and robust error handling.

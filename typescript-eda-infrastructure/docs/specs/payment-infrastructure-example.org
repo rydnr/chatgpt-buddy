@@ -1,0 +1,869 @@
+#+TITLE: Payment Infrastructure Example Specification
+#+SUBTITLE: Complete Payment Processing Infrastructure Implementation
+#+AUTHOR: TypeScript-EDA Infrastructure Team
+#+DATE: 2025-07-03
+#+LAYOUT: spec
+#+PROJECT: typescript-eda-infrastructure
+
+* Payment Infrastructure Specification
+
+This specification demonstrates a complete payment processing infrastructure using TypeScript-EDA Infrastructure patterns. It shows how to build robust, scalable adapters for payment processing systems.
+
+** Business Requirements
+
+1. Process payments through multiple payment providers (Stripe, PayPal, Square)
+2. Handle payment failures with appropriate retry logic
+3. Store payment records for audit and reconciliation
+4. Send payment confirmations to customers
+5. Integrate with fraud detection services
+6. Support multiple currencies and payment methods
+7. Provide real-time payment status updates
+
+** Infrastructure Architecture
+
+#+BEGIN_SRC ascii
+┌─────────────────────────────────────────────────────────────────┐
+│                     Application Layer                          │
+├─────────────────────────────────────────────────────────────────┤
+│ • PaymentService • FraudDetectionService • NotificationService │
+├─────────────────────────────────────────────────────────────────┤
+│                    Domain Ports (Contracts)                    │
+├─────────────────────────────────────────────────────────────────┤
+│ • PaymentProcessorPort • PaymentRepositoryPort                 │
+│ • FraudDetectionPort   • NotificationPort                      │
+├─────────────────────────────────────────────────────────────────┤
+│                  Infrastructure Adapters                       │
+├─────────────────────────────────────────────────────────────────┤
+│ • StripeAdapter       • PostgresPaymentRepository              │
+│ • PayPalAdapter       • FraudDetectionAdapter                  │
+│ • SquareAdapter       • EmailNotificationAdapter               │
+└─────────────────────────────────────────────────────────────────┘
+#+END_SRC
+
+** Domain Contracts (Ports)
+
+*** Payment Processing Port
+#+BEGIN_SRC typescript
+import { Port } from '@typescript-eda/domain';
+
+export abstract class PaymentProcessorPort extends Port {
+  public readonly name = 'PaymentProcessorPort';
+
+  public abstract processPayment(payment: Payment): Promise<PaymentResult>;
+  public abstract refundPayment(paymentId: PaymentId, amount?: Money): Promise<RefundResult>;
+  public abstract getPaymentStatus(paymentId: PaymentId): Promise<PaymentStatus>;
+  public abstract listSupportedCurrencies(): Promise<Currency[]>;
+  public abstract validatePaymentMethod(method: PaymentMethod): Promise<ValidationResult>;
+}
+
+export abstract class PaymentRepositoryPort extends Repository<Payment, PaymentId> {
+  public abstract findByCustomerId(customerId: CustomerId): Promise<Payment[]>;
+  public abstract findByStatus(status: PaymentStatus): Promise<Payment[]>;
+  public abstract findByDateRange(start: Date, end: Date): Promise<Payment[]>;
+  public abstract getTotalByCustomer(customerId: CustomerId): Promise<Money>;
+}
+
+export abstract class FraudDetectionPort extends Port {
+  public readonly name = 'FraudDetectionPort';
+
+  public abstract analyzePayment(payment: Payment): Promise<FraudAnalysisResult>;
+  public abstract reportFraud(paymentId: PaymentId, reason: string): Promise<void>;
+  public abstract updateRiskProfile(customerId: CustomerId, score: number): Promise<void>;
+}
+#+END_SRC
+
+** Stripe Payment Adapter Implementation
+
+#+BEGIN_SRC typescript
+import { AdapterFor } from '@typescript-eda/infrastructure';
+import { PaymentProcessorPort } from '../../domain/ports/payment-processor-port';
+import Stripe from 'stripe';
+
+@AdapterFor(PaymentProcessorPort)
+export class StripePaymentAdapter extends PaymentProcessorPort {
+  private stripe: Stripe;
+  private webhookSecret: string;
+
+  constructor(
+    private apiKey: string,
+    webhookSecret: string,
+    private config: StripeConfig
+  ) {
+    super();
+    this.webhookSecret = webhookSecret;
+  }
+
+  public async initialize(): Promise<void> {
+    try {
+      this.stripe = new Stripe(this.apiKey, {
+        apiVersion: '2023-10-16',
+        appInfo: {
+          name: 'TypeScript-EDA Payment System',
+          version: '1.0.0'
+        },
+        maxNetworkRetries: 3,
+        timeout: 30000
+      });
+
+      // Verify API key
+      await this.stripe.accounts.retrieve();
+      
+      console.log('✅ Stripe payment adapter initialized successfully');
+    } catch (error) {
+      throw new PaymentAdapterError('Failed to initialize Stripe adapter', error);
+    }
+  }
+
+  public async processPayment(payment: Payment): Promise<PaymentResult> {
+    const retryPolicy = new ExponentialBackoffRetry({
+      maxAttempts: 3,
+      baseDelay: 1000,
+      maxDelay: 5000
+    });
+
+    return retryPolicy.execute(async () => {
+      try {
+        const paymentIntent = await this.createPaymentIntent(payment);
+        const confirmedIntent = await this.confirmPaymentIntent(paymentIntent, payment);
+        
+        return this.mapToPaymentResult(confirmedIntent, payment);
+      } catch (error) {
+        throw this.translateStripeError(error, payment);
+      }
+    });
+  }
+
+  private async createPaymentIntent(payment: Payment): Promise<Stripe.PaymentIntent> {
+    const amount = this.convertToStripeAmount(payment.getAmount());
+    
+    return this.stripe.paymentIntents.create({
+      amount,
+      currency: payment.getAmount().getCurrency().toLowerCase(),
+      payment_method: payment.getPaymentMethod().getStripeMethodId(),
+      confirmation_method: 'manual',
+      confirm: false,
+      metadata: {
+        orderId: payment.getOrderId().getValue(),
+        customerId: payment.getCustomerId().getValue(),
+        paymentId: payment.id.getValue()
+      },
+      description: `Payment for order ${payment.getOrderId().getValue()}`,
+      statement_descriptor: this.config.statementDescriptor,
+      receipt_email: payment.getCustomerEmail().getValue()
+    });
+  }
+
+  private async confirmPaymentIntent(
+    intent: Stripe.PaymentIntent, 
+    payment: Payment
+  ): Promise<Stripe.PaymentIntent> {
+    return this.stripe.paymentIntents.confirm(intent.id, {
+      payment_method: payment.getPaymentMethod().getStripeMethodId(),
+      return_url: this.config.returnUrl
+    });
+  }
+
+  public async refundPayment(
+    paymentId: PaymentId, 
+    amount?: Money
+  ): Promise<RefundResult> {
+    try {
+      const stripePaymentId = await this.getStripePaymentId(paymentId);
+      
+      const refundParams: Stripe.RefundCreateParams = {
+        payment_intent: stripePaymentId,
+        reason: 'requested_by_customer'
+      };
+
+      if (amount) {
+        refundParams.amount = this.convertToStripeAmount(amount);
+      }
+
+      const refund = await this.stripe.refunds.create(refundParams);
+      
+      return new RefundResult(
+        new RefundId(refund.id),
+        paymentId,
+        amount || await this.getOriginalAmount(paymentId),
+        RefundStatus.fromStripeStatus(refund.status),
+        new Date(refund.created * 1000)
+      );
+    } catch (error) {
+      throw this.translateStripeError(error, null);
+    }
+  }
+
+  public async getPaymentStatus(paymentId: PaymentId): Promise<PaymentStatus> {
+    try {
+      const stripePaymentId = await this.getStripePaymentId(paymentId);
+      const intent = await this.stripe.paymentIntents.retrieve(stripePaymentId);
+      
+      return PaymentStatus.fromStripeStatus(intent.status);
+    } catch (error) {
+      throw this.translateStripeError(error, null);
+    }
+  }
+
+  public async listSupportedCurrencies(): Promise<Currency[]> {
+    // Stripe supports many currencies - return commonly used ones
+    return [
+      new Currency('USD'),
+      new Currency('EUR'),
+      new Currency('GBP'),
+      new Currency('CAD'),
+      new Currency('AUD'),
+      new Currency('JPY')
+    ];
+  }
+
+  public async validatePaymentMethod(method: PaymentMethod): Promise<ValidationResult> {
+    try {
+      const paymentMethod = await this.stripe.paymentMethods.retrieve(
+        method.getStripeMethodId()
+      );
+
+      const checks = {
+        cvcCheck: paymentMethod.card?.checks?.cvc_check,
+        addressCheck: paymentMethod.card?.checks?.address_line1_check,
+        postalCodeCheck: paymentMethod.card?.checks?.address_postal_code_check
+      };
+
+      const isValid = Object.values(checks).every(check => 
+        check === 'pass' || check === 'unavailable'
+      );
+
+      return new ValidationResult(
+        isValid,
+        isValid ? 'Payment method is valid' : 'Payment method validation failed',
+        checks
+      );
+    } catch (error) {
+      return new ValidationResult(
+        false,
+        `Payment method validation error: ${error.message}`,
+        {}
+      );
+    }
+  }
+
+  // Webhook processing for real-time updates
+  public async processWebhook(body: string, signature: string): Promise<DomainEvent[]> {
+    try {
+      const event = this.stripe.webhooks.constructEvent(
+        body,
+        signature,
+        this.webhookSecret
+      );
+
+      return this.translateWebhookEvent(event);
+    } catch (error) {
+      throw new WebhookProcessingError('Invalid webhook signature', error);
+    }
+  }
+
+  private translateWebhookEvent(event: Stripe.Event): DomainEvent[] {
+    const events: DomainEvent[] = [];
+
+    switch (event.type) {
+      case 'payment_intent.succeeded':
+        const succeededIntent = event.data.object as Stripe.PaymentIntent;
+        events.push(new PaymentProcessed(
+          new PaymentId(succeededIntent.metadata.paymentId),
+          new Money(
+            succeededIntent.amount_received / 100,
+            succeededIntent.currency.toUpperCase()
+          ),
+          new Date(succeededIntent.created * 1000)
+        ));
+        break;
+
+      case 'payment_intent.payment_failed':
+        const failedIntent = event.data.object as Stripe.PaymentIntent;
+        events.push(new PaymentFailed(
+          new PaymentId(failedIntent.metadata.paymentId),
+          failedIntent.last_payment_error?.message || 'Payment failed',
+          failedIntent.last_payment_error?.code
+        ));
+        break;
+
+      case 'charge.dispute.created':
+        const dispute = event.data.object as Stripe.Dispute;
+        events.push(new PaymentDisputed(
+          new PaymentId(dispute.payment_intent as string),
+          dispute.reason,
+          new Money(dispute.amount / 100, dispute.currency.toUpperCase()),
+          new Date(dispute.created * 1000)
+        ));
+        break;
+    }
+
+    return events;
+  }
+
+  private translateStripeError(error: any, payment: Payment | null): Error {
+    if (error.type === 'StripeCardError') {
+      return new PaymentDeclinedError(
+        error.message,
+        payment?.getPaymentMethod(),
+        error.decline_code
+      );
+    }
+
+    if (error.type === 'StripeRateLimitError') {
+      return new PaymentServiceUnavailableError(
+        'Payment service rate limit exceeded. Please try again later.',
+        parseInt(error.headers['retry-after']) || 60
+      );
+    }
+
+    if (error.type === 'StripeConnectionError') {
+      return new PaymentServiceConnectionError(
+        'Unable to connect to payment service',
+        error
+      );
+    }
+
+    if (error.type === 'StripeAuthenticationError') {
+      return new PaymentConfigurationError(
+        'Payment service authentication failed',
+        error
+      );
+    }
+
+    return new PaymentProcessingError(
+      `Unexpected payment error: ${error.message}`,
+      error
+    );
+  }
+
+  private convertToStripeAmount(money: Money): number {
+    // Stripe expects amounts in cents for most currencies
+    const currency = money.getCurrency();
+    const zeroDecimalCurrencies = ['JPY', 'KRW', 'VND', 'CLP'];
+    
+    if (zeroDecimalCurrencies.includes(currency)) {
+      return money.getAmount();
+    }
+    
+    return Math.round(money.getAmount() * 100);
+  }
+
+  private async getStripePaymentId(paymentId: PaymentId): Promise<string> {
+    // In real implementation, this would query the payment repository
+    // to get the Stripe payment intent ID associated with our domain payment ID
+    throw new Error('Method not implemented');
+  }
+
+  private async getOriginalAmount(paymentId: PaymentId): Promise<Money> {
+    // In real implementation, this would query the payment repository
+    throw new Error('Method not implemented');
+  }
+
+  public async shutdown(): Promise<void> {
+    // Stripe SDK doesn't require explicit shutdown
+    console.log('💳 Stripe payment adapter shut down');
+  }
+
+  public async isHealthy(): Promise<boolean> {
+    try {
+      await this.stripe.accounts.retrieve();
+      return true;
+    } catch {
+      return false;
+    }
+  }
+}
+
+// Configuration interface
+export interface StripeConfig {
+  statementDescriptor: string;
+  returnUrl: string;
+  webhookEndpoint: string;
+}
+
+// Custom errors
+export class PaymentAdapterError extends Error {
+  constructor(message: string, public readonly cause?: Error) {
+    super(message);
+    this.name = 'PaymentAdapterError';
+  }
+}
+
+export class PaymentDeclinedError extends Error {
+  constructor(
+    message: string,
+    public readonly paymentMethod?: PaymentMethod,
+    public readonly declineCode?: string
+  ) {
+    super(message);
+    this.name = 'PaymentDeclinedError';
+  }
+}
+
+export class PaymentServiceUnavailableError extends Error {
+  constructor(message: string, public readonly retryAfter?: number) {
+    super(message);
+    this.name = 'PaymentServiceUnavailableError';
+  }
+}
+
+export class WebhookProcessingError extends Error {
+  constructor(message: string, public readonly cause?: Error) {
+    super(message);
+    this.name = 'WebhookProcessingError';
+  }
+}
+#+END_SRC
+
+** Payment Repository Adapter
+
+#+BEGIN_SRC typescript
+import { AdapterFor } from '@typescript-eda/infrastructure';
+import { PaymentRepositoryPort } from '../../domain/repositories/payment-repository-port';
+
+@AdapterFor(PaymentRepositoryPort)
+export class PostgresPaymentRepository extends PaymentRepositoryPort {
+  constructor(
+    private connection: PostgresConnection,
+    private encryptionService: EncryptionService
+  ) {
+    super();
+  }
+
+  public async save(payment: Payment): Promise<void> {
+    const query = `
+      INSERT INTO payments (
+        id, customer_id, order_id, amount, currency, 
+        payment_method_id, status, provider, provider_payment_id,
+        created_at, updated_at, encrypted_data
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+      ON CONFLICT (id) 
+      DO UPDATE SET 
+        status = EXCLUDED.status,
+        provider_payment_id = EXCLUDED.provider_payment_id,
+        updated_at = EXCLUDED.updated_at,
+        encrypted_data = EXCLUDED.encrypted_data
+    `;
+
+    const encryptedData = await this.encryptionService.encrypt(
+      JSON.stringify({
+        paymentMethodDetails: payment.getPaymentMethod().getSecureData(),
+        customerEmail: payment.getCustomerEmail().getValue()
+      })
+    );
+
+    try {
+      await this.connection.query(query, [
+        payment.id.getValue(),
+        payment.getCustomerId().getValue(),
+        payment.getOrderId().getValue(),
+        payment.getAmount().getAmount(),
+        payment.getAmount().getCurrency(),
+        payment.getPaymentMethod().getId().getValue(),
+        payment.getStatus().getValue(),
+        payment.getProvider(),
+        payment.getProviderPaymentId(),
+        payment.getCreatedAt(),
+        new Date(),
+        encryptedData
+      ]);
+    } catch (error) {
+      throw new PaymentRepositoryError('Failed to save payment', error);
+    }
+  }
+
+  public async findByCustomerId(customerId: CustomerId): Promise<Payment[]> {
+    const query = `
+      SELECT * FROM payments 
+      WHERE customer_id = $1 
+      ORDER BY created_at DESC
+    `;
+
+    try {
+      const result = await this.connection.query(query, [customerId.getValue()]);
+      return Promise.all(result.rows.map(row => this.mapRowToPayment(row)));
+    } catch (error) {
+      throw new PaymentRepositoryError('Failed to find payments by customer', error);
+    }
+  }
+
+  public async findByStatus(status: PaymentStatus): Promise<Payment[]> {
+    const query = `
+      SELECT * FROM payments 
+      WHERE status = $1 
+      ORDER BY created_at DESC
+    `;
+
+    try {
+      const result = await this.connection.query(query, [status.getValue()]);
+      return Promise.all(result.rows.map(row => this.mapRowToPayment(row)));
+    } catch (error) {
+      throw new PaymentRepositoryError('Failed to find payments by status', error);
+    }
+  }
+
+  public async findByDateRange(start: Date, end: Date): Promise<Payment[]> {
+    const query = `
+      SELECT * FROM payments 
+      WHERE created_at >= $1 AND created_at <= $2 
+      ORDER BY created_at DESC
+    `;
+
+    try {
+      const result = await this.connection.query(query, [start, end]);
+      return Promise.all(result.rows.map(row => this.mapRowToPayment(row)));
+    } catch (error) {
+      throw new PaymentRepositoryError('Failed to find payments by date range', error);
+    }
+  }
+
+  public async getTotalByCustomer(customerId: CustomerId): Promise<Money> {
+    const query = `
+      SELECT SUM(amount) as total, currency 
+      FROM payments 
+      WHERE customer_id = $1 AND status = 'completed'
+      GROUP BY currency
+    `;
+
+    try {
+      const result = await this.connection.query(query, [customerId.getValue()]);
+      
+      if (result.rows.length === 0) {
+        return new Money(0, 'USD'); // Default currency
+      }
+
+      // For simplicity, return the first currency total
+      // In a real system, you might want to handle multiple currencies
+      const row = result.rows[0];
+      return new Money(parseFloat(row.total), row.currency);
+    } catch (error) {
+      throw new PaymentRepositoryError('Failed to calculate customer total', error);
+    }
+  }
+
+  private async mapRowToPayment(row: any): Promise<Payment> {
+    try {
+      const decryptedData = await this.encryptionService.decrypt(row.encrypted_data);
+      const secureData = JSON.parse(decryptedData);
+
+      return new Payment(
+        new PaymentId(row.id),
+        new CustomerId(row.customer_id),
+        new OrderId(row.order_id),
+        new Money(row.amount, row.currency),
+        await this.reconstructPaymentMethod(row.payment_method_id, secureData),
+        new PaymentStatus(row.status),
+        row.provider,
+        row.provider_payment_id,
+        row.created_at
+      );
+    } catch (error) {
+      throw new PaymentRepositoryError('Failed to map payment data', error);
+    }
+  }
+
+  private async reconstructPaymentMethod(
+    methodId: string, 
+    secureData: any
+  ): Promise<PaymentMethod> {
+    // Reconstruct payment method from stored data
+    return PaymentMethod.fromSecureData(
+      new PaymentMethodId(methodId),
+      secureData.paymentMethodDetails
+    );
+  }
+}
+#+END_SRC
+
+** Fraud Detection Adapter
+
+#+BEGIN_SRC typescript
+import { AdapterFor } from '@typescript-eda/infrastructure';
+import { FraudDetectionPort } from '../../domain/ports/fraud-detection-port';
+
+@AdapterFor(FraudDetectionPort)
+export class SiftFraudDetectionAdapter extends FraudDetectionPort {
+  private siftClient: SiftClient;
+
+  constructor(
+    private apiKey: string,
+    private accountId: string,
+    private config: FraudDetectionConfig
+  ) {
+    super();
+  }
+
+  public async initialize(): Promise<void> {
+    this.siftClient = new SiftClient({
+      apiKey: this.apiKey,
+      accountId: this.accountId,
+      timeout: 5000
+    });
+
+    // Test API connection
+    try {
+      await this.siftClient.getAccount();
+      console.log('🛡️ Fraud detection adapter initialized successfully');
+    } catch (error) {
+      throw new FraudDetectionAdapterError('Failed to initialize fraud detection', error);
+    }
+  }
+
+  public async analyzePayment(payment: Payment): Promise<FraudAnalysisResult> {
+    try {
+      const siftEvent = this.buildSiftEvent(payment);
+      const response = await this.siftClient.track(siftEvent);
+      
+      const riskScore = response.score || 0;
+      const riskLevel = this.calculateRiskLevel(riskScore);
+      const decision = this.makeDecision(riskLevel, payment);
+
+      return new FraudAnalysisResult(
+        payment.id,
+        riskScore,
+        riskLevel,
+        decision,
+        response.reasons || [],
+        new Date()
+      );
+    } catch (error) {
+      // Don't fail payment processing for fraud detection errors
+      console.warn('Fraud detection analysis failed:', error);
+      
+      return new FraudAnalysisResult(
+        payment.id,
+        0.5, // Default medium risk
+        FraudRiskLevel.MEDIUM,
+        FraudDecision.REVIEW,
+        ['fraud_detection_unavailable'],
+        new Date()
+      );
+    }
+  }
+
+  private buildSiftEvent(payment: Payment): SiftEvent {
+    return {
+      $type: '$transaction',
+      $api_key: this.apiKey,
+      $user_id: payment.getCustomerId().getValue(),
+      $transaction_id: payment.id.getValue(),
+      $amount: payment.getAmount().getAmount() * 1000000, // Sift expects micros
+      $currency_code: payment.getAmount().getCurrency(),
+      $payment_methods: [{
+        $payment_type: this.mapPaymentMethodType(payment.getPaymentMethod()),
+        $payment_gateway: payment.getProvider(),
+        $card_bin: payment.getPaymentMethod().getBin(),
+        $card_last4: payment.getPaymentMethod().getLast4()
+      }],
+      $billing_address: this.buildAddress(payment.getBillingAddress()),
+      $user_email: payment.getCustomerEmail().getValue(),
+      $session_id: payment.getSessionId(),
+      $ip: payment.getCustomerIP(),
+      $time: Math.floor(payment.getCreatedAt().getTime() / 1000)
+    };
+  }
+
+  private calculateRiskLevel(score: number): FraudRiskLevel {
+    if (score >= this.config.highRiskThreshold) {
+      return FraudRiskLevel.HIGH;
+    }
+    if (score >= this.config.mediumRiskThreshold) {
+      return FraudRiskLevel.MEDIUM;
+    }
+    return FraudRiskLevel.LOW;
+  }
+
+  private makeDecision(riskLevel: FraudRiskLevel, payment: Payment): FraudDecision {
+    switch (riskLevel) {
+      case FraudRiskLevel.LOW:
+        return FraudDecision.APPROVE;
+        
+      case FraudRiskLevel.MEDIUM:
+        // Additional checks for medium risk
+        if (payment.getAmount().getAmount() > this.config.autoApproveLimit) {
+          return FraudDecision.REVIEW;
+        }
+        return FraudDecision.APPROVE;
+        
+      case FraudRiskLevel.HIGH:
+        return FraudDecision.DECLINE;
+        
+      default:
+        return FraudDecision.REVIEW;
+    }
+  }
+
+  public async reportFraud(paymentId: PaymentId, reason: string): Promise<void> {
+    try {
+      await this.siftClient.track({
+        $type: '$chargeback',
+        $api_key: this.apiKey,
+        $transaction_id: paymentId.getValue(),
+        $chargeback_reason: reason,
+        $time: Math.floor(Date.now() / 1000)
+      });
+    } catch (error) {
+      throw new FraudDetectionAdapterError('Failed to report fraud', error);
+    }
+  }
+
+  public async updateRiskProfile(customerId: CustomerId, score: number): Promise<void> {
+    try {
+      await this.siftClient.track({
+        $type: '$label',
+        $api_key: this.apiKey,
+        $user_id: customerId.getValue(),
+        $is_fraud: score > 0.8,
+        $abuse_type: 'payment_abuse',
+        $time: Math.floor(Date.now() / 1000)
+      });
+    } catch (error) {
+      throw new FraudDetectionAdapterError('Failed to update risk profile', error);
+    }
+  }
+
+  public async shutdown(): Promise<void> {
+    console.log('🛡️ Fraud detection adapter shut down');
+  }
+
+  public async isHealthy(): Promise<boolean> {
+    try {
+      await this.siftClient.getAccount();
+      return true;
+    } catch {
+      return false;
+    }
+  }
+}
+
+export interface FraudDetectionConfig {
+  highRiskThreshold: number;
+  mediumRiskThreshold: number;
+  autoApproveLimit: number;
+}
+#+END_SRC
+
+** Integration Testing Example
+
+#+BEGIN_SRC typescript
+describe('Payment Infrastructure Integration', () => {
+  let paymentAdapter: StripePaymentAdapter;
+  let repository: PostgresPaymentRepository;
+  let fraudDetection: SiftFraudDetectionAdapter;
+  let dbContainer: StartedTestContainer;
+
+  beforeAll(async () => {
+    // Start test database
+    dbContainer = await new PostgreSqlContainer()
+      .withDatabase('payment_test')
+      .withUsername('test_user')
+      .withPassword('test_pass')
+      .start();
+
+    const connection = new PostgresConnection({
+      host: dbContainer.getHost(),
+      port: dbContainer.getFirstMappedPort(),
+      database: dbContainer.getDatabase(),
+      username: dbContainer.getUsername(),
+      password: dbContainer.getPassword()
+    });
+
+    await runPaymentMigrations(connection);
+
+    // Initialize adapters
+    paymentAdapter = new StripePaymentAdapter(
+      process.env.STRIPE_TEST_KEY!,
+      process.env.STRIPE_WEBHOOK_SECRET!,
+      {
+        statementDescriptor: 'TEST PAYMENT',
+        returnUrl: 'http://localhost:3000/return',
+        webhookEndpoint: 'http://localhost:3000/webhook'
+      }
+    );
+
+    repository = new PostgresPaymentRepository(
+      connection,
+      new TestEncryptionService()
+    );
+
+    fraudDetection = new SiftFraudDetectionAdapter(
+      process.env.SIFT_API_KEY!,
+      process.env.SIFT_ACCOUNT_ID!,
+      {
+        highRiskThreshold: 0.8,
+        mediumRiskThreshold: 0.5,
+        autoApproveLimit: 1000
+      }
+    );
+
+    await Promise.all([
+      paymentAdapter.initialize(),
+      repository.initialize(),
+      fraudDetection.initialize()
+    ]);
+  });
+
+  afterAll(async () => {
+    await Promise.all([
+      paymentAdapter.shutdown(),
+      repository.shutdown(),
+      fraudDetection.shutdown()
+    ]);
+    await dbContainer.stop();
+  });
+
+  it('should process payment end-to-end', async () => {
+    // Given: A valid payment
+    const payment = new Payment(
+      PaymentId.generate(),
+      new CustomerId('cust_123'),
+      new OrderId('order_456'),
+      new Money(1000, 'USD'),
+      createTestPaymentMethod(),
+      PaymentStatus.pending()
+    );
+
+    // When: Payment is processed through the full flow
+    
+    // 1. Fraud analysis
+    const fraudResult = await fraudDetection.analyzePayment(payment);
+    expect(fraudResult.getDecision()).toBe(FraudDecision.APPROVE);
+
+    // 2. Payment processing
+    const paymentResult = await paymentAdapter.processPayment(payment);
+    expect(paymentResult.getStatus()).toBe(PaymentStatus.COMPLETED);
+
+    // 3. Persistence
+    await repository.save(payment);
+
+    // 4. Verification
+    const savedPayment = await repository.findById(payment.id);
+    expect(savedPayment).toBeDefined();
+    expect(savedPayment!.getStatus()).toBe(PaymentStatus.COMPLETED);
+  });
+
+  it('should handle payment failure gracefully', async () => {
+    // Given: A payment that will fail
+    const payment = createFailingPayment();
+
+    // When: Payment processing fails
+    await expect(paymentAdapter.processPayment(payment))
+      .rejects.toThrow(PaymentDeclinedError);
+
+    // Then: Failure should be recorded
+    const savedPayment = await repository.findById(payment.id);
+    expect(savedPayment?.getStatus()).toBe(PaymentStatus.FAILED);
+  });
+});
+#+END_SRC
+
+This specification demonstrates a complete payment infrastructure implementation with:
+
+1. **Multiple Adapter Implementations**: Stripe payment processing, PostgreSQL persistence, Sift fraud detection
+2. **Comprehensive Error Handling**: Domain-specific errors with proper translation
+3. **Security Considerations**: Encryption for sensitive payment data
+4. **Real-time Processing**: Webhook handling for payment status updates
+5. **Fraud Detection Integration**: Risk analysis with configurable decision rules
+6. **Robust Testing**: Integration tests with real external services using test containers
+
+The infrastructure layer successfully bridges complex payment processing requirements with clean domain abstractions while maintaining security, reliability, and testability.

@@ -1,0 +1,62 @@
+{
+  "name": "@typescript-eda/infrastructure",
+  "version": "1.0.0",
+  "description": "Infrastructure adapters and implementations for TypeScript-EDA event-driven architecture",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "lint": "eslint src/**/*.ts",
+    "lint:fix": "eslint src/**/*.ts --fix",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "typescript",
+    "event-driven-architecture",
+    "domain-driven-design",
+    "infrastructure",
+    "adapters",
+    "ports-and-adapters",
+    "hexagonal-architecture",
+    "eda",
+    "ddd"
+  ],
+  "author": "TypeScript-EDA Team",
+  "license": "GPL-3.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rydnr/typescript-eda-infrastructure.git"
+  },
+  "bugs": {
+    "url": "https://github.com/rydnr/typescript-eda-infrastructure/issues"
+  },
+  "homepage": "https://typescript-eda.org/infrastructure",
+  "dependencies": {
+    "@typescript-eda/domain": "^1.0.0",
+    "reflect-metadata": "^0.2.0"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.0",
+    "@types/node": "^20.0.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "eslint": "^8.0.0",
+    "jest": "^29.5.0",
+    "ts-jest": "^29.1.0",
+    "typescript": "^5.0.0"
+  },
+  "peerDependencies": {
+    "@typescript-eda/domain": "^1.0.0"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
+}

@@ -1,0 +1,1005 @@
+#+TITLE: Building Bridges: The Infrastructure Story
+#+SUBTITLE: How Adapters Connect Pure Domain Logic to the Real World
+#+AUTHOR: TypeScript-EDA Infrastructure Team
+#+DATE: 2025-07-03
+#+LAYOUT: project
+#+PROJECT: typescript-eda-infrastructure
+
+* Prologue: The Gap Between Intent and Reality
+
+In the beginning, there was pure domain logic—beautiful, clean, and untainted by the complexity of the outside world. But domain models alone cannot deliver value. They must interact with databases, APIs, file systems, message queues, and countless other external systems.
+
+#+BEGIN_QUOTE
+"The infrastructure layer is where architectural purity meets practical necessity. It's the bridge between the ideal and the real."
+#+END_QUOTE
+
+This is the story of how we built that bridge, creating adapters that allow pure domain logic to interact with any external system while maintaining architectural integrity.
+
+* Chapter 1: The Realization - Ports Need Adapters
+
+** The Pure Domain Dilemma
+
+Our domain layer defined perfect abstractions:
+
+#+BEGIN_SRC typescript
+// Domain layer defines what it needs
+export abstract class UserRepository extends Repository<User, UserId> {
+  public abstract findByEmail(email: Email): Promise<User | null>;
+  public abstract save(user: User): Promise<void>;
+}
+
+export abstract class NotificationPort extends Port {
+  public abstract sendEmail(to: Email, subject: string, body: string): Promise<void>;
+}
+#+END_SRC
+
+But abstractions cannot save data or send emails. They define *what* needs to happen, not *how* it happens.
+
+** The Infrastructure Responsibility
+
+The infrastructure layer became responsible for the *how*:
+
+- *How* do we store users? PostgreSQL, MongoDB, in-memory?
+- *How* do we send notifications? SMTP, SendGrid, Slack?
+- *How* do we handle authentication? JWT, OAuth, API keys?
+- *How* do we integrate with external APIs? REST, GraphQL, gRPC?
+
+Each "how" required a specific adapter that implemented the domain's abstract contracts.
+
+* Chapter 2: The @AdapterFor Decorator - Declaring Intent
+
+** Connecting Contracts to Implementations
+
+The breakthrough came with the `@AdapterFor` decorator, which created an explicit link between domain contracts (ports) and infrastructure implementations (adapters):
+
+#+BEGIN_SRC typescript
+import { AdapterFor } from '@typescript-eda/infrastructure';
+import { UserRepository } from '@typescript-eda/domain';
+
+@AdapterFor(UserRepository)
+export class PostgresUserRepository extends UserRepository {
+  constructor(private connection: PostgresConnection) {
+    super();
+  }
+
+  public async findByEmail(email: Email): Promise<User | null> {
+    const result = await this.connection.query(
+      'SELECT * FROM users WHERE email = $1',
+      [email.getValue()]
+    );
+    
+    return result.rows.length > 0 
+      ? this.mapToUser(result.rows[0]) 
+      : null;
+  }
+
+  public async save(user: User): Promise<void> {
+    await this.connection.query(
+      'INSERT INTO users (id, email, name, status) VALUES ($1, $2, $3, $4) ON CONFLICT (id) DO UPDATE SET email = $2, name = $3, status = $4',
+      [
+        user.id.getValue(),
+        user.getEmail().getValue(),
+        user.getName().getFullName(),
+        user.getStatus().getStatus()
+      ]
+    );
+  }
+
+  private mapToUser(row: any): User {
+    return new User(
+      new UserId(row.id),
+      new Email(row.email),
+      new UserName(row.first_name, row.last_name),
+      new UserStatus(row.status)
+    );
+  }
+}
+#+END_SRC
+
+** Metadata-Driven Discovery
+
+The `@AdapterFor` decorator used reflection to create discoverable mappings:
+
+#+BEGIN_SRC typescript
+export function AdapterFor(port: Port): ClassDecorator {
+  return (target: unknown) => {
+    // Store metadata linking this adapter to its port
+    Reflect.defineMetadata('port', port, target);
+    
+    // Register in global adapter registry
+    AdapterRegistry.register(port, target as any);
+  };
+}
+#+END_SRC
+
+This enabled the application layer to automatically discover and wire adapters without manual configuration.
+
+* Chapter 3: Database Adapters - Persistence with Purpose
+
+** From Raw SQL to Domain Language
+
+Traditional database code mixed technical and business concerns:
+
+#+BEGIN_SRC typescript
+// Traditional approach - technical focus
+async function updateUser(userId: string, data: any) {
+  const query = 'UPDATE users SET email = ?, name = ? WHERE id = ?';
+  await db.execute(query, [data.email, data.name, userId]);
+}
+#+END_SRC
+
+Infrastructure adapters translated between domain language and database operations:
+
+#+BEGIN_SRC typescript
+@AdapterFor(UserRepository)
+export class PostgresUserRepository extends UserRepository {
+  public async changeUserEmail(user: User, newEmail: Email): Promise<void> {
+    // Domain operation translated to database operation
+    const transaction = await this.connection.beginTransaction();
+    
+    try {
+      // Update user record
+      await transaction.query(
+        'UPDATE users SET email = $1, updated_at = NOW() WHERE id = $2',
+        [newEmail.getValue(), user.id.getValue()]
+      );
+      
+      // Store domain event for audit trail
+      await transaction.query(
+        'INSERT INTO domain_events (aggregate_id, event_type, event_data, created_at) VALUES ($1, $2, $3, NOW())',
+        [user.id.getValue(), 'UserEmailChanged', JSON.stringify({
+          userId: user.id.getValue(),
+          previousEmail: user.getEmail().getValue(),
+          newEmail: newEmail.getValue()
+        })]
+      );
+      
+      await transaction.commit();
+    } catch (error) {
+      await transaction.rollback();
+      throw new UserPersistenceError('Failed to change user email', error);
+    }
+  }
+}
+#+END_SRC
+
+** Domain-Driven Queries
+
+Repository adapters spoke the domain language, not database language:
+
+#+BEGIN_SRC typescript
+@AdapterFor(UserRepository)
+export class MongoUserRepository extends UserRepository {
+  public async findActiveUsers(): Promise<User[]> {
+    // Business query expressed in domain terms
+    const cursor = this.collection.find({
+      status: 'active',
+      emailVerified: true,
+      lastLoginAt: { $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) } // Last 30 days
+    });
+    
+    const documents = await cursor.toArray();
+    return documents.map(doc => this.mapToUser(doc));
+  }
+
+  public async findUsersRequiringNotification(): Promise<User[]> {
+    // Complex business logic in repository
+    const cursor = this.collection.find({
+      $and: [
+        { status: 'active' },
+        { emailVerified: true },
+        {
+          $or: [
+            { lastNotificationAt: { $lt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } },
+            { lastNotificationAt: { $exists: false } }
+          ]
+        }
+      ]
+    });
+    
+    return (await cursor.toArray()).map(doc => this.mapToUser(doc));
+  }
+}
+#+END_SRC
+
+* Chapter 4: API Adapters - External System Integration
+
+** RESTful Domain Communication
+
+API adapters translated domain events into external system calls:
+
+#+BEGIN_SRC typescript
+@AdapterFor(NotificationPort)
+export class SendGridNotificationAdapter extends NotificationPort {
+  constructor(private apiKey: string, private httpClient: HttpClient) {
+    super();
+  }
+
+  public async sendEmail(to: Email, subject: string, body: string): Promise<void> {
+    const payload = {
+      personalizations: [{
+        to: [{ email: to.getValue() }],
+        subject: subject
+      }],
+      from: { email: 'noreply@example.com', name: 'Our Application' },
+      content: [{
+        type: 'text/html',
+        value: body
+      }]
+    };
+
+    try {
+      const response = await this.httpClient.post('https://api.sendgrid.com/v3/mail/send', {
+        headers: {
+          'Authorization': `Bearer ${this.apiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        throw new NotificationDeliveryError(
+          `SendGrid API error: ${response.status} ${response.statusText}`
+        );
+      }
+    } catch (error) {
+      throw new NotificationDeliveryError('Failed to send email via SendGrid', error);
+    }
+  }
+}
+#+END_SRC
+
+** Event-Driven API Integration
+
+Some adapters consumed external events and translated them into domain events:
+
+#+BEGIN_SRC typescript
+@AdapterFor(PaymentEventPort)
+export class StripeWebhookAdapter extends PaymentEventPort implements PrimaryPort {
+  constructor(private webhookSecret: string) {
+    super();
+  }
+
+  public async accept(app: Application): Promise<void> {
+    // Listen for Stripe webhooks
+    const server = new WebhookServer();
+    
+    server.on('webhook', async (payload: StripeWebhookPayload) => {
+      try {
+        // Verify webhook signature
+        this.verifySignature(payload);
+        
+        // Translate Stripe event to domain event
+        const domainEvent = this.translateStripeToDomain(payload);
+        
+        if (domainEvent) {
+          await app.handle(domainEvent);
+        }
+      } catch (error) {
+        console.error('Failed to process Stripe webhook:', error);
+      }
+    });
+  }
+
+  private translateStripeToDomain(payload: StripeWebhookPayload): Event | null {
+    switch (payload.type) {
+      case 'payment_intent.succeeded':
+        return new PaymentProcessed(
+          new PaymentId(payload.data.object.id),
+          new Money(payload.data.object.amount / 100, 'USD'), // Stripe uses cents
+          new Date(payload.data.object.created * 1000)
+        );
+        
+      case 'payment_intent.payment_failed':
+        return new PaymentFailed(
+          new PaymentId(payload.data.object.id),
+          payload.data.object.last_payment_error?.message || 'Payment failed'
+        );
+        
+      default:
+        return null; // Ignore unhandled events
+    }
+  }
+}
+#+END_SRC
+
+* Chapter 5: Message Queue Adapters - Asynchronous Communication
+
+** Event-Driven Messaging
+
+Message queue adapters enabled scalable, asynchronous event processing:
+
+#+BEGIN_SRC typescript
+@AdapterFor(EventBusPort)
+export class RabbitMQEventBusAdapter extends EventBusPort implements PrimaryPort {
+  constructor(private connection: amqp.Connection) {
+    super();
+  }
+
+  public async accept(app: Application): Promise<void> {
+    const channel = await this.connection.createChannel();
+    
+    // Set up event publishing
+    await channel.assertExchange('domain-events', 'topic', { durable: true });
+    
+    // Set up event consumption
+    await this.setupEventConsumers(channel, app);
+  }
+
+  public async publishEvent(event: Event): Promise<void> {
+    const channel = await this.connection.createChannel();
+    const routingKey = `events.${event.type}`;
+    
+    const message = Buffer.from(JSON.stringify(event.toJSON()));
+    
+    await channel.publish('domain-events', routingKey, message, {
+      persistent: true,
+      messageId: event.id,
+      timestamp: event.timestamp.getTime(),
+      type: event.type
+    });
+  }
+
+  private async setupEventConsumers(channel: amqp.Channel, app: Application): Promise<void> {
+    // Create queue for this application instance
+    const queue = await channel.assertQueue('', { exclusive: true });
+    
+    // Bind to relevant event types
+    const eventTypes = ['UserRegistered', 'UserEmailChanged', 'OrderPlaced'];
+    
+    for (const eventType of eventTypes) {
+      await channel.bindQueue(queue.queue, 'domain-events', `events.${eventType}`);
+    }
+    
+    // Consume messages
+    await channel.consume(queue.queue, async (msg) => {
+      if (msg) {
+        try {
+          const eventData = JSON.parse(msg.content.toString());
+          const domainEvent = this.deserializeEvent(eventData);
+          
+          await app.handle(domainEvent);
+          channel.ack(msg);
+        } catch (error) {
+          console.error('Failed to process event:', error);
+          channel.nack(msg, false, false); // Dead letter the message
+        }
+      }
+    });
+  }
+}
+#+END_SRC
+
+* Chapter 6: File System Adapters - Storage and Documents
+
+** Domain-Driven File Operations
+
+File system adapters provided domain-friendly file operations:
+
+#+BEGIN_SRC typescript
+@AdapterFor(DocumentStoragePort)
+export class S3DocumentStorageAdapter extends DocumentStoragePort {
+  constructor(private s3Client: S3Client, private bucketName: string) {
+    super();
+  }
+
+  public async storeUserDocument(
+    user: User, 
+    document: UserDocument
+  ): Promise<DocumentStored> {
+    const key = this.generateDocumentKey(user, document);
+    
+    try {
+      await this.s3Client.send(new PutObjectCommand({
+        Bucket: this.bucketName,
+        Key: key,
+        Body: document.getContent(),
+        ContentType: document.getContentType(),
+        Metadata: {
+          userId: user.id.getValue(),
+          documentType: document.getType(),
+          uploadedAt: new Date().toISOString()
+        }
+      }));
+
+      const storedLocation = new DocumentLocation(
+        `s3://${this.bucketName}/${key}`
+      );
+
+      return new DocumentStored(
+        user.id,
+        document.getId(),
+        storedLocation
+      );
+    } catch (error) {
+      throw new DocumentStorageError(
+        'Failed to store document in S3',
+        error
+      );
+    }
+  }
+
+  public async retrieveUserDocument(
+    user: User, 
+    documentId: DocumentId
+  ): Promise<UserDocument | null> {
+    const key = this.generateDocumentKey(user, { id: documentId });
+    
+    try {
+      const response = await this.s3Client.send(new GetObjectCommand({
+        Bucket: this.bucketName,
+        Key: key
+      }));
+
+      if (!response.Body) {
+        return null;
+      }
+
+      const content = await this.streamToBuffer(response.Body);
+      
+      return new UserDocument(
+        documentId,
+        new DocumentType(response.Metadata?.documentType || 'unknown'),
+        content,
+        new ContentType(response.ContentType || 'application/octet-stream')
+      );
+    } catch (error) {
+      if (error.name === 'NoSuchKey') {
+        return null;
+      }
+      throw new DocumentRetrievalError(
+        'Failed to retrieve document from S3',
+        error
+      );
+    }
+  }
+
+  private generateDocumentKey(user: User, document: { id?: DocumentId }): string {
+    return `users/${user.id.getValue()}/documents/${document.id?.getValue() || 'unknown'}`;
+  }
+}
+#+END_SRC
+
+* Chapter 7: Authentication Adapters - Security and Identity
+
+** Domain-Aware Security
+
+Authentication adapters translated between security systems and domain concepts:
+
+#+BEGIN_SRC typescript
+@AdapterFor(AuthenticationPort)
+export class JWTAuthenticationAdapter extends AuthenticationPort {
+  constructor(
+    private secretKey: string,
+    private userRepository: UserRepository
+  ) {
+    super();
+  }
+
+  public async authenticateUser(
+    credentials: UserCredentials
+  ): Promise<AuthenticationResult> {
+    // Find user in domain
+    const user = await this.userRepository.findByEmail(credentials.getEmail());
+    
+    if (!user) {
+      throw new AuthenticationError('User not found');
+    }
+
+    // Verify credentials
+    const isValid = await this.verifyPassword(
+      credentials.getPassword(),
+      user.getPasswordHash()
+    );
+
+    if (!isValid) {
+      throw new AuthenticationError('Invalid credentials');
+    }
+
+    // Check user status
+    if (!user.isActive()) {
+      throw new AuthenticationError('User account is not active');
+    }
+
+    // Generate token
+    const token = this.generateJWT(user);
+    
+    return new AuthenticationResult(
+      user,
+      new AuthenticationToken(token),
+      new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
+    );
+  }
+
+  public async validateToken(token: AuthenticationToken): Promise<User | null> {
+    try {
+      const payload = this.verifyJWT(token.getValue());
+      const userId = new UserId(payload.sub);
+      
+      const user = await this.userRepository.findById(userId);
+      
+      return user && user.isActive() ? user : null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  private generateJWT(user: User): string {
+    return jwt.sign(
+      {
+        sub: user.id.getValue(),
+        email: user.getEmail().getValue(),
+        name: user.getName().getFullName(),
+        iat: Math.floor(Date.now() / 1000)
+      },
+      this.secretKey,
+      { expiresIn: '24h' }
+    );
+  }
+}
+#+END_SRC
+
+* Chapter 8: Testing Infrastructure Adapters
+
+** Adapter Testing Strategy
+
+Infrastructure adapters required different testing approaches than domain logic:
+
+#+BEGIN_SRC typescript
+describe('PostgresUserRepository', () => {
+  let repository: PostgresUserRepository;
+  let testContainer: StartedTestContainer;
+  let connection: Connection;
+
+  beforeAll(async () => {
+    // Use Testcontainers for real database testing
+    testContainer = await new PostgreSqlContainer()
+      .withDatabase('testdb')
+      .withUsername('testuser')
+      .withPassword('testpass')
+      .start();
+
+    connection = await createConnection({
+      host: testContainer.getHost(),
+      port: testContainer.getFirstMappedPort(),
+      database: testContainer.getDatabase(),
+      username: testContainer.getUsername(),
+      password: testContainer.getPassword()
+    });
+
+    await runMigrations(connection);
+    repository = new PostgresUserRepository(connection);
+  });
+
+  afterAll(async () => {
+    await connection.close();
+    await testContainer.stop();
+  });
+
+  it('should store and retrieve user with all domain properties', async () => {
+    // Given: A user with complex domain properties
+    const user = new User(
+      new UserId('test-123'),
+      new Email('test@example.com'),
+      new UserName('John', 'Doe'),
+      UserStatus.active()
+    );
+
+    // When: User is saved and retrieved
+    await repository.save(user);
+    const retrievedUser = await repository.findById(user.id);
+
+    // Then: All domain properties are preserved
+    expect(retrievedUser).not.toBeNull();
+    expect(retrievedUser!.id.equals(user.id)).toBe(true);
+    expect(retrievedUser!.getEmail().equals(user.getEmail())).toBe(true);
+    expect(retrievedUser!.getName().equals(user.getName())).toBe(true);
+    expect(retrievedUser!.getStatus().equals(user.getStatus())).toBe(true);
+  });
+
+  it('should handle complex domain queries', async () => {
+    // Given: Multiple users with different statuses
+    const activeUser = createTestUser('active@example.com', UserStatus.active());
+    const pendingUser = createTestUser('pending@example.com', UserStatus.pending());
+    
+    await repository.save(activeUser);
+    await repository.save(pendingUser);
+
+    // When: Querying for active users
+    const activeUsers = await repository.findActiveUsers();
+
+    // Then: Only active users are returned
+    expect(activeUsers).toHaveLength(1);
+    expect(activeUsers[0].getEmail().equals(activeUser.getEmail())).toBe(true);
+  });
+});
+#+END_SRC
+
+** Contract Testing
+
+Contract tests ensured adapters fulfilled their port contracts:
+
+#+BEGIN_SRC typescript
+describe('NotificationAdapter Contract', () => {
+  const adapters = [
+    new SendGridNotificationAdapter(apiKey, httpClient),
+    new SMTPNotificationAdapter(smtpConfig),
+    new SlackNotificationAdapter(slackToken)
+  ];
+
+  adapters.forEach(adapter => {
+    describe(`${adapter.constructor.name}`, () => {
+      it('should implement NotificationPort contract', () => {
+        expect(adapter).toBeInstanceOf(NotificationPort);
+      });
+
+      it('should send email successfully', async () => {
+        const email = new Email('test@example.com');
+        const subject = 'Test Subject';
+        const body = 'Test Body';
+
+        await expect(
+          adapter.sendEmail(email, subject, body)
+        ).resolves.not.toThrow();
+      });
+
+      it('should handle invalid email addresses', async () => {
+        const invalidEmail = new Email('invalid-email');
+        
+        await expect(
+          adapter.sendEmail(invalidEmail, 'Subject', 'Body')
+        ).rejects.toThrow(NotificationDeliveryError);
+      });
+    });
+  });
+});
+#+END_SRC
+
+* Chapter 9: Configuration and Environment Management
+
+** Environment-Aware Adapters
+
+Adapters adapted to different environments automatically:
+
+#+BEGIN_SRC typescript
+@AdapterFor(NotificationPort)
+export class EnvironmentAwareNotificationAdapter extends NotificationPort {
+  private delegate: NotificationPort;
+
+  constructor() {
+    super();
+    this.delegate = this.createDelegate();
+  }
+
+  private createDelegate(): NotificationPort {
+    const environment = process.env.NODE_ENV || 'development';
+
+    switch (environment) {
+      case 'production':
+        return new SendGridNotificationAdapter(
+          process.env.SENDGRID_API_KEY!,
+          new HttpClient()
+        );
+        
+      case 'staging':
+        return new SMTPNotificationAdapter({
+          host: process.env.SMTP_HOST!,
+          port: parseInt(process.env.SMTP_PORT!),
+          username: process.env.SMTP_USERNAME!,
+          password: process.env.SMTP_PASSWORD!
+        });
+        
+      case 'test':
+        return new InMemoryNotificationAdapter();
+        
+      default:
+        return new ConsoleNotificationAdapter();
+    }
+  }
+
+  public async sendEmail(to: Email, subject: string, body: string): Promise<void> {
+    return this.delegate.sendEmail(to, subject, body);
+  }
+}
+#+END_SRC
+
+** Configuration Validation
+
+Adapters validated their configuration at startup:
+
+#+BEGIN_SRC typescript
+@AdapterFor(DatabasePort)
+export class PostgresConnectionAdapter extends DatabasePort {
+  private connection: Connection;
+
+  constructor(private config: DatabaseConfig) {
+    super();
+    this.validateConfig(config);
+  }
+
+  public async initialize(): Promise<void> {
+    try {
+      this.connection = await createConnection({
+        host: this.config.host,
+        port: this.config.port,
+        database: this.config.database,
+        username: this.config.username,
+        password: this.config.password,
+        ssl: this.config.ssl
+      });
+
+      // Test connection
+      await this.connection.query('SELECT 1');
+      
+      console.log(`✅ Database connection established: ${this.config.host}:${this.config.port}/${this.config.database}`);
+    } catch (error) {
+      throw new DatabaseConnectionError(
+        `Failed to connect to database: ${error.message}`,
+        error
+      );
+    }
+  }
+
+  private validateConfig(config: DatabaseConfig): void {
+    const required = ['host', 'port', 'database', 'username', 'password'];
+    const missing = required.filter(key => !config[key]);
+
+    if (missing.length > 0) {
+      throw new ConfigurationError(
+        `Missing required database configuration: ${missing.join(', ')}`
+      );
+    }
+
+    if (config.port < 1 || config.port > 65535) {
+      throw new ConfigurationError(
+        `Invalid database port: ${config.port}. Must be between 1 and 65535.`
+      );
+    }
+  }
+}
+#+END_SRC
+
+* Chapter 10: The Infrastructure Pattern Library
+
+** Reusable Adapter Patterns
+
+Common adapter patterns emerged that could be reused across projects:
+
+#+BEGIN_SRC typescript
+// Base HTTP API adapter with common patterns
+export abstract class BaseHttpApiAdapter extends Port {
+  constructor(
+    protected baseUrl: string,
+    protected apiKey: string,
+    protected httpClient: HttpClient
+  ) {
+    super();
+  }
+
+  protected async makeRequest<T>(
+    method: 'GET' | 'POST' | 'PUT' | 'DELETE',
+    endpoint: string,
+    data?: any
+  ): Promise<T> {
+    const url = `${this.baseUrl}${endpoint}`;
+    
+    const response = await this.httpClient.request({
+      method,
+      url,
+      headers: {
+        'Authorization': `Bearer ${this.apiKey}`,
+        'Content-Type': 'application/json',
+        'User-Agent': 'TypeScript-EDA/1.0'
+      },
+      data: data ? JSON.stringify(data) : undefined
+    });
+
+    if (!response.ok) {
+      throw new ApiError(
+        `API request failed: ${response.status} ${response.statusText}`,
+        response.status
+      );
+    }
+
+    return response.json();
+  }
+
+  protected handleApiError(error: any): never {
+    if (error instanceof ApiError) {
+      throw error;
+    }
+    
+    throw new ApiError(
+      `Unexpected API error: ${error.message}`,
+      500
+    );
+  }
+}
+
+// Specific API adapter extending the base
+@AdapterFor(CustomerSyncPort)
+export class SalesforceCustomerAdapter extends BaseHttpApiAdapter implements CustomerSyncPort {
+  constructor(apiKey: string) {
+    super('https://api.salesforce.com/v1', apiKey, new HttpClient());
+  }
+
+  public async syncCustomer(customer: Customer): Promise<CustomerSynced> {
+    try {
+      const salesforceData = this.transformToSalesforce(customer);
+      
+      const result = await this.makeRequest<SalesforceResponse>(
+        'POST',
+        '/customers',
+        salesforceData
+      );
+
+      return new CustomerSynced(
+        customer.id,
+        new ExternalId(result.id),
+        new Date()
+      );
+    } catch (error) {
+      this.handleApiError(error);
+    }
+  }
+}
+#+END_SRC
+
+* Chapter 11: Error Handling and Resilience
+
+** Infrastructure Error Patterns
+
+Infrastructure adapters implemented sophisticated error handling:
+
+#+BEGIN_SRC typescript
+@AdapterFor(PaymentProcessingPort)
+export class StripePaymentAdapter extends PaymentProcessingPort {
+  constructor(private stripeClient: Stripe) {
+    super();
+  }
+
+  public async processPayment(payment: Payment): Promise<PaymentResult> {
+    const retryPolicy = new ExponentialBackoffRetry({
+      maxAttempts: 3,
+      baseDelay: 1000,
+      maxDelay: 10000
+    });
+
+    return retryPolicy.execute(async () => {
+      try {
+        const result = await this.stripeClient.paymentIntents.create({
+          amount: payment.getAmount().getAmount() * 100, // Convert to cents
+          currency: payment.getAmount().getCurrency().toLowerCase(),
+          payment_method: payment.getPaymentMethod().getValue(),
+          confirm: true,
+          metadata: {
+            orderId: payment.getOrderId().getValue(),
+            customerId: payment.getCustomerId().getValue()
+          }
+        });
+
+        return this.mapStripeResultToPaymentResult(result);
+      } catch (error) {
+        return this.handleStripeError(error, payment);
+      }
+    });
+  }
+
+  private handleStripeError(error: any, payment: Payment): never {
+    if (error.type === 'StripeCardError') {
+      throw new PaymentDeclinedError(
+        error.message,
+        payment.getPaymentMethod()
+      );
+    }
+
+    if (error.type === 'StripeRateLimitError') {
+      throw new PaymentRateLimitError(
+        'Payment rate limit exceeded, please try again later'
+      );
+    }
+
+    if (error.type === 'StripeConnectionError') {
+      throw new PaymentServiceUnavailableError(
+        'Payment service temporarily unavailable'
+      );
+    }
+
+    throw new PaymentProcessingError(
+      `Unexpected payment error: ${error.message}`,
+      error
+    );
+  }
+}
+#+END_SRC
+
+* Chapter 12: Performance and Monitoring
+
+** Instrumented Adapters
+
+Production adapters included comprehensive monitoring:
+
+#+BEGIN_SRC typescript
+@AdapterFor(UserRepository)
+export class InstrumentedPostgresUserRepository extends PostgresUserRepository {
+  constructor(
+    connection: Connection,
+    private metrics: MetricsCollector,
+    private logger: Logger
+  ) {
+    super(connection);
+  }
+
+  public async findByEmail(email: Email): Promise<User | null> {
+    const timer = this.metrics.startTimer('user_repository.find_by_email');
+    const startTime = Date.now();
+
+    try {
+      this.logger.debug('Finding user by email', { email: email.getValue() });
+      
+      const result = await super.findByEmail(email);
+      
+      const duration = Date.now() - startTime;
+      this.metrics.recordHistogram('user_repository.query_duration', duration);
+      this.metrics.incrementCounter('user_repository.queries_total', {
+        operation: 'find_by_email',
+        status: 'success'
+      });
+
+      if (result) {
+        this.logger.info('User found by email', { 
+          userId: result.id.getValue(),
+          email: email.getValue() 
+        });
+      } else {
+        this.logger.info('No user found for email', { email: email.getValue() });
+      }
+
+      return result;
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      this.metrics.incrementCounter('user_repository.queries_total', {
+        operation: 'find_by_email',
+        status: 'error'
+      });
+
+      this.logger.error('Error finding user by email', {
+        email: email.getValue(),
+        error: error.message,
+        duration
+      });
+
+      throw error;
+    } finally {
+      timer.end();
+    }
+  }
+}
+#+END_SRC
+
+* Epilogue: The Infrastructure Foundation
+
+** More Than Implementation Details
+
+The infrastructure layer became more than just implementation details. It became the foundation that allowed pure domain logic to interact with the real world while maintaining architectural integrity.
+
+#+BEGIN_QUOTE
+"Good infrastructure is invisible. It does its job so well that developers can focus entirely on business logic, forgetting that complexity exists."
+#+END_QUOTE
+
+** Enabling Innovation
+
+By providing clean abstractions and reliable implementations, the infrastructure layer enabled:
+
+- *Rapid Development*: Developers could focus on business logic instead of integration details
+- *Easy Testing*: Clear boundaries between domain logic and external systems
+- *System Evolution*: Changing external systems required only adapter changes
+- *Operational Excellence*: Built-in monitoring, error handling, and resilience
+
+** The Bridge Builders
+
+Every infrastructure adapter was a bridge—connecting the pure world of domain logic to the messy reality of external systems. These bridges allowed business value to flow from clean domain models to real-world impact.
+
+The infrastructure layer made the impossible possible: keeping domain logic pure while delivering practical value. It proved that architectural purity and pragmatic delivery were not opposites, but partners in creating exceptional software.
+
+**This is how we built bridges between intent and reality, between the ideal and the practical, between the domain and the world.**
