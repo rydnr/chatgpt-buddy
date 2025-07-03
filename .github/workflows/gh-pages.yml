@@ -1,0 +1,93 @@
+name: Build and Deploy GitHub Pages
+
+on:
+  push:
+    branches: [ main ]
+    paths: [ 'docs/**' ]
+  pull_request:
+    branches: [ main ]
+    paths: [ 'docs/**' ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Setup Ruby
+      uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: '3.1'
+        bundler-cache: true
+        
+    - name: Setup Emacs
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y emacs-nox
+        
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        
+    - name: Install Pandoc
+      run: |
+        sudo apt-get install -y pandoc
+        
+    - name: Create Gemfile
+      run: |
+        cat > Gemfile << EOF
+        source "https://rubygems.org"
+        gem "jekyll", "~> 4.3.2"
+        gem "minima", "~> 2.5"
+        gem "jekyll-feed", "~> 0.12"
+        gem "jekyll-sitemap"
+        gem "jekyll-seo-tag"
+        EOF
+        
+    - name: Install Ruby dependencies
+      run: bundle install
+      
+    - name: Convert org files to HTML
+      run: ./scripts/convert-org-to-html.sh
+      
+    - name: Setup Pages
+      uses: actions/configure-pages@v4
+      
+    - name: Build with Jekyll
+      run: |
+        cd docs
+        bundle exec jekyll build --destination ../_site
+      env:
+        JEKYLL_ENV: production
+        
+    - name: Upload artifact
+      uses: actions/upload-pages-artifact@v3
+      with:
+        path: _site
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Deploy to GitHub Pages
+      id: deployment
+      uses: actions/deploy-pages@v4
