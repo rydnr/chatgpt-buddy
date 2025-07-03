@@ -1,0 +1,665 @@
+#+TITLE: Getting Started with TypeScript-EDA Domain
+#+SUBTITLE: Building Rich Domain Models with Event-Driven Architecture
+#+AUTHOR: TypeScript-EDA Domain Team
+#+DATE: 2025-07-03
+#+LAYOUT: project
+#+PROJECT: typescript-eda-domain
+
+* Quick Start Guide
+
+TypeScript-EDA Domain provides the core building blocks for creating rich, event-driven domain models. This guide will walk you through creating your first domain model using entities, value objects, events, and the @listen decorator.
+
+** Prerequisites
+
+- Node.js 18+ and npm/pnpm
+- TypeScript 5+ knowledge
+- Basic understanding of domain-driven design concepts
+- Familiarity with decorators and metadata
+
+** Installation
+
+#+BEGIN_SRC bash
+npm install @typescript-eda/domain
+# or with pnpm
+pnpm add @typescript-eda/domain
+#+END_SRC
+
+* Your First Domain Model
+
+Let's build a simple e-commerce domain to demonstrate the core concepts.
+
+** Step 1: Define Value Objects
+
+Value objects encapsulate business rules and ensure data validity:
+
+#+BEGIN_SRC typescript
+// src/domain/value-objects/email.ts
+import { ValueObject } from '@typescript-eda/domain';
+
+export class Email extends ValueObject {
+  constructor(private readonly value: string) {
+    super();
+    this.validate(value);
+  }
+
+  private validate(email: string): void {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      throw new Error(`Invalid email format: ${email}`);
+    }
+  }
+
+  public getValue(): string {
+    return this.value;
+  }
+
+  protected getEqualityComponents(): unknown[] {
+    return [this.value];
+  }
+}
+#+END_SRC
+
+#+BEGIN_SRC typescript
+// src/domain/value-objects/user-id.ts
+import { ValueObject } from '@typescript-eda/domain';
+
+export class UserId extends ValueObject {
+  constructor(private readonly value: string) {
+    super();
+    if (!value || value.trim().length === 0) {
+      throw new Error('User ID cannot be empty');
+    }
+  }
+
+  public getValue(): string {
+    return this.value;
+  }
+
+  protected getEqualityComponents(): unknown[] {
+    return [this.value];
+  }
+}
+#+END_SRC
+
+#+BEGIN_SRC typescript
+// src/domain/value-objects/money.ts
+import { ValueObject } from '@typescript-eda/domain';
+
+export class Money extends ValueObject {
+  constructor(
+    private readonly amount: number,
+    private readonly currency: string
+  ) {
+    super();
+    if (amount < 0) {
+      throw new Error('Amount cannot be negative');
+    }
+    if (!currency || currency.length !== 3) {
+      throw new Error('Currency must be a 3-letter code');
+    }
+  }
+
+  public getAmount(): number {
+    return this.amount;
+  }
+
+  public getCurrency(): string {
+    return this.currency;
+  }
+
+  public add(other: Money): Money {
+    if (this.currency !== other.currency) {
+      throw new Error(`Cannot add different currencies: ${this.currency} and ${other.currency}`);
+    }
+    return new Money(this.amount + other.amount, this.currency);
+  }
+
+  protected getEqualityComponents(): unknown[] {
+    return [this.amount, this.currency];
+  }
+}
+#+END_SRC
+
+** Step 2: Define Domain Events
+
+Events capture important business occurrences:
+
+#+BEGIN_SRC typescript
+// src/domain/events/user-events.ts
+import { Event } from '@typescript-eda/domain';
+import { UserId } from '../value-objects/user-id';
+import { Email } from '../value-objects/email';
+
+export class UserRegistered extends Event {
+  public readonly type = 'UserRegistered';
+
+  constructor(
+    public readonly userId: UserId,
+    public readonly email: Email,
+    public readonly name: string
+  ) {
+    super();
+  }
+
+  public toJSON(): Record<string, unknown> {
+    return {
+      type: this.type,
+      userId: this.userId.getValue(),
+      email: this.email.getValue(),
+      name: this.name,
+      timestamp: this.timestamp.toISOString(),
+      id: this.id
+    };
+  }
+}
+
+export class EmailVerificationRequested extends Event {
+  public readonly type = 'EmailVerificationRequested';
+
+  constructor(
+    public readonly userId: UserId,
+    public readonly email: Email,
+    public readonly verificationToken: string
+  ) {
+    super();
+  }
+
+  public toJSON(): Record<string, unknown> {
+    return {
+      type: this.type,
+      userId: this.userId.getValue(),
+      email: this.email.getValue(),
+      verificationToken: this.verificationToken,
+      timestamp: this.timestamp.toISOString(),
+      id: this.id
+    };
+  }
+}
+
+export class EmailVerified extends Event {
+  public readonly type = 'EmailVerified';
+
+  constructor(
+    public readonly userId: UserId,
+    public readonly email: Email
+  ) {
+    super();
+  }
+
+  public toJSON(): Record<string, unknown> {
+    return {
+      type: this.type,
+      userId: this.userId.getValue(),
+      email: this.email.getValue(),
+      timestamp: this.timestamp.toISOString(),
+      id: this.id
+    };
+  }
+}
+#+END_SRC
+
+** Step 3: Create Your First Entity
+
+Entities combine identity, state, and behavior:
+
+#+BEGIN_SRC typescript
+// src/domain/entities/user.ts
+import { Entity, listen } from '@typescript-eda/domain';
+import { UserId } from '../value-objects/user-id';
+import { Email } from '../value-objects/email';
+import { 
+  UserRegistered, 
+  EmailVerificationRequested, 
+  EmailVerified 
+} from '../events/user-events';
+
+export enum UserStatus {
+  PENDING_VERIFICATION = 'pending_verification',
+  ACTIVE = 'active',
+  SUSPENDED = 'suspended'
+}
+
+export class User extends Entity<UserId> {
+  private email: Email;
+  private name: string;
+  private status: UserStatus;
+  private emailVerified: boolean;
+
+  constructor(
+    id: UserId,
+    email: Email,
+    name: string,
+    status: UserStatus = UserStatus.PENDING_VERIFICATION
+  ) {
+    super(id);
+    this.email = email;
+    this.name = name;
+    this.status = status;
+    this.emailVerified = false;
+  }
+
+  // Static factory method for registration
+  public static register(
+    userId: UserId,
+    email: Email,
+    name: string
+  ): [User, UserRegistered, EmailVerificationRequested] {
+    const user = new User(userId, email, name);
+    
+    const registeredEvent = new UserRegistered(userId, email, name);
+    
+    const verificationToken = user.generateVerificationToken();
+    const verificationEvent = new EmailVerificationRequested(
+      userId, 
+      email, 
+      verificationToken
+    );
+
+    return [user, registeredEvent, verificationEvent];
+  }
+
+  @listen(EmailVerified)
+  public async verifyEmail(event: EmailVerified): Promise<void> {
+    if (!this.id.equals(event.userId)) {
+      return; // Not for this user
+    }
+
+    this.emailVerified = true;
+    this.status = UserStatus.ACTIVE;
+  }
+
+  public changeEmail(newEmail: Email): EmailVerificationRequested {
+    if (this.status !== UserStatus.ACTIVE) {
+      throw new Error('Cannot change email for non-active user');
+    }
+
+    this.email = newEmail;
+    this.emailVerified = false;
+    this.status = UserStatus.PENDING_VERIFICATION;
+
+    const verificationToken = this.generateVerificationToken();
+    return new EmailVerificationRequested(this.id, newEmail, verificationToken);
+  }
+
+  private generateVerificationToken(): string {
+    return Math.random().toString(36).substring(2, 15) + 
+           Math.random().toString(36).substring(2, 15);
+  }
+
+  // Getters for accessing state
+  public getEmail(): Email {
+    return this.email;
+  }
+
+  public getName(): string {
+    return this.name;
+  }
+
+  public getStatus(): UserStatus {
+    return this.status;
+  }
+
+  public isEmailVerified(): boolean {
+    return this.emailVerified;
+  }
+
+  public isActive(): boolean {
+    return this.status === UserStatus.ACTIVE && this.emailVerified;
+  }
+}
+#+END_SRC
+
+** Step 4: Define Repository Interface
+
+Repositories provide domain-friendly data access:
+
+#+BEGIN_SRC typescript
+// src/domain/repositories/user-repository.ts
+import { Repository } from '@typescript-eda/domain';
+import { User } from '../entities/user';
+import { UserId } from '../value-objects/user-id';
+import { Email } from '../value-objects/email';
+
+export abstract class UserRepository extends Repository<User, UserId> {
+  public abstract findByEmail(email: Email): Promise<User | null>;
+  public abstract findActiveUsers(): Promise<User[]>;
+  public abstract existsByEmail(email: Email): Promise<boolean>;
+}
+#+END_SRC
+
+** Step 5: Create a Domain Service
+
+Services handle operations that don't naturally belong to entities:
+
+#+BEGIN_SRC typescript
+// src/domain/services/user-registration-service.ts
+import { User, UserStatus } from '../entities/user';
+import { UserId } from '../value-objects/user-id';
+import { Email } from '../value-objects/email';
+import { UserRepository } from '../repositories/user-repository';
+import { UserRegistered, EmailVerificationRequested } from '../events/user-events';
+
+export class UserRegistrationService {
+  constructor(private userRepository: UserRepository) {}
+
+  public async registerUser(
+    email: Email,
+    name: string
+  ): Promise<[User, UserRegistered, EmailVerificationRequested]> {
+    // Business rule: Email must be unique
+    const existingUser = await this.userRepository.findByEmail(email);
+    if (existingUser) {
+      throw new Error(`User with email ${email.getValue()} already exists`);
+    }
+
+    // Generate new user ID
+    const userId = new UserId(this.generateUserId());
+
+    // Use factory method for registration
+    const [user, registeredEvent, verificationEvent] = User.register(
+      userId, 
+      email, 
+      name
+    );
+
+    // Save the user
+    await this.userRepository.save(user);
+
+    return [user, registeredEvent, verificationEvent];
+  }
+
+  private generateUserId(): string {
+    return 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+  }
+}
+#+END_SRC
+
+* Testing Your Domain Model
+
+Domain models are easy to test because they're pure business logic:
+
+** Step 6: Unit Testing
+
+#+BEGIN_SRC typescript
+// tests/domain/entities/user.test.ts
+import { User, UserStatus } from '../../../src/domain/entities/user';
+import { UserId } from '../../../src/domain/value-objects/user-id';
+import { Email } from '../../../src/domain/value-objects/email';
+import { EmailVerified } from '../../../src/domain/events/user-events';
+
+describe('User Entity', () => {
+  let user: User;
+  let userId: UserId;
+  let email: Email;
+
+  beforeEach(() => {
+    userId = new UserId('test-user-123');
+    email = new Email('test@example.com');
+    user = new User(userId, email, 'Test User');
+  });
+
+  describe('Registration', () => {
+    it('should create user with pending verification status', () => {
+      expect(user.getStatus()).toBe(UserStatus.PENDING_VERIFICATION);
+      expect(user.isEmailVerified()).toBe(false);
+      expect(user.isActive()).toBe(false);
+    });
+
+    it('should create registration events', () => {
+      const [newUser, registeredEvent, verificationEvent] = User.register(
+        userId,
+        email,
+        'Test User'
+      );
+
+      expect(registeredEvent.type).toBe('UserRegistered');
+      expect(registeredEvent.userId).toBe(userId);
+      expect(registeredEvent.email).toBe(email);
+
+      expect(verificationEvent.type).toBe('EmailVerificationRequested');
+      expect(verificationEvent.userId).toBe(userId);
+      expect(verificationEvent.email).toBe(email);
+      expect(verificationEvent.verificationToken).toBeTruthy();
+    });
+  });
+
+  describe('Email Verification', () => {
+    it('should verify email and activate user', async () => {
+      const verifiedEvent = new EmailVerified(userId, email);
+      
+      await user.verifyEmail(verifiedEvent);
+
+      expect(user.isEmailVerified()).toBe(true);
+      expect(user.getStatus()).toBe(UserStatus.ACTIVE);
+      expect(user.isActive()).toBe(true);
+    });
+
+    it('should ignore verification for other users', async () => {
+      const otherUserId = new UserId('other-user-456');
+      const verifiedEvent = new EmailVerified(otherUserId, email);
+      
+      await user.verifyEmail(verifiedEvent);
+
+      expect(user.isEmailVerified()).toBe(false);
+      expect(user.getStatus()).toBe(UserStatus.PENDING_VERIFICATION);
+    });
+  });
+
+  describe('Email Change', () => {
+    it('should allow email change for active users', async () => {
+      // First verify the user
+      const verifiedEvent = new EmailVerified(userId, email);
+      await user.verifyEmail(verifiedEvent);
+
+      // Then change email
+      const newEmail = new Email('new@example.com');
+      const verificationEvent = user.changeEmail(newEmail);
+
+      expect(user.getEmail()).toBe(newEmail);
+      expect(user.isEmailVerified()).toBe(false);
+      expect(user.getStatus()).toBe(UserStatus.PENDING_VERIFICATION);
+      expect(verificationEvent.type).toBe('EmailVerificationRequested');
+    });
+
+    it('should not allow email change for non-active users', () => {
+      const newEmail = new Email('new@example.com');
+
+      expect(() => {
+        user.changeEmail(newEmail);
+      }).toThrow('Cannot change email for non-active user');
+    });
+  });
+});
+#+END_SRC
+
+** Step 7: Testing Value Objects
+
+#+BEGIN_SRC typescript
+// tests/domain/value-objects/email.test.ts
+import { Email } from '../../../src/domain/value-objects/email';
+
+describe('Email Value Object', () => {
+  it('should create valid email', () => {
+    const email = new Email('test@example.com');
+    expect(email.getValue()).toBe('test@example.com');
+  });
+
+  it('should reject invalid email formats', () => {
+    const invalidEmails = [
+      'invalid',
+      'invalid@',
+      '@example.com',
+      'invalid.example.com',
+      ''
+    ];
+
+    invalidEmails.forEach(invalidEmail => {
+      expect(() => new Email(invalidEmail)).toThrow('Invalid email format');
+    });
+  });
+
+  it('should have value equality', () => {
+    const email1 = new Email('test@example.com');
+    const email2 = new Email('test@example.com');
+    const email3 = new Email('other@example.com');
+
+    expect(email1.equals(email2)).toBe(true);
+    expect(email1.equals(email3)).toBe(false);
+  });
+});
+#+END_SRC
+
+** Step 8: Testing Domain Services
+
+#+BEGIN_SRC typescript
+// tests/domain/services/user-registration-service.test.ts
+import { UserRegistrationService } from '../../../src/domain/services/user-registration-service';
+import { Email } from '../../../src/domain/value-objects/email';
+import { UserRepository } from '../../../src/domain/repositories/user-repository';
+import { User } from '../../../src/domain/entities/user';
+
+// Mock repository for testing
+class MockUserRepository extends UserRepository {
+  private users: Map<string, User> = new Map();
+
+  async findById(id: any): Promise<User | null> {
+    return this.users.get(id.getValue()) || null;
+  }
+
+  async save(user: User): Promise<void> {
+    this.users.set(user.id.getValue(), user);
+  }
+
+  async delete(id: any): Promise<void> {
+    this.users.delete(id.getValue());
+  }
+
+  async findAll(): Promise<User[]> {
+    return Array.from(this.users.values());
+  }
+
+  async findByEmail(email: Email): Promise<User | null> {
+    return Array.from(this.users.values())
+      .find(user => user.getEmail().equals(email)) || null;
+  }
+
+  async findActiveUsers(): Promise<User[]> {
+    return Array.from(this.users.values())
+      .filter(user => user.isActive());
+  }
+
+  async existsByEmail(email: Email): Promise<boolean> {
+    return Array.from(this.users.values())
+      .some(user => user.getEmail().equals(email));
+  }
+}
+
+describe('UserRegistrationService', () => {
+  let userRepository: MockUserRepository;
+  let registrationService: UserRegistrationService;
+
+  beforeEach(() => {
+    userRepository = new MockUserRepository();
+    registrationService = new UserRegistrationService(userRepository);
+  });
+
+  it('should register new user successfully', async () => {
+    const email = new Email('test@example.com');
+    const name = 'Test User';
+
+    const [user, registeredEvent, verificationEvent] = await registrationService.registerUser(
+      email,
+      name
+    );
+
+    expect(user.getEmail()).toBe(email);
+    expect(user.getName()).toBe(name);
+    expect(registeredEvent.type).toBe('UserRegistered');
+    expect(verificationEvent.type).toBe('EmailVerificationRequested');
+
+    // Verify user was saved
+    const savedUser = await userRepository.findByEmail(email);
+    expect(savedUser).toBeDefined();
+    expect(savedUser!.getEmail().equals(email)).toBe(true);
+  });
+
+  it('should reject registration with existing email', async () => {
+    const email = new Email('test@example.com');
+    
+    // Register first user
+    await registrationService.registerUser(email, 'First User');
+
+    // Try to register second user with same email
+    await expect(
+      registrationService.registerUser(email, 'Second User')
+    ).rejects.toThrow('User with email test@example.com already exists');
+  });
+});
+#+END_SRC
+
+* Best Practices
+
+** Domain Model Guidelines
+
+1. **Keep Value Objects Immutable**: Never provide setters, always create new instances
+2. **Encapsulate Business Rules**: Don't let invalid state exist
+3. **Use Meaningful Names**: Follow ubiquitous language from business domain
+4. **Events Should Be Past Tense**: They represent things that have happened
+5. **Test Business Logic Directly**: Don't test infrastructure concerns in domain tests
+
+** Event Design Patterns
+
+#+BEGIN_SRC typescript
+// Good: Events are immutable and descriptive
+export class OrderCancelled extends Event {
+  public readonly type = 'OrderCancelled';
+  
+  constructor(
+    public readonly orderId: OrderId,
+    public readonly reason: string,
+    public readonly cancelledBy: UserId
+  ) {
+    super();
+  }
+}
+
+// Bad: Mutable events with generic names
+export class OrderEvent extends Event {
+  public type: string; // Mutable
+  public data: any; // Not descriptive
+}
+#+END_SRC
+
+** Entity Lifecycle Management
+
+#+BEGIN_SRC typescript
+export class Order extends Entity<OrderId> {
+  // Factory methods for creation
+  public static create(customerId: CustomerId, items: OrderItem[]): [Order, OrderCreated] {
+    const order = new Order(OrderId.generate(), customerId, items);
+    const event = new OrderCreated(order.id, customerId, items);
+    return [order, event];
+  }
+
+  // Business operations return events
+  public cancel(reason: string, cancelledBy: UserId): OrderCancelled {
+    if (this.status === OrderStatus.SHIPPED) {
+      throw new Error('Cannot cancel shipped order');
+    }
+    
+    this.status = OrderStatus.CANCELLED;
+    return new OrderCancelled(this.id, reason, cancelledBy);
+  }
+
+  // @listen decorators for event handling
+  @listen(PaymentProcessed)
+  public async markAsPaid(event: PaymentProcessed): Promise<OrderPaid> {
+    if (!this.id.equals(event.orderId)) return;
+    
+    this.paymentStatus = PaymentStatus.PAID;
+    return new OrderPaid(this.id, event.paymentId);
+  }
+}
+#+END_SRC
+
+You now have a complete foundation for building rich domain models with TypeScript-EDA Domain. The patterns demonstrated here scale from simple applications to complex enterprise systems while maintaining clarity and testability.

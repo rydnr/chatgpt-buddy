@@ -1,0 +1,682 @@
+#+TITLE: User Domain Example Specification
+#+SUBTITLE: Complete User Management Domain Model
+#+AUTHOR: TypeScript-EDA Domain Team
+#+DATE: 2025-07-03
+#+LAYOUT: spec
+#+PROJECT: typescript-eda-domain
+
+* User Domain Specification
+
+This specification demonstrates a complete user management domain using TypeScript-EDA Domain patterns.
+
+** Business Requirements
+
+1. Users can register with email and name
+2. Email verification is required before activation
+3. Users can change their email address
+4. Only active users can perform actions
+5. Email addresses must be unique across all users
+6. User registration generates welcome notifications
+
+** Domain Model Architecture
+
+#+BEGIN_SRC ascii
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│   Value Objects │     │     Entities    │     │     Events      │
+├─────────────────┤     ├─────────────────┤     ├─────────────────┤
+│ • UserId        │────▶│ • User          │────▶│ • UserRegistered│
+│ • Email         │     │                 │     │ • EmailVerified │
+│ • UserName      │     │                 │     │ • EmailChanged  │
+│ • UserStatus    │     │                 │     │ • UserSuspended │
+└─────────────────┘     └─────────────────┘     └─────────────────┘
+        │                       │                       │
+        ▼                       ▼                       ▼
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│   Repositories  │     │    Services     │     │   Validators    │
+├─────────────────┤     ├─────────────────┤     ├─────────────────┤
+│ • UserRepository│     │ • Registration  │     │ • EmailValidator│
+│                 │     │ • EmailVerifier │     │ • UserValidator │
+│                 │     │ • Notification  │     │                 │
+└─────────────────┘     └─────────────────┘     └─────────────────┘
+#+END_SRC
+
+** Value Objects Implementation
+
+*** UserId
+#+BEGIN_SRC typescript
+export class UserId extends ValueObject {
+  constructor(private readonly value: string) {
+    super();
+    this.validate(value);
+  }
+
+  private validate(value: string): void {
+    if (!value || value.trim().length === 0) {
+      throw new InvalidUserIdError('User ID cannot be empty');
+    }
+    if (value.length > 50) {
+      throw new InvalidUserIdError('User ID cannot exceed 50 characters');
+    }
+  }
+
+  public getValue(): string {
+    return this.value;
+  }
+
+  protected getEqualityComponents(): unknown[] {
+    return [this.value];
+  }
+
+  public static generate(): UserId {
+    return new UserId(`user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
+  }
+}
+#+END_SRC
+
+*** Email
+#+BEGIN_SRC typescript
+export class Email extends ValueObject {
+  private static readonly EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  private static readonly MAX_LENGTH = 254; // RFC 5321 limit
+
+  constructor(private readonly value: string) {
+    super();
+    this.validate(value);
+  }
+
+  private validate(email: string): void {
+    if (!email || email.trim().length === 0) {
+      throw new InvalidEmailError('Email cannot be empty');
+    }
+    
+    if (email.length > Email.MAX_LENGTH) {
+      throw new InvalidEmailError(`Email cannot exceed ${Email.MAX_LENGTH} characters`);
+    }
+    
+    if (!Email.EMAIL_REGEX.test(email)) {
+      throw new InvalidEmailError(`Invalid email format: ${email}`);
+    }
+  }
+
+  public getValue(): string {
+    return this.value;
+  }
+
+  public getDomain(): string {
+    return this.value.split('@')[1];
+  }
+
+  public getLocalPart(): string {
+    return this.value.split('@')[0];
+  }
+
+  protected getEqualityComponents(): unknown[] {
+    return [this.value.toLowerCase()]; // Case-insensitive equality
+  }
+}
+#+END_SRC
+
+*** UserName
+#+BEGIN_SRC typescript
+export class UserName extends ValueObject {
+  private static readonly MIN_LENGTH = 2;
+  private static readonly MAX_LENGTH = 100;
+
+  constructor(
+    private readonly firstName: string,
+    private readonly lastName: string
+  ) {
+    super();
+    this.validate(firstName, lastName);
+  }
+
+  private validate(firstName: string, lastName: string): void {
+    if (!firstName || firstName.trim().length < UserName.MIN_LENGTH) {
+      throw new InvalidUserNameError(`First name must be at least ${UserName.MIN_LENGTH} characters`);
+    }
+    
+    if (!lastName || lastName.trim().length < UserName.MIN_LENGTH) {
+      throw new InvalidUserNameError(`Last name must be at least ${UserName.MIN_LENGTH} characters`);
+    }
+    
+    if (firstName.length > UserName.MAX_LENGTH || lastName.length > UserName.MAX_LENGTH) {
+      throw new InvalidUserNameError(`Name parts cannot exceed ${UserName.MAX_LENGTH} characters`);
+    }
+  }
+
+  public getFirstName(): string {
+    return this.firstName;
+  }
+
+  public getLastName(): string {
+    return this.lastName;
+  }
+
+  public getFullName(): string {
+    return `${this.firstName} ${this.lastName}`;
+  }
+
+  public getInitials(): string {
+    return `${this.firstName.charAt(0)}${this.lastName.charAt(0)}`.toUpperCase();
+  }
+
+  protected getEqualityComponents(): unknown[] {
+    return [this.firstName.toLowerCase(), this.lastName.toLowerCase()];
+  }
+}
+#+END_SRC
+
+*** UserStatus
+#+BEGIN_SRC typescript
+export enum UserStatusType {
+  PENDING_VERIFICATION = 'pending_verification',
+  ACTIVE = 'active',
+  SUSPENDED = 'suspended',
+  DEACTIVATED = 'deactivated'
+}
+
+export class UserStatus extends ValueObject {
+  constructor(private readonly status: UserStatusType) {
+    super();
+  }
+
+  public getStatus(): UserStatusType {
+    return this.status;
+  }
+
+  public isActive(): boolean {
+    return this.status === UserStatusType.ACTIVE;
+  }
+
+  public isPending(): boolean {
+    return this.status === UserStatusType.PENDING_VERIFICATION;
+  }
+
+  public isSuspended(): boolean {
+    return this.status === UserStatusType.SUSPENDED;
+  }
+
+  public canPerformActions(): boolean {
+    return this.status === UserStatusType.ACTIVE;
+  }
+
+  protected getEqualityComponents(): unknown[] {
+    return [this.status];
+  }
+
+  // Factory methods for common statuses
+  public static pending(): UserStatus {
+    return new UserStatus(UserStatusType.PENDING_VERIFICATION);
+  }
+
+  public static active(): UserStatus {
+    return new UserStatus(UserStatusType.ACTIVE);
+  }
+
+  public static suspended(): UserStatus {
+    return new UserStatus(UserStatusType.SUSPENDED);
+  }
+}
+#+END_SRC
+
+** Domain Events
+
+*** User Registration Events
+#+BEGIN_SRC typescript
+export class UserRegistered extends Event {
+  public readonly type = 'UserRegistered';
+
+  constructor(
+    public readonly userId: UserId,
+    public readonly email: Email,
+    public readonly name: UserName,
+    public readonly registrationSource: string = 'web'
+  ) {
+    super();
+  }
+
+  public toJSON(): Record<string, unknown> {
+    return {
+      type: this.type,
+      userId: this.userId.getValue(),
+      email: this.email.getValue(),
+      firstName: this.name.getFirstName(),
+      lastName: this.name.getLastName(),
+      registrationSource: this.registrationSource,
+      timestamp: this.timestamp.toISOString(),
+      id: this.id
+    };
+  }
+}
+
+export class EmailVerificationRequested extends Event {
+  public readonly type = 'EmailVerificationRequested';
+
+  constructor(
+    public readonly userId: UserId,
+    public readonly email: Email,
+    public readonly verificationToken: string,
+    public readonly expiresAt: Date
+  ) {
+    super();
+  }
+
+  public toJSON(): Record<string, unknown> {
+    return {
+      type: this.type,
+      userId: this.userId.getValue(),
+      email: this.email.getValue(),
+      verificationToken: this.verificationToken,
+      expiresAt: this.expiresAt.toISOString(),
+      timestamp: this.timestamp.toISOString(),
+      id: this.id
+    };
+  }
+}
+
+export class EmailVerified extends Event {
+  public readonly type = 'EmailVerified';
+
+  constructor(
+    public readonly userId: UserId,
+    public readonly email: Email,
+    public readonly verifiedAt: Date = new Date()
+  ) {
+    super();
+  }
+
+  public toJSON(): Record<string, unknown> {
+    return {
+      type: this.type,
+      userId: this.userId.getValue(),
+      email: this.email.getValue(),
+      verifiedAt: this.verifiedAt.toISOString(),
+      timestamp: this.timestamp.toISOString(),
+      id: this.id
+    };
+  }
+}
+#+END_SRC
+
+** User Entity Implementation
+
+#+BEGIN_SRC typescript
+export class User extends Entity<UserId> {
+  private email: Email;
+  private name: UserName;
+  private status: UserStatus;
+  private emailVerified: boolean;
+  private verificationToken?: string;
+  private verificationTokenExpiresAt?: Date;
+  private readonly createdAt: Date;
+  private lastLoginAt?: Date;
+
+  constructor(
+    id: UserId,
+    email: Email,
+    name: UserName,
+    status: UserStatus = UserStatus.pending(),
+    createdAt: Date = new Date()
+  ) {
+    super(id);
+    this.email = email;
+    this.name = name;
+    this.status = status;
+    this.emailVerified = false;
+    this.createdAt = createdAt;
+  }
+
+  // Factory method for user registration
+  public static register(
+    email: Email,
+    name: UserName,
+    registrationSource: string = 'web'
+  ): [User, UserRegistered, EmailVerificationRequested] {
+    const userId = UserId.generate();
+    const user = new User(userId, email, name);
+    
+    // Generate verification token
+    const verificationToken = user.generateVerificationToken();
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+    
+    user.verificationToken = verificationToken;
+    user.verificationTokenExpiresAt = expiresAt;
+
+    const registeredEvent = new UserRegistered(userId, email, name, registrationSource);
+    const verificationEvent = new EmailVerificationRequested(
+      userId, 
+      email, 
+      verificationToken, 
+      expiresAt
+    );
+
+    return [user, registeredEvent, verificationEvent];
+  }
+
+  @listen(EmailVerified)
+  public async verifyEmail(event: EmailVerified): Promise<UserActivated | void> {
+    if (!this.id.equals(event.userId)) {
+      return; // Not for this user
+    }
+
+    this.emailVerified = true;
+    this.status = UserStatus.active();
+    this.verificationToken = undefined;
+    this.verificationTokenExpiresAt = undefined;
+
+    return new UserActivated(this.id, this.email, event.verifiedAt);
+  }
+
+  public changeEmail(newEmail: Email): [EmailChangeRequested, EmailVerificationRequested] {
+    if (!this.status.canPerformActions()) {
+      throw new InvalidOperationError('User must be active to change email');
+    }
+
+    if (this.email.equals(newEmail)) {
+      throw new InvalidOperationError('New email must be different from current email');
+    }
+
+    const previousEmail = this.email;
+    this.email = newEmail;
+    this.emailVerified = false;
+    this.status = UserStatus.pending();
+
+    // Generate new verification token
+    const verificationToken = this.generateVerificationToken();
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    
+    this.verificationToken = verificationToken;
+    this.verificationTokenExpiresAt = expiresAt;
+
+    const emailChangeEvent = new EmailChangeRequested(
+      this.id, 
+      previousEmail, 
+      newEmail
+    );
+    
+    const verificationEvent = new EmailVerificationRequested(
+      this.id, 
+      newEmail, 
+      verificationToken, 
+      expiresAt
+    );
+
+    return [emailChangeEvent, verificationEvent];
+  }
+
+  public suspend(reason: string, suspendedBy: UserId): UserSuspended {
+    if (!this.status.canPerformActions()) {
+      throw new InvalidOperationError('Can only suspend active users');
+    }
+
+    this.status = UserStatus.suspended();
+    return new UserSuspended(this.id, reason, suspendedBy);
+  }
+
+  public recordLogin(): UserLoggedIn {
+    if (!this.status.canPerformActions()) {
+      throw new InvalidOperationError('Only active users can log in');
+    }
+
+    this.lastLoginAt = new Date();
+    return new UserLoggedIn(this.id, this.lastLoginAt);
+  }
+
+  private generateVerificationToken(): string {
+    return Math.random().toString(36).substring(2, 15) + 
+           Math.random().toString(36).substring(2, 15);
+  }
+
+  // Getters
+  public getEmail(): Email {
+    return this.email;
+  }
+
+  public getName(): UserName {
+    return this.name;
+  }
+
+  public getStatus(): UserStatus {
+    return this.status;
+  }
+
+  public isEmailVerified(): boolean {
+    return this.emailVerified;
+  }
+
+  public isActive(): boolean {
+    return this.status.isActive() && this.emailVerified;
+  }
+
+  public getCreatedAt(): Date {
+    return this.createdAt;
+  }
+
+  public getLastLoginAt(): Date | undefined {
+    return this.lastLoginAt;
+  }
+
+  public getVerificationToken(): string | undefined {
+    return this.verificationToken;
+  }
+
+  public isVerificationTokenExpired(): boolean {
+    if (!this.verificationTokenExpiresAt) {
+      return true;
+    }
+    return new Date() > this.verificationTokenExpiresAt;
+  }
+}
+#+END_SRC
+
+** Repository Interface
+
+#+BEGIN_SRC typescript
+export abstract class UserRepository extends Repository<User, UserId> {
+  // Basic CRUD operations inherited from Repository<User, UserId>
+  
+  // Domain-specific query methods
+  public abstract findByEmail(email: Email): Promise<User | null>;
+  public abstract findActiveUsers(): Promise<User[]>;
+  public abstract findUsersByStatus(status: UserStatus): Promise<User[]>;
+  public abstract existsByEmail(email: Email): Promise<boolean>;
+  public abstract findPendingVerification(): Promise<User[]>;
+  public abstract findByVerificationToken(token: string): Promise<User | null>;
+  
+  // Advanced queries
+  public abstract findRecentlyRegistered(days: number): Promise<User[]>;
+  public abstract findInactiveUsers(days: number): Promise<User[]>;
+  public abstract countUsersByStatus(): Promise<Map<UserStatusType, number>>;
+}
+#+END_SRC
+
+** Domain Services
+
+*** User Registration Service
+#+BEGIN_SRC typescript
+export class UserRegistrationService {
+  constructor(
+    private userRepository: UserRepository,
+    private emailValidator: EmailValidationService
+  ) {}
+
+  public async registerUser(
+    email: Email,
+    name: UserName,
+    registrationSource: string = 'web'
+  ): Promise<[User, UserRegistered, EmailVerificationRequested]> {
+    // Business rule: Email must be unique
+    const existingUser = await this.userRepository.findByEmail(email);
+    if (existingUser) {
+      throw new EmailAlreadyExistsError(`User with email ${email.getValue()} already exists`);
+    }
+
+    // Business rule: Email domain must be allowed
+    await this.emailValidator.validateEmailDomain(email);
+
+    // Create user and events
+    const [user, registeredEvent, verificationEvent] = User.register(
+      email, 
+      name, 
+      registrationSource
+    );
+
+    // Persist user
+    await this.userRepository.save(user);
+
+    return [user, registeredEvent, verificationEvent];
+  }
+
+  public async verifyEmail(
+    verificationToken: string
+  ): Promise<[User, EmailVerified] | null> {
+    const user = await this.userRepository.findByVerificationToken(verificationToken);
+    if (!user) {
+      return null;
+    }
+
+    if (user.isVerificationTokenExpired()) {
+      throw new VerificationTokenExpiredError('Verification token has expired');
+    }
+
+    const verifiedEvent = new EmailVerified(user.id, user.getEmail());
+    const activatedEvent = await user.verifyEmail(verifiedEvent);
+
+    await this.userRepository.save(user);
+
+    return [user, verifiedEvent];
+  }
+}
+#+END_SRC
+
+** Testing Examples
+
+*** Unit Tests
+#+BEGIN_SRC typescript
+describe('User Domain', () => {
+  describe('User Registration', () => {
+    it('should create user with pending status', () => {
+      const email = new Email('test@example.com');
+      const name = new UserName('John', 'Doe');
+      
+      const [user, registeredEvent, verificationEvent] = User.register(email, name);
+
+      expect(user.getStatus().isPending()).toBe(true);
+      expect(user.isEmailVerified()).toBe(false);
+      expect(registeredEvent.type).toBe('UserRegistered');
+      expect(verificationEvent.type).toBe('EmailVerificationRequested');
+    });
+
+    it('should generate unique user IDs', () => {
+      const email1 = new Email('test1@example.com');
+      const email2 = new Email('test2@example.com');
+      const name = new UserName('John', 'Doe');
+
+      const [user1] = User.register(email1, name);
+      const [user2] = User.register(email2, name);
+
+      expect(user1.id.equals(user2.id)).toBe(false);
+    });
+  });
+
+  describe('Email Verification', () => {
+    it('should activate user when email is verified', async () => {
+      const [user] = User.register(
+        new Email('test@example.com'),
+        new UserName('John', 'Doe')
+      );
+
+      const verifiedEvent = new EmailVerified(user.id, user.getEmail());
+      const activatedEvent = await user.verifyEmail(verifiedEvent);
+
+      expect(user.isActive()).toBe(true);
+      expect(user.isEmailVerified()).toBe(true);
+      expect(activatedEvent).toBeInstanceOf(UserActivated);
+    });
+
+    it('should ignore verification for other users', async () => {
+      const [user] = User.register(
+        new Email('test@example.com'),
+        new UserName('John', 'Doe')
+      );
+
+      const otherUserId = UserId.generate();
+      const verifiedEvent = new EmailVerified(otherUserId, user.getEmail());
+      
+      const result = await user.verifyEmail(verifiedEvent);
+
+      expect(result).toBeUndefined();
+      expect(user.isActive()).toBe(false);
+    });
+  });
+
+  describe('Email Change', () => {
+    it('should allow email change for active users', async () => {
+      const [user] = User.register(
+        new Email('old@example.com'),
+        new UserName('John', 'Doe')
+      );
+
+      // Activate user first
+      const verifiedEvent = new EmailVerified(user.id, user.getEmail());
+      await user.verifyEmail(verifiedEvent);
+
+      // Change email
+      const newEmail = new Email('new@example.com');
+      const [changeEvent, verificationEvent] = user.changeEmail(newEmail);
+
+      expect(user.getEmail().equals(newEmail)).toBe(true);
+      expect(user.isEmailVerified()).toBe(false);
+      expect(user.getStatus().isPending()).toBe(true);
+      expect(changeEvent.type).toBe('EmailChangeRequested');
+      expect(verificationEvent.type).toBe('EmailVerificationRequested');
+    });
+
+    it('should not allow email change for inactive users', () => {
+      const [user] = User.register(
+        new Email('test@example.com'),
+        new UserName('John', 'Doe')
+      );
+
+      const newEmail = new Email('new@example.com');
+
+      expect(() => {
+        user.changeEmail(newEmail);
+      }).toThrow('User must be active to change email');
+    });
+  });
+});
+#+END_SRC
+
+** Integration with Application Layer
+
+This domain model integrates with the application layer through:
+
+1. **Event Handlers**: Application layer listens to domain events
+2. **Repository Implementations**: Infrastructure layer provides concrete repositories
+3. **Domain Services**: Application layer orchestrates domain services
+4. **Command Handlers**: Application layer translates commands to domain operations
+
+#+BEGIN_SRC typescript
+// Example application layer integration
+export class UserApplicationService {
+  constructor(
+    private userRegistrationService: UserRegistrationService,
+    private eventPublisher: EventPublisher
+  ) {}
+
+  @CommandHandler(RegisterUserCommand)
+  public async registerUser(command: RegisterUserCommand): Promise<void> {
+    const email = new Email(command.email);
+    const name = new UserName(command.firstName, command.lastName);
+
+    const [user, registeredEvent, verificationEvent] = 
+      await this.userRegistrationService.registerUser(email, name);
+
+    // Publish events for other bounded contexts
+    await this.eventPublisher.publishAll([registeredEvent, verificationEvent]);
+  }
+}
+#+END_SRC
+
+This specification demonstrates a complete domain model that encapsulates business rules, maintains consistency, and provides clear interfaces for integration with other layers.
