@@ -1,0 +1,561 @@
+---
+title: "ChatGPT-Buddy Development Guide"
+subtitle: "Setting Up Your Development Environment  "
+author: "ChatGPT-Buddy Team"
+date: "2025-07-02"
+layout: project
+project: chatgpt-buddy
+---
+
+<h1 id="table-of-contents">Table of Contents <span class="tag"
+data-tag-name="TOC"><span class="smallcaps">TOC</span></span></h1>
+<ul>
+<li><a href="#overview">Overview</a></li>
+<li><a href="#prerequisites">Prerequisites</a></li>
+<li><a href="#quick-setup">Quick Setup</a></li>
+<li><a href="#project-structure">Project Structure</a></li>
+<li><a href="#development-workflow">Development Workflow</a></li>
+<li><a href="#browser-extension-development">Browser Extension
+Development</a></li>
+<li><a href="#testing">Testing</a></li>
+<li><a href="#architecture-understanding">Architecture
+Understanding</a></li>
+<li><a href="#common-tasks">Common Tasks</a></li>
+<li><a href="#troubleshooting">Troubleshooting</a></li>
+<li><a href="#contributing">Contributing</a></li>
+</ul>
+<h1 id="overview">Overview</h1>
+<p>Web-Buddy is a generic web automation framework that transforms
+single-purpose tools into extensible, maintainable automation platforms.
+This guide will help you set up your development environment and
+understand the project structure.</p>
+<h2 id="key-components">Key Components</h2>
+<ul>
+<li><strong>Core Framework</strong>: Generic messaging infrastructure
+(<code>packages/web-buddy-core</code>)</li>
+<li><strong>Server</strong>: Event-driven HTTP server with WebSocket
+support (<code>packages/chatgpt-buddy-server</code>)</li>
+<li><strong>Browser Extension</strong>: Chrome extension for DOM
+automation (<code>extension/</code>)</li>
+<li><strong>Domain Implementations</strong>: Site-specific automation
+clients (<code>implementations/</code>)</li>
+<li><strong>E2E Tests</strong>: Playwright-based end-to-end testing
+(<code>tests/e2e/</code>)</li>
+</ul>
+<h1 id="prerequisites">Prerequisites</h1>
+<h2 id="required-software">Required Software</h2>
+<ul>
+<li><strong>Node.js</strong> 18+ (LTS recommended)</li>
+<li><strong>pnpm</strong> 8+ (package manager)</li>
+<li><strong>Git</strong> (version control)</li>
+<li><strong>Google Chrome</strong> (for extension development)</li>
+<li><strong>TypeScript</strong> 5+ (for type checking)</li>
+</ul>
+<h2 id="optional-but-recommended">Optional but Recommended</h2>
+<ul>
+<li><strong>VS Code</strong> with TypeScript extension</li>
+<li><strong>Chrome DevTools</strong> experience</li>
+<li><strong>WebSocket</strong> debugging tools (e.g., WebSocket
+King)</li>
+</ul>
+<h2 id="installation-commands">Installation Commands</h2>
+<pre class="bash"><code># Install Node.js (using nvm - recommended)
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
+nvm install --lts
+nvm use --lts
+
+# Install pnpm globally
+npm install -g pnpm
+
+# Verify installations
+node --version    # Should be 18+
+pnpm --version    # Should be 8+
+</code></pre>
+<h1 id="quick-setup">Quick Setup</h1>
+<h2 id="clone-and-install-dependencies">1. Clone and Install
+Dependencies</h2>
+<pre class="bash"><code># Clone the repository
+git clone https://github.com/rydnr/chatgpt-buddy.git
+cd chatgpt-buddy
+
+# Install all dependencies (workspace root + all packages)
+pnpm install
+
+# Install browser extension dependencies
+pnpm run extension:install
+</code></pre>
+<h2 id="build-the-project">2. Build the Project</h2>
+<pre class="bash"><code># Build all packages
+pnpm run build
+
+# Type check everything
+pnpm run typecheck
+</code></pre>
+<h2 id="verify-installation">3. Verify Installation</h2>
+<pre class="bash"><code># Run unit tests
+pnpm test
+
+# Run integration tests
+pnpm run test:integration
+
+# Should see: &quot;All tests passing&quot; ✅
+</code></pre>
+<h1 id="project-structure">Project Structure</h1>
+<pre class="example"><code>chatgpt-buddy/
+├── packages/
+│   ├── chatgpt-buddy-server/          # HTTP server with WebSocket
+│   ├── chatgpt-buddy-core/            # Legacy core (being migrated)
+│   └── web-buddy-core/                # New generic framework core
+├── extension/                         # Browser extension
+│   ├── src/
+│   │   ├── background.ts              # WebSocket communication
+│   │   ├── content_script.ts          # DOM automation
+│   │   ├── popup.html                 # Connection UI
+│   │   └── popup.js                   # UI logic
+│   └── manifest.json                  # Extension configuration
+├── implementations/
+│   └── google-buddy/                  # Google search automation
+├── tests/
+│   ├── integration/                   # Server integration tests
+│   └── e2e/                          # End-to-end browser tests
+├── scripts/                          # Development utilities
+├── examples/                         # Usage examples
+└── docs/                            # Documentation
+</code></pre>
+<h2 id="key-configuration-files">Key Configuration Files</h2>
+<ul>
+<li><code>pnpm-workspace.yaml</code>: Monorepo workspace
+configuration</li>
+<li><code>playwright.config.ts</code>: E2E test configuration</li>
+<li><code>jest.config.js</code>: Unit/integration test
+configuration</li>
+<li><code>tsconfig.json</code>: TypeScript configuration (per
+package)</li>
+</ul>
+<h1 id="development-workflow">Development Workflow</h1>
+<h2 id="start-the-development-server">1. Start the Development
+Server</h2>
+<pre class="bash"><code># Terminal 1: Start the Web-Buddy server with WebSocket support
+cd /path/to/chatgpt-buddy
+node scripts/start-e2e-server-simple.js
+
+# You should see:
+# ✅ E2E test server started successfully!
+# 📡 Server will be available at: http://localhost:3003
+# 🔌 WebSocket endpoint: ws://localhost:3003/ws
+</code></pre>
+<h2 id="load-the-browser-extension">2. Load the Browser Extension</h2>
+<ol>
+<li>Open Chrome and navigate to <code>chrome://extensions/</code></li>
+<li>Enable <strong>Developer mode</strong> (toggle in top right)</li>
+<li>Click <strong>Load unpacked</strong></li>
+<li>Select the <code>extension/</code> directory</li>
+<li>Pin the extension to your toolbar (puzzle piece icon)</li>
+</ol>
+<h2 id="verify-connection">3. Verify Connection</h2>
+<ol>
+<li>Click the Web-Buddy extension icon</li>
+<li>You should see the connection popup</li>
+<li>Click <strong>Connect</strong> button</li>
+<li>Status should change to 🟢 <strong>Connected</strong></li>
+<li>Server terminal should show:
+<code>✅ Extension registered</code></li>
+</ol>
+<h2 id="development-loop">4. Development Loop</h2>
+<pre class="bash"><code># Make changes to TypeScript files
+# Run type checking
+pnpm run typecheck
+
+# Run tests
+pnpm test
+
+# Test specific functionality
+pnpm run test:integration
+
+# For extension changes: reload extension in Chrome
+# Chrome → Extensions → Web-Buddy → Reload icon
+</code></pre>
+<h1 id="browser-extension-development">Browser Extension
+Development</h1>
+<h2 id="extension-architecture">Extension Architecture</h2>
+<pre class="example"><code>┌─────────────────────────────────────────────┐
+│                Browser Tab                  │
+│  ┌─────────────────────────────────────────┐│
+│  │         Content Script                 ││  ← DOM Automation
+│  │    (content_script.ts)                 ││
+│  └─────────────────────────────────────────┘│
+└─────────────────────────────────────────────┘
+                    ↕ chrome.runtime.sendMessage
+┌─────────────────────────────────────────────┐
+│           Background Script                 │  ← WebSocket Manager
+│         (background.ts)                     │
+└─────────────────────────────────────────────┘
+                    ↕ WebSocket
+┌─────────────────────────────────────────────┐
+│            Web-Buddy Server                 │  ← Event Processing
+│      (packages/chatgpt-buddy-server)       │
+└─────────────────────────────────────────────┘
+</code></pre>
+<h2 id="development-tasks">Development Tasks</h2>
+<h3 id="modifying-the-popup-ui">Modifying the Popup UI</h3>
+<pre class="bash"><code># Edit the popup files
+vim extension/src/popup.html    # UI structure
+vim extension/src/popup.js      # UI logic
+
+# Reload extension in Chrome
+# Changes are applied immediately
+</code></pre>
+<h3 id="adding-new-automation-actions">Adding New Automation
+Actions</h3>
+<ol>
+<li><strong>Add action to content script</strong>:</li>
+</ol>
+<pre class="typescript"><code>// extension/src/content_script.ts
+case &#39;newAction&#39;:
+  return handleNewAction(parameters, correlationId);
+
+function handleNewAction(parameters: any, correlationId: string): any {
+  // Your DOM automation logic here
+  return {
+    correlationId,
+    status: &#39;success&#39;,
+    data: { /* results */ }
+  };
+}
+</code></pre>
+<ol>
+<li><strong>Test the new action</strong>:</li>
+</ol>
+<pre class="bash"><code># Use the test client or write E2E test
+pnpm run test:e2e
+</code></pre>
+<h3 id="websocket-communication">WebSocket Communication</h3>
+<ul>
+<li><strong>Background script</strong> manages WebSocket connection</li>
+<li><strong>Content script</strong> executes DOM automation</li>
+<li><strong>Popup</strong> provides connection management UI</li>
+<li>Messages flow: <code>Server → Background → Content → DOM</code></li>
+</ul>
+<h2 id="extension-debugging">Extension Debugging</h2>
+<pre class="bash"><code># View extension logs
+# 1. Chrome → Extensions → Web-Buddy → Details
+# 2. Click &quot;Inspect views: background page&quot;
+# 3. Check Console tab for background script logs
+
+# View content script logs
+# 1. Open any webpage
+# 2. F12 → Console tab
+# 3. Content script logs appear here
+
+# View popup logs
+# 1. Right-click extension icon → Inspect popup
+# 2. Check Console tab
+</code></pre>
+<h1 id="testing">Testing</h1>
+<h2 id="test-types-and-commands">Test Types and Commands</h2>
+<pre class="bash"><code># Unit tests (fast, isolated)
+pnpm test
+
+# Integration tests (server + client)
+pnpm run test:integration
+
+# End-to-end tests (full browser automation)
+pnpm run test:e2e
+
+# Watch mode for development
+pnpm run test:watch
+</code></pre>
+<h2 id="tdd-emoji-methodology">TDD-Emoji Methodology</h2>
+<p>This project follows the TDD-Emoji approach:</p>
+<ul>
+<li>🔴 <strong>RED</strong>: Write failing test first</li>
+<li>🟢 <strong>GREEN</strong>: Implement minimal code to pass</li>
+<li>🔵 <strong>REFACTOR</strong>: Clean up and optimize</li>
+<li>✅ <strong>COMPLETE</strong>: Mark feature as done</li>
+</ul>
+<p>Example workflow:</p>
+<pre class="typescript"><code>// 🔴 RED: Write failing test
+it(&#39;🔴 should fill input field via automation&#39;, async () =&gt; {
+  const response = await client.sendEvent({
+    type: &#39;automationRequested&#39;,
+    payload: { action: &#39;fillInput&#39;, parameters: { selector: &#39;#test&#39;, value: &#39;hello&#39; }}
+  });
+  expect(response.status).toBe(&#39;success&#39;);
+});
+
+// 🟢 GREEN: Implement minimal solution
+// 🔵 REFACTOR: Improve implementation
+// ✅ COMPLETE: Update progress documentation
+</code></pre>
+<h2 id="running-e2e-tests">Running E2E Tests</h2>
+<pre class="bash"><code># Prerequisites: Server running + Extension loaded
+
+# Terminal 1: Start server
+node scripts/start-e2e-server-simple.js
+
+# Terminal 2: Run E2E tests
+pnpm run test:e2e
+
+# Tests verify: Client → Server → Extension → Browser flow
+</code></pre>
+<h2 id="test-files-structure">Test Files Structure</h2>
+<ul>
+<li><code>tests/integration/</code>: Server and client integration</li>
+<li><code>tests/e2e/</code>: Full browser automation with
+Playwright</li>
+<li><code>packages/*/src/*.test.ts</code>: Unit tests per package</li>
+</ul>
+<h1 id="architecture-understanding">Architecture Understanding</h1>
+<h2 id="event-driven-flow">Event-Driven Flow</h2>
+<pre class="example"><code>Client Code                    Server                    Browser Extension
+──────────                    ──────                    ─────────────────
+
+WebBuddyClient.sendEvent()
+         │
+         ▼
+    HTTP POST /api/event  ──►  Express Handler
+                               │
+                               ▼
+                          WebSocket.send()  ──►  Background Script
+                                                      │
+                                                      ▼
+                                              chrome.tabs.sendMessage()
+                                                      │
+                                                      ▼
+                                                Content Script
+                                                      │
+                                                      ▼
+                                               document.querySelector()
+                                                DOM Manipulation
+</code></pre>
+<h2 id="core-concepts">Core Concepts</h2>
+<h3 id="events-vs-messages">Events vs Messages</h3>
+<ul>
+<li><strong>Events</strong>: New event-driven architecture
+(preferred)</li>
+<li><strong>Messages</strong>: Legacy message-based system (being phased
+out)</li>
+<li>Server supports both for backward compatibility</li>
+</ul>
+<h3 id="domain-driven-design">Domain-Driven Design</h3>
+<ul>
+<li><strong>Core Layer</strong>: Generic messaging
+(<code>web-buddy-core</code>)</li>
+<li><strong>Domain Layer</strong>: Site-specific logic
+(<code>google-buddy</code>)</li>
+<li><strong>API Layer</strong>: Developer-friendly wrappers
+(<code>GoogleBuddyClient</code>)</li>
+</ul>
+<h3 id="smart-automation-matching">Smart Automation Matching</h3>
+<p>Server implements intelligent automation matching:</p>
+<ul>
+<li>Action matching (40% weight)</li>
+<li>Website matching (30% weight)</li>
+<li>Parameter compatibility (20% weight)</li>
+<li>Context similarity (10% weight)</li>
+</ul>
+<h1 id="common-tasks">Common Tasks</h1>
+<h2 id="adding-a-new-website-implementation">Adding a New Website
+Implementation</h2>
+<pre class="bash"><code># 1. Create new implementation directory
+mkdir implementations/your-site-buddy
+cd implementations/your-site-buddy
+
+# 2. Set up package.json
+cat &gt; package.json &lt;&lt; &#39;EOF&#39;
+{
+  &quot;name&quot;: &quot;@your-site-buddy/client&quot;,
+  &quot;version&quot;: &quot;1.0.0&quot;,
+  &quot;dependencies&quot;: {
+    &quot;@web-buddy/core&quot;: &quot;workspace:*&quot;
+  }
+}
+EOF
+
+# 3. Create basic client structure
+mkdir src
+cat &gt; src/client.ts &lt;&lt; &#39;EOF&#39;
+import { WebBuddyClient } from &#39;@web-buddy/core&#39;;
+
+export class YourSiteBuddyClient {
+  constructor(private webBuddyClient: WebBuddyClient) {}
+
+  async yourAction(): Promise&lt;any&gt; {
+    return this.webBuddyClient.sendEvent({
+      type: &#39;automationRequested&#39;,
+      payload: { action: &#39;yourAction&#39;, parameters: {} }
+    });
+  }
+}
+EOF
+
+# 4. Add to workspace
+echo &quot;implementations/your-site-buddy&quot; &gt;&gt; ../../pnpm-workspace.yaml
+
+# 5. Install and test
+pnpm install
+</code></pre>
+<h2 id="creating-e2e-tests">Creating E2E Tests</h2>
+<pre class="typescript"><code>// tests/e2e/your-site.e2e.test.ts
+import { test, expect } from &#39;@playwright/test&#39;;
+
+test(&#39;should automate your site&#39;, async ({ page }) =&gt; {
+  // Start with server running and extension loaded
+  await page.goto(&#39;https://your-site.com&#39;);
+
+  // Send automation event
+  const response = await client.sendEvent({
+    type: &#39;automationRequested&#39;,
+    payload: { action: &#39;yourAction&#39;, parameters: {} }
+  });
+
+  // Verify DOM changes
+  await expect(page.locator(&#39;#result&#39;)).toHaveText(&#39;Expected result&#39;);
+});
+</code></pre>
+<h2 id="debugging-websocket-issues">Debugging WebSocket Issues</h2>
+<pre class="bash"><code># 1. Check server logs
+node scripts/start-e2e-server-simple.js
+# Look for connection and message logs
+
+# 2. Check extension background script
+# Chrome → Extensions → Web-Buddy → Inspect views: background page
+
+# 3. Test WebSocket manually
+# Use WebSocket King or similar tool
+# Connect to: ws://localhost:3003/ws
+
+# 4. Verify extension permissions
+# Check manifest.json includes all required permissions
+</code></pre>
+<h2 id="performance-optimization">Performance Optimization</h2>
+<pre class="bash"><code># Bundle size analysis
+npx webpack-bundle-analyzer
+
+# TypeScript performance
+npx tsc --listFiles | wc -l
+
+# Test performance
+pnpm test -- --verbose --detectOpenHandles
+</code></pre>
+<h1 id="troubleshooting">Troubleshooting</h1>
+<h2 id="common-issues">Common Issues</h2>
+<h3 id="extension-not-connecting">Extension Not Connecting</h3>
+<ol>
+<li><strong>Server not running</strong>: Start with
+<code>node scripts/start-e2e-server-simple.js</code></li>
+<li><strong>Wrong URL</strong>: Check popup shows
+<code>ws://localhost:3003/ws</code></li>
+<li><strong>Extension errors</strong>: Check background script
+console</li>
+<li><strong>Firewall</strong>: Ensure port 3003 is not blocked</li>
+</ol>
+<h3 id="typescript-compilation-errors">TypeScript Compilation
+Errors</h3>
+<pre class="bash"><code># Clear node_modules and reinstall
+rm -rf node_modules package-lock.json
+pnpm install
+
+# Check TypeScript version compatibility
+npx tsc --version
+
+# Verify workspace configuration
+pnpm list --depth=0
+</code></pre>
+<h3 id="tests-failing">Tests Failing</h3>
+<pre class="bash"><code># Update test dependencies
+pnpm update @playwright/test jest
+
+# Clear test cache
+npx jest --clearCache
+
+# Run tests in isolation
+pnpm test -- --runInBand
+</code></pre>
+<h3 id="websocket-connection-issues">WebSocket Connection Issues</h3>
+<ul>
+<li><strong>CORS errors</strong>: Server allows all origins in
+development</li>
+<li><strong>Port conflicts</strong>: Change port in
+<code>start-e2e-server-simple.js</code></li>
+<li><strong>SSL issues</strong>: Use <code>ws://</code> for local
+development, <code>wss://</code> for production</li>
+</ul>
+<h2 id="getting-help">Getting Help</h2>
+<ul>
+<li><strong>Documentation</strong>: <code>README.md</code>,
+<code>TDD-EMOJI-PROGRESS.md</code></li>
+<li><strong>Architecture</strong>:
+<code>specs/web-buddy-framework-roadmap.md</code></li>
+<li><strong>Examples</strong>: <code>examples/</code> directory</li>
+<li><strong>Tests</strong>: Look at existing test files for
+patterns</li>
+</ul>
+<h2 id="useful-commands">Useful Commands</h2>
+<pre class="bash"><code># Clean everything and start fresh
+pnpm run clean
+rm -rf node_modules
+pnpm install
+pnpm run build
+
+# Check project health
+pnpm run typecheck
+pnpm test
+pnpm run lint
+
+# View all available scripts
+pnpm run
+
+# Check dependencies
+pnpm list
+pnpm outdated
+</code></pre>
+<h1 id="contributing">Contributing</h1>
+<h2 id="before-contributing">Before Contributing</h2>
+<ol>
+<li>Read this guide completely</li>
+<li>Set up your development environment</li>
+<li>Run all tests to ensure everything works</li>
+<li>Read the architecture documentation</li>
+</ol>
+<h2 id="development-process">Development Process</h2>
+<ol>
+<li><strong>Create feature branch</strong>:
+<code>git checkout -b feature/your-feature</code></li>
+<li><strong>Follow TDD-Emoji</strong>: 🔴 → 🟢 → 🔵 → ✅</li>
+<li><strong>Write tests first</strong>: Always write failing tests
+before implementation</li>
+<li><strong>Update documentation</strong>: Keep
+<code>TDD-EMOJI-PROGRESS.md</code> updated</li>
+<li><strong>Test thoroughly</strong>: Unit, integration, and E2E
+tests</li>
+<li><strong>Create pull request</strong>: With clear description and
+test evidence</li>
+</ol>
+<h2 id="code-standards">Code Standards</h2>
+<ul>
+<li><strong>TypeScript</strong>: Strict mode enabled, no
+<code>any</code> types</li>
+<li><strong>Testing</strong>: &gt;90% coverage, TDD approach</li>
+<li><strong>Documentation</strong>: TSDoc comments for all public
+APIs</li>
+<li><strong>Formatting</strong>: Prettier + ESLint (automatic)</li>
+<li><strong>Architecture</strong>: Follow DDD and event-driven
+patterns</li>
+</ul>
+<h2 id="commit-message-format">Commit Message Format</h2>
+<pre class="example"><code>🌐 implement Google search automation client
+
+- Add GoogleBuddyClient with search() method
+- Implement smart result filtering and extraction
+- Add comprehensive E2E tests with Playwright
+- Update TDD-EMOJI progress documentation
+
+🤖 Generated with [Claude Code](https://claude.ai/code)
+
+Co-Authored-By: Claude &lt;noreply@anthropic.com&gt;
+</code></pre>
+<p>—</p>
+<p><strong>Happy coding! 🚀</strong></p>
+<p>For questions or issues, please check the troubleshooting section or
+create an issue on GitHub.</p>

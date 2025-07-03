@@ -1,0 +1,93 @@
+# Site settings
+title: "TypeScript-EDA Ecosystem"
+description: "Event-driven architecture tools for modern TypeScript development"
+baseurl: ""
+url: "https://rydnr.github.io/chatgpt-buddy"
+
+# Build settings
+markdown: kramdown
+highlighter: rouge
+permalink: pretty
+
+# Collections for each project
+collections:
+  typescript-eda:
+    output: true
+    permalink: /:collection/:name/
+  web-buddy:
+    output: true
+    permalink: /:collection/:name/
+  chatgpt-buddy:
+    output: true
+    permalink: /:collection/:name/
+
+# Plugins
+plugins:
+  - jekyll-sitemap
+  - jekyll-feed
+  - jekyll-seo-tag
+
+# Exclude from processing
+exclude:
+  - Gemfile
+  - Gemfile.lock
+  - node_modules
+  - vendor/bundle/
+  - vendor/cache/
+  - vendor/gems/
+  - vendor/ruby/
+  - README.md
+
+# Default layouts
+defaults:
+  - scope:
+      path: ""
+      type: "typescript-eda"
+    values:
+      layout: "project"
+      project: "typescript-eda"
+  - scope:
+      path: ""
+      type: "web-buddy"
+    values:
+      layout: "project"
+      project: "web-buddy"
+  - scope:
+      path: ""
+      type: "chatgpt-buddy"
+    values:
+      layout: "project"
+      project: "chatgpt-buddy"
+
+# Site navigation
+nav_links:
+  - title: "TypeScript-EDA"
+    url: "/typescript-eda/"
+    description: "Core EDA framework"
+  - title: "Web-Buddy" 
+    url: "/web-buddy/"
+    description: "Web automation framework"
+  - title: "ChatGPT-Buddy"
+    url: "/chatgpt-buddy/"
+    description: "ChatGPT automation"
+
+# Project metadata
+projects:
+  typescript-eda:
+    name: "TypeScript-EDA"
+    description: "Event-driven architecture framework"
+    icon: "🏗️"
+    github: "https://github.com/rydnr/typescript-eda"
+    npm: "@typescript-eda/core"
+  web-buddy:
+    name: "Web-Buddy"
+    description: "Generic web automation framework"
+    icon: "🌐"
+    github: "https://github.com/rydnr/web-buddy"
+    npm: "@web-buddy/core"
+  chatgpt-buddy:
+    name: "ChatGPT-Buddy"
+    description: "ChatGPT automation specialist"
+    icon: "🤖"
+    github: "https://github.com/rydnr/chatgpt-buddy"
+    npm: "@chatgpt-buddy/client"

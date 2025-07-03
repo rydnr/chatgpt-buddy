@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TypeScript-EDA Ecosystem - Event-Driven Architecture for Modern Development</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .hero {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 3rem;
+            margin-bottom: 3rem;
+            text-align: center;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        .hero h1 {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .hero p {
+            font-size: 1.2rem;
+            color: #666;
+            margin-bottom: 2rem;
+            max-width: 800px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .architecture-diagram {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 2rem;
+            margin: 2rem 0;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            overflow-x: auto;
+        }
+
+        .projects {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 2rem;
+            margin-top: 3rem;
+        }
+
+        .project-card {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 2rem;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            backdrop-filter: blur(10px);
+        }
+
+        .project-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+        }
+
+        .project-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+
+        .project-card h2 {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+            color: #2c3e50;
+        }
+
+        .project-card p {
+            color: #666;
+            margin-bottom: 1.5rem;
+        }
+
+        .project-links {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            border: none;
+            cursor: pointer;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-secondary {
+            background: #f8f9fa;
+            color: #495057;
+            border: 2px solid #e9ecef;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .features {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 2rem;
+            margin: 3rem 0;
+            backdrop-filter: blur(10px);
+        }
+
+        .features h2 {
+            text-align: center;
+            margin-bottom: 2rem;
+            color: #2c3e50;
+        }
+
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 2rem;
+        }
+
+        .feature-item {
+            text-align: center;
+            padding: 1rem;
+        }
+
+        .feature-item h3 {
+            color: #495057;
+            margin-bottom: 0.5rem;
+        }
+
+        .feature-item p {
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 3rem;
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        .relationships {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 2rem;
+            margin: 2rem 0;
+            backdrop-filter: blur(10px);
+        }
+
+        .relationships h2 {
+            text-align: center;
+            margin-bottom: 1.5rem;
+            color: #2c3e50;
+        }
+
+        @media (max-width: 768px) {
+            .hero h1 {
+                font-size: 2rem;
+            }
+            
+            .container {
+                padding: 1rem;
+            }
+            
+            .hero {
+                padding: 2rem;
+            }
+            
+            .projects {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="hero">
+            <h1>TypeScript-EDA Ecosystem</h1>
+            <p>A comprehensive suite of event-driven architecture tools for modern TypeScript development, from core framework to specialized web automation.</p>
+            
+            <div class="relationships">
+                <h2>🏗️ Architecture Relationship</h2>
+                <div class="architecture-diagram">
+TypeScript-EDA (Core Framework)
+    │
+    │ provides event-driven architecture primitives
+    │ (@listen decorators, Event classes, Application base)
+    │
+    ▼
+Web-Buddy (Generic Web Automation Framework)
+    │
+    │ extends TypeScript-EDA for browser automation
+    │ (message routing, extension framework, client SDKs)
+    │
+    ▼
+ChatGPT-Buddy (Specialized Implementation)
+    │
+    │ implements Web-Buddy for ChatGPT automation
+    │ (specific automation patterns, UI handlers)
+                </div>
+            </div>
+        </div>
+
+        <div class="features">
+            <h2>🌟 Ecosystem Benefits</h2>
+            <div class="feature-grid">
+                <div class="feature-item">
+                    <h3>🏛️ Event-Driven Architecture</h3>
+                    <p>Built on proven DDD and EDA patterns with @listen decorators and domain events</p>
+                </div>
+                <div class="feature-item">
+                    <h3>🔄 Reusable Components</h3>
+                    <p>Share infrastructure across projects while maintaining domain-specific logic</p>
+                </div>
+                <div class="feature-item">
+                    <h3>🧪 Test-Driven Development</h3>
+                    <p>Walking skeleton approach with comprehensive testing at all levels</p>
+                </div>
+                <div class="feature-item">
+                    <h3>📦 Modular Design</h3>
+                    <p>Use what you need - from core EDA patterns to complete automation solutions</p>
+                </div>
+                <div class="feature-item">
+                    <h3>🌐 Web Automation</h3>
+                    <p>From generic browser automation to specialized ChatGPT interactions</p>
+                </div>
+                <div class="feature-item">
+                    <h3>🚀 Production Ready</h3>
+                    <p>Battle-tested architecture with performance optimization and monitoring</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="projects">
+            <div class="project-card">
+                <div class="project-icon">🏗️</div>
+                <h2>TypeScript-EDA</h2>
+                <p>Core event-driven architecture framework providing the foundation for scalable TypeScript applications with domain-driven design principles.</p>
+                <ul style="margin-bottom: 1.5rem; color: #666;">
+                    <li>@listen decorators for event handling</li>
+                    <li>Domain entities and value objects</li>
+                    <li>Hexagonal architecture support</li>
+                    <li>Literate programming approach</li>
+                </ul>
+                <div class="project-links">
+                    <a href="typescript-eda/" class="btn btn-primary">📖 Documentation</a>
+                    <a href="typescript-eda/getting-started.html" class="btn btn-secondary">🚀 Quick Start</a>
+                    <a href="typescript-eda/story.html" class="btn btn-secondary">📚 Story</a>
+                </div>
+            </div>
+
+            <div class="project-card">
+                <div class="project-icon">🌐</div>
+                <h2>Web-Buddy</h2>
+                <p>Generic web automation framework that extends TypeScript-EDA for browser automation, providing reusable infrastructure for any website.</p>
+                <ul style="margin-bottom: 1.5rem; color: #666;">
+                    <li>Generic message-passing infrastructure</li>
+                    <li>Browser extension framework</li>
+                    <li>Multi-site automation support</li>
+                    <li>Developer-friendly client APIs</li>
+                </ul>
+                <div class="project-links">
+                    <a href="web-buddy/" class="btn btn-primary">📖 Documentation</a>
+                    <a href="web-buddy/getting-started.html" class="btn btn-secondary">🚀 Quick Start</a>
+                    <a href="web-buddy/story.html" class="btn btn-secondary">📚 Story</a>
+                </div>
+            </div>
+
+            <div class="project-card">
+                <div class="project-icon">🤖</div>
+                <h2>ChatGPT-Buddy</h2>
+                <p>Specialized implementation of Web-Buddy for ChatGPT automation, featuring advanced training capabilities and pattern management.</p>
+                <ul style="margin-bottom: 1.5rem; color: #666;">
+                    <li>ChatGPT-specific automation patterns</li>
+                    <li>Interactive training system</li>
+                    <li>Pattern sharing and collaboration</li>
+                    <li>D-Bus integration for Linux desktops</li>
+                </ul>
+                <div class="project-links">
+                    <a href="chatgpt-buddy/" class="btn btn-primary">📖 Documentation</a>
+                    <a href="chatgpt-buddy/getting-started.html" class="btn btn-secondary">🚀 Quick Start</a>
+                    <a href="chatgpt-buddy/story.html" class="btn btn-secondary">📚 Story</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="features">
+            <h2>🎯 Choose Your Entry Point</h2>
+            <div class="feature-grid">
+                <div class="feature-item">
+                    <h3>🏗️ Framework Developers</h3>
+                    <p>Start with <strong>TypeScript-EDA</strong> to build event-driven applications with proven architectural patterns</p>
+                </div>
+                <div class="feature-item">
+                    <h3>🌐 Web Automation Developers</h3>
+                    <p>Use <strong>Web-Buddy</strong> for generic browser automation across multiple websites and platforms</p>
+                </div>
+                <div class="feature-item">
+                    <h3>🤖 ChatGPT Users</h3>
+                    <p>Jump straight to <strong>ChatGPT-Buddy</strong> for specialized ChatGPT automation and AI interaction workflows</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>Built with ❤️ using Event-Driven Architecture • Licensed under GPL-3.0</p>
+            <p style="margin-top: 0.5rem; font-size: 0.9rem;">
+                <a href="https://github.com/rydnr" style="color: rgba(255,255,255,0.9);">GitHub</a> • 
+                <a href="https://www.npmjs.com/~rydnr" style="color: rgba(255,255,255,0.9);">NPM</a>
+            </p>
+        </div>
+    </div>
+</body>
+</html>

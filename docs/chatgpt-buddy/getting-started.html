@@ -1,0 +1,790 @@
+---
+title: "Getting Started with ChatGPT-Buddy"
+subtitle: "AI-Powered Automation Made Simple"
+author: "ChatGPT-Buddy Team"
+date: "2025-07-02"
+layout: project
+project: chatgpt-buddy
+---
+
+<h1 id="quick-start-guide">Quick Start Guide</h1>
+<p>ChatGPT-Buddy is a specialized implementation of Web-Buddy for
+automating ChatGPT interactions. Built on event-driven architecture, it
+features interactive training, pattern management, and cross-platform
+communication for powerful AI workflow automation.</p>
+<h2 id="prerequisites">Prerequisites</h2>
+<ul>
+<li>Node.js 18+ and pnpm 8+</li>
+<li>ChatGPT account (Plus recommended for advanced features)</li>
+<li>Chrome or Firefox browser</li>
+<li>Basic understanding of automation concepts</li>
+</ul>
+<h2 id="installation-options">Installation Options</h2>
+<h3 id="option-1-npm-package-recommended">Option 1: NPM Package
+(Recommended)</h3>
+<pre class="bash"><code># Install ChatGPT-Buddy client
+npm install @chatgpt-buddy/client
+
+# For TypeScript projects
+npm install -D @types/node typescript
+</code></pre>
+<h3 id="option-2-browser-extension">Option 2: Browser Extension</h3>
+<pre class="bash"><code># Clone the repository
+git clone https://github.com/rydnr/chatgpt-buddy.git
+cd chatgpt-buddy
+
+# Install dependencies
+pnpm install
+
+# Build the extension
+pnpm build:extension
+
+# Load the extension in Chrome:
+# 1. Open chrome://extensions/
+# 2. Enable &quot;Developer mode&quot;
+# 3. Click &quot;Load unpacked&quot;
+# 4. Select the `extension/build` directory
+</code></pre>
+<h3 id="option-3-full-development-setup">Option 3: Full Development
+Setup</h3>
+<pre class="bash"><code># Clone and set up the complete development environment
+git clone https://github.com/rydnr/chatgpt-buddy.git
+cd chatgpt-buddy
+
+# Install all dependencies
+pnpm install
+
+# Start the development server
+pnpm dev:server
+
+# In another terminal, start the client
+pnpm dev:client
+</code></pre>
+<h1 id="your-first-chatgpt-automation">Your First ChatGPT
+Automation</h1>
+<p>Let's start with a simple automation to understand the basics.</p>
+<h2 id="step-1-basic-client-setup">Step 1: Basic Client Setup</h2>
+<pre class="typescript"><code>// simple-automation.ts
+import { ChatGPTBuddyClient } from &#39;@chatgpt-buddy/client&#39;;
+
+async function main() {
+  // Initialize the client
+  const client = new ChatGPTBuddyClient({
+    serverUrl: &#39;http://localhost:3000&#39;, // Default server
+    apiKey: process.env.CHATGPT_BUDDY_API_KEY // Optional for auth
+  });
+
+  try {
+    // Test connection
+    const status = await client.getStatus();
+    console.log(&#39;✅ Connected to ChatGPT-Buddy:&#39;, status);
+
+    // Your first automation
+    await client.selectProject(&#39;general&#39;);
+    const response = await client.askQuestion(&#39;What is TypeScript?&#39;);
+
+    console.log(&#39;🤖 ChatGPT Response:&#39;, response);
+
+  } catch (error) {
+    console.error(&#39;❌ Automation failed:&#39;, error);
+  }
+}
+
+main();
+</code></pre>
+<h2 id="step-2-project-based-workflows">Step 2: Project-Based
+Workflows</h2>
+<p>ChatGPT-Buddy organizes work into projects for better context
+management:</p>
+<pre class="typescript"><code>// project-workflow.ts
+import { ChatGPTBuddyClient } from &#39;@chatgpt-buddy/client&#39;;
+
+async function codeReviewWorkflow() {
+  const client = new ChatGPTBuddyClient({
+    serverUrl: &#39;http://localhost:3000&#39;
+  });
+
+  // Select the code review project
+  await client.selectProject(&#39;code-review&#39;);
+
+  // Upload a file for review
+  await client.uploadFile(&#39;./src/my-component.tsx&#39;);
+
+  // Ask for code review
+  const review = await client.askQuestion(`
+    Please review this React component for:
+    1. Best practices
+    2. Performance optimizations
+    3. Accessibility concerns
+    4. Security issues
+  `);
+
+  console.log(&#39;📝 Code Review Results:&#39;);
+  console.log(review);
+
+  // Extract specific recommendations
+  const recommendations = await client.askQuestion(
+    &#39;Please provide a numbered list of specific improvement recommendations&#39;
+  );
+
+  return {
+    review,
+    recommendations,
+    timestamp: new Date().toISOString()
+  };
+}
+
+// Run the workflow
+codeReviewWorkflow().then(result =&gt; {
+  console.log(&#39;✅ Code review completed!&#39;);
+  console.log(JSON.stringify(result, null, 2));
+});
+</code></pre>
+<h2 id="step-3-conversation-management">Step 3: Conversation
+Management</h2>
+<p>Manage multiple ChatGPT conversations programmatically:</p>
+<pre class="typescript"><code>// conversation-management.ts
+import { ChatGPTBuddyClient } from &#39;@chatgpt-buddy/client&#39;;
+
+async function researchWorkflow(topic: string) {
+  const client = new ChatGPTBuddyClient({
+    serverUrl: &#39;http://localhost:3000&#39;
+  });
+
+  // Start a new conversation for research
+  const researchConversation = await client.startNewConversation();
+  console.log(`🆕 Started research conversation: ${researchConversation.id}`);
+
+  // Conduct research in dedicated conversation
+  await client.switchToConversation(researchConversation.id);
+  await client.selectProject(&#39;research&#39;);
+
+  const overview = await client.askQuestion(`
+    Please provide a comprehensive overview of ${topic}, including:
+    1. Key concepts and definitions
+    2. Current trends and developments
+    3. Practical applications
+    4. Future outlook
+  `);
+
+  // Start another conversation for detailed analysis
+  const analysisConversation = await client.startNewConversation();
+  await client.switchToConversation(analysisConversation.id);
+  await client.selectProject(&#39;analysis&#39;);
+
+  const deepDive = await client.askQuestion(`
+    Based on the topic &quot;${topic}&quot;, please provide:
+    1. Technical implementation details
+    2. Advantages and disadvantages
+    3. Comparison with alternatives
+    4. Real-world case studies
+  `);
+
+  return {
+    topic,
+    conversations: {
+      research: {
+        id: researchConversation.id,
+        overview
+      },
+      analysis: {
+        id: analysisConversation.id,
+        deepDive
+      }
+    }
+  };
+}
+
+// Example usage
+researchWorkflow(&#39;Event-Driven Architecture&#39;).then(result =&gt; {
+  console.log(&#39;📚 Research completed!&#39;);
+  console.log(`Topic: ${result.topic}`);
+  console.log(`Research conversation: ${result.conversations.research.id}`);
+  console.log(`Analysis conversation: ${result.conversations.analysis.id}`);
+});
+</code></pre>
+<h1 id="interactive-training-system">Interactive Training System</h1>
+<p>One of ChatGPT-Buddy's most powerful features is the ability to learn
+automation patterns through browser interactions.</p>
+<h2 id="step-4-recording-automation-patterns">Step 4: Recording
+Automation Patterns</h2>
+<pre class="typescript"><code>// pattern-training.ts
+import { ChatGPTBuddyClient } from &#39;@chatgpt-buddy/client&#39;;
+
+async function createAutomationPattern() {
+  const client = new ChatGPTBuddyClient({
+    serverUrl: &#39;http://localhost:3000&#39;
+  });
+
+  console.log(&#39;🎯 Starting training mode...&#39;);
+
+  // Start training mode (activates browser overlay)
+  await client.startTrainingMode();
+
+  console.log(`
+    📝 Training Instructions:
+    1. Go to ChatGPT in your browser
+    2. Perform the actions you want to automate
+    3. The system will record your interactions
+    4. Press Ctrl+Shift+T to stop training
+  `);
+
+  // Wait for training completion
+  const pattern = await client.waitForTrainingCompletion();
+
+  console.log(&#39;✅ Pattern recorded:&#39;, pattern.name);
+  console.log(`📊 Steps captured: ${pattern.steps.length}`);
+
+  // Save the pattern for future use
+  await client.savePattern(pattern, {
+    name: &#39;My Custom Workflow&#39;,
+    description: &#39;Automated workflow for specific task&#39;,
+    tags: [&#39;custom&#39;, &#39;workflow&#39;]
+  });
+
+  return pattern;
+}
+
+// Alternative: Create pattern programmatically
+async function createProgrammaticPattern() {
+  const client = new ChatGPTBuddyClient({
+    serverUrl: &#39;http://localhost:3000&#39;
+  });
+
+  const pattern = await client.createPattern({
+    name: &#39;Code Documentation Workflow&#39;,
+    description: &#39;Generate documentation for code files&#39;,
+    steps: [
+      {
+        action: &#39;SELECT_PROJECT&#39;,
+        target: &#39;code-documentation&#39;,
+        description: &#39;Select documentation project&#39;
+      },
+      {
+        action: &#39;UPLOAD_FILE&#39;,
+        target: &#39;input[type=&quot;file&quot;]&#39;,
+        description: &#39;Upload code file&#39;
+      },
+      {
+        action: &#39;ASK_QUESTION&#39;,
+        prompt: &#39;Generate comprehensive documentation for this code&#39;,
+        description: &#39;Request documentation generation&#39;
+      },
+      {
+        action: &#39;EXTRACT_RESPONSE&#39;,
+        format: &#39;markdown&#39;,
+        description: &#39;Extract markdown documentation&#39;
+      }
+    ]
+  });
+
+  console.log(&#39;✅ Pattern created:&#39;, pattern.id);
+  return pattern;
+}
+</code></pre>
+<h2 id="step-5-executing-automation-patterns">Step 5: Executing
+Automation Patterns</h2>
+<pre class="typescript"><code>// pattern-execution.ts
+import { ChatGPTBuddyClient } from &#39;@chatgpt-buddy/client&#39;;
+
+async function executeAutomationPatterns() {
+  const client = new ChatGPTBuddyClient({
+    serverUrl: &#39;http://localhost:3000&#39;
+  });
+
+  // List available patterns
+  const patterns = await client.getPatterns();
+  console.log(`📋 Available patterns: ${patterns.length}`);
+
+  patterns.forEach(pattern =&gt; {
+    console.log(`  - ${pattern.name}: ${pattern.description}`);
+  });
+
+  // Execute a specific pattern
+  const codeReviewPattern = patterns.find(p =&gt; 
+    p.name.includes(&#39;Code Review&#39;)
+  );
+
+  if (codeReviewPattern) {
+    console.log(`🚀 Executing pattern: ${codeReviewPattern.name}`);
+
+    const result = await client.executePattern(codeReviewPattern.id, {
+      variables: {
+        filePath: &#39;./src/components/UserProfile.tsx&#39;,
+        reviewType: &#39;security-focused&#39;
+      }
+    });
+
+    console.log(&#39;✅ Pattern execution completed:&#39;);
+    console.log(result);
+  }
+
+  // Execute pattern with custom data
+  const documentationPattern = patterns.find(p =&gt; 
+    p.name.includes(&#39;Documentation&#39;)
+  );
+
+  if (documentationPattern) {
+    const files = [
+      &#39;./src/utils/api-client.ts&#39;,
+      &#39;./src/hooks/useUser.ts&#39;,
+      &#39;./src/components/DataTable.tsx&#39;
+    ];
+
+    console.log(&#39;📚 Generating documentation for multiple files...&#39;);
+
+    const results = await Promise.all(
+      files.map(file =&gt; 
+        client.executePattern(documentationPattern.id, {
+          variables: { filePath: file }
+        })
+      )
+    );
+
+    console.log(`✅ Generated documentation for ${results.length} files`);
+    return results;
+  }
+}
+</code></pre>
+<h1 id="advanced-features">Advanced Features</h1>
+<h2 id="step-6-pattern-sharing-and-collaboration">Step 6: Pattern
+Sharing and Collaboration</h2>
+<pre class="typescript"><code>// pattern-collaboration.ts
+import { ChatGPTBuddyClient } from &#39;@chatgpt-buddy/client&#39;;
+
+async function teamCollaboration() {
+  const client = new ChatGPTBuddyClient({
+    serverUrl: &#39;http://localhost:3000&#39;
+  });
+
+  // Share a pattern with team
+  const myPattern = await client.getPattern(&#39;my-code-review-pattern&#39;);
+
+  await client.sharePattern(myPattern.id, {
+    teamId: &#39;frontend-team&#39;,
+    permissions: [&#39;read&#39;, &#39;execute&#39;],
+    message: &#39;Code review pattern optimized for React components&#39;
+  });
+
+  // Import patterns from team library
+  const teamPatterns = await client.getTeamPatterns(&#39;frontend-team&#39;);
+  console.log(`📚 Team patterns available: ${teamPatterns.length}`);
+
+  // Subscribe to pattern updates
+  await client.subscribeToPatternUpdates({
+    onPatternUpdated: (pattern) =&gt; {
+      console.log(`🔄 Pattern updated: ${pattern.name}`);
+    },
+    onNewPatternShared: (pattern) =&gt; {
+      console.log(`🆕 New pattern shared: ${pattern.name}`);
+    }
+  });
+
+  // Export patterns for backup
+  const exportData = await client.exportPatterns({
+    format: &#39;json&#39;,
+    includeTeamPatterns: true,
+    includeExecutionHistory: false
+  });
+
+  // Save to file
+  require(&#39;fs&#39;).writeFileSync(
+    &#39;./pattern-backup.json&#39;, 
+    JSON.stringify(exportData, null, 2)
+  );
+
+  console.log(&#39;💾 Patterns exported to pattern-backup.json&#39;);
+}
+</code></pre>
+<h2 id="step-7-cross-platform-communication">Step 7: Cross-Platform
+Communication</h2>
+<p>ChatGPT-Buddy supports multiple communication protocols for optimal
+performance:</p>
+<pre class="typescript"><code>// cross-platform-client.ts
+import { ChatGPTBuddyClient } from &#39;@chatgpt-buddy/client&#39;;
+
+async function optimizedCommunication() {
+  // The client automatically detects the best communication method
+  const client = new ChatGPTBuddyClient({
+    serverUrl: &#39;http://localhost:3000&#39;,
+    preferredTransport: &#39;auto&#39;, // &#39;websocket&#39;, &#39;dbus&#39;, or &#39;auto&#39;
+    platform: process.platform
+  });
+
+  // Check communication status
+  const transport = await client.getTransportInfo();
+  console.log(`🔗 Using transport: ${transport.type}`);
+  console.log(`⚡ Average latency: ${transport.averageLatency}ms`);
+
+  if (transport.type === &#39;dbus&#39;) {
+    console.log(&#39;🐧 Using D-Bus for optimal Linux performance&#39;);
+
+    // D-Bus specific features
+    await client.enableDesktopNotifications();
+    await client.registerGlobalHotkeys({
+      &#39;Ctrl+Shift+C&#39;: &#39;quick-chat&#39;,
+      &#39;Ctrl+Shift+R&#39;: &#39;run-last-pattern&#39;
+    });
+  }
+
+  // Performance comparison
+  const performanceTest = await client.runPerformanceTest({
+    iterations: 100,
+    includeLatency: true,
+    includeReliability: true
+  });
+
+  console.log(&#39;📊 Performance Results:&#39;);
+  console.log(`  Average latency: ${performanceTest.averageLatency}ms`);
+  console.log(`  Success rate: ${performanceTest.successRate}%`);
+  console.log(`  Throughput: ${performanceTest.throughput} requests/sec`);
+}
+</code></pre>
+<h1 id="production-usage-examples">Production Usage Examples</h1>
+<h2 id="step-8-content-creation-pipeline">Step 8: Content Creation
+Pipeline</h2>
+<pre class="typescript"><code>// content-pipeline.ts
+import { ChatGPTBuddyClient } from &#39;@chatgpt-buddy/client&#39;;
+
+async function contentCreationPipeline(topics: string[]) {
+  const client = new ChatGPTBuddyClient({
+    serverUrl: &#39;http://localhost:3000&#39;
+  });
+
+  const results = [];
+
+  for (const topic of topics) {
+    console.log(`📝 Creating content for: ${topic}`);
+
+    // Phase 1: Research
+    await client.selectProject(&#39;content-research&#39;);
+    const research = await client.askQuestion(`
+      Research the topic &quot;${topic}&quot; and provide:
+      1. Key points to cover
+      2. Target audience considerations
+      3. Current trends and relevance
+      4. Potential angles and perspectives
+    `);
+
+    // Phase 2: Content Creation
+    await client.selectProject(&#39;content-writing&#39;);
+    const article = await client.askQuestion(`
+      Based on this research: ${research}
+
+      Write a comprehensive blog post about &quot;${topic}&quot; that:
+      - Is 1000-1500 words long
+      - Uses engaging headings and subheadings
+      - Includes practical examples
+      - Has a clear introduction and conclusion
+      - Is optimized for readability
+    `);
+
+    // Phase 3: SEO Optimization
+    await client.selectProject(&#39;seo-optimization&#39;);
+    const seoData = await client.askQuestion(`
+      For this article about &quot;${topic}&quot;:
+      ${article}
+
+      Provide:
+      1. SEO-optimized title (under 60 characters)
+      2. Meta description (under 160 characters)
+      3. 5-10 relevant keywords
+      4. Suggested internal linking opportunities
+      5. Social media post variations
+    `);
+
+    results.push({
+      topic,
+      research,
+      article,
+      seo: seoData,
+      timestamp: new Date().toISOString()
+    });
+
+    console.log(`✅ Content created for: ${topic}`);
+  }
+
+  return results;
+}
+
+// Usage
+const topics = [
+  &#39;Event-Driven Architecture in JavaScript&#39;,
+  &#39;Building Scalable React Applications&#39;,
+  &#39;TypeScript Best Practices for 2025&#39;
+];
+
+contentCreationPipeline(topics).then(results =&gt; {
+  console.log(`🎉 Created ${results.length} articles`);
+
+  // Save results
+  require(&#39;fs&#39;).writeFileSync(
+    &#39;./content-output.json&#39;,
+    JSON.stringify(results, null, 2)
+  );
+});
+</code></pre>
+<h2 id="step-9-code-analysis-automation">Step 9: Code Analysis
+Automation</h2>
+<pre class="typescript"><code>// code-analysis.ts
+import { ChatGPTBuddyClient } from &#39;@chatgpt-buddy/client&#39;;
+import * as fs from &#39;fs&#39;;
+import * as path from &#39;path&#39;;
+
+async function analyzeCodebase(projectPath: string) {
+  const client = new ChatGPTBuddyClient({
+    serverUrl: &#39;http://localhost:3000&#39;
+  });
+
+  console.log(`🔍 Analyzing codebase: ${projectPath}`);
+
+  // Find all TypeScript/JavaScript files
+  const files = findCodeFiles(projectPath);
+  console.log(`📁 Found ${files.length} code files`);
+
+  const analyses = [];
+
+  for (const file of files) {
+    console.log(`📝 Analyzing: ${path.relative(projectPath, file)}`);
+
+    await client.selectProject(&#39;code-analysis&#39;);
+
+    // Upload file
+    await client.uploadFile(file);
+
+    // Get comprehensive analysis
+    const analysis = await client.askQuestion(`
+      Analyze this code file and provide:
+
+      1. **Code Quality Assessment**
+         - Complexity analysis
+         - Code smells identification
+         - Maintainability score (1-10)
+
+      2. **Security Review**
+         - Potential vulnerabilities
+         - Security best practices compliance
+         - Risk level (Low/Medium/High)
+
+      3. **Performance Analysis**
+         - Performance bottlenecks
+         - Optimization opportunities
+         - Memory usage patterns
+
+      4. **Architecture Review**
+         - Design pattern usage
+         - SOLID principles compliance
+         - Coupling and cohesion analysis
+
+      5. **Recommendations**
+         - Specific improvement suggestions
+         - Refactoring priorities
+         - Testing recommendations
+
+      Provide the analysis in structured JSON format.
+    `);
+
+    analyses.push({
+      file: path.relative(projectPath, file),
+      analysis: analysis,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  // Generate summary report
+  await client.selectProject(&#39;report-generation&#39;);
+  const summaryReport = await client.askQuestion(`
+    Based on these code analyses:
+    ${JSON.stringify(analyses, null, 2)}
+
+    Generate a comprehensive codebase summary report including:
+    1. Overall code quality metrics
+    2. Most critical issues to address
+    3. Architecture strengths and weaknesses
+    4. Security posture assessment
+    5. Recommended action plan with priorities
+  `);
+
+  return {
+    projectPath,
+    fileCount: files.length,
+    analyses,
+    summaryReport,
+    timestamp: new Date().toISOString()
+  };
+}
+
+function findCodeFiles(dir: string): string[] {
+  const files: string[] = [];
+  const entries = fs.readdirSync(dir, { withFileTypes: true });
+
+  for (const entry of entries) {
+    const fullPath = path.join(dir, entry.name);
+
+    if (entry.isDirectory() &amp;&amp; !entry.name.startsWith(&#39;.&#39;) &amp;&amp; entry.name !== &#39;node_modules&#39;) {
+      files.push(...findCodeFiles(fullPath));
+    } else if (entry.isFile() &amp;&amp; /\.(ts|tsx|js|jsx)$/.test(entry.name)) {
+      files.push(fullPath);
+    }
+  }
+
+  return files;
+}
+
+// Usage
+analyzeCodebase(&#39;./src&#39;).then(report =&gt; {
+  console.log(`✅ Analysis completed for ${report.fileCount} files`);
+
+  // Save detailed report
+  fs.writeFileSync(
+    &#39;./codebase-analysis-report.json&#39;,
+    JSON.stringify(report, null, 2)
+  );
+
+  console.log(&#39;📋 Report saved to codebase-analysis-report.json&#39;);
+});
+</code></pre>
+<h1 id="monitoring-and-analytics">Monitoring and Analytics</h1>
+<h2 id="step-10-pattern-performance-monitoring">Step 10: Pattern
+Performance Monitoring</h2>
+<pre class="typescript"><code>// monitoring.ts
+import { ChatGPTBuddyClient } from &#39;@chatgpt-buddy/client&#39;;
+
+async function monitorPatternPerformance() {
+  const client = new ChatGPTBuddyClient({
+    serverUrl: &#39;http://localhost:3000&#39;
+  });
+
+  // Get performance metrics for all patterns
+  const metrics = await client.getPatternMetrics({
+    timeRange: &#39;30d&#39;,
+    includeSuccessRate: true,
+    includeAverageExecutionTime: true,
+    includeUsageFrequency: true
+  });
+
+  console.log(&#39;📊 Pattern Performance Metrics:&#39;);
+  console.log(&#39;================================&#39;);
+
+  metrics.forEach(metric =&gt; {
+    console.log(`\n📋 Pattern: ${metric.patternName}`);
+    console.log(`   Success Rate: ${metric.successRate.toFixed(1)}%`);
+    console.log(`   Avg Execution: ${metric.averageExecutionTime}ms`);
+    console.log(`   Usage Count: ${metric.usageCount}`);
+    console.log(`   Last Used: ${metric.lastUsed}`);
+
+    if (metric.successRate &lt; 90) {
+      console.log(`   ⚠️  Low success rate - needs attention`);
+    }
+
+    if (metric.averageExecutionTime &gt; 30000) {
+      console.log(`   🐌 Slow execution - consider optimization`);
+    }
+  });
+
+  // Get detailed analytics
+  const analytics = await client.getAnalytics({
+    timeRange: &#39;7d&#39;,
+    metrics: [&#39;execution_time&#39;, &#39;success_rate&#39;, &#39;error_types&#39;],
+    groupBy: &#39;pattern&#39;
+  });
+
+  // Set up real-time monitoring
+  await client.subscribeToMetrics({
+    onSlowExecution: (pattern, executionTime) =&gt; {
+      console.log(`🐌 Slow execution alert: ${pattern.name} took ${executionTime}ms`);
+    },
+    onFailure: (pattern, error) =&gt; {
+      console.log(`❌ Pattern failure: ${pattern.name} - ${error.message}`);
+    },
+    onSuccess: (pattern, result) =&gt; {
+      console.log(`✅ Pattern success: ${pattern.name}`);
+    }
+  });
+
+  return { metrics, analytics };
+}
+</code></pre>
+<h1 id="best-practices">Best Practices</h1>
+<h2 id="error-handling-and-retry-logic">Error Handling and Retry
+Logic</h2>
+<pre class="typescript"><code>// robust-automation.ts
+import { ChatGPTBuddyClient } from &#39;@chatgpt-buddy/client&#39;;
+
+async function robustAutomation() {
+  const client = new ChatGPTBuddyClient({
+    serverUrl: &#39;http://localhost:3000&#39;,
+    retryAttempts: 3,
+    retryDelay: 1000,
+    timeout: 30000
+  });
+
+  try {
+    // Use retry wrapper for critical operations
+    const result = await client.withRetry(async () =&gt; {
+      await client.selectProject(&#39;critical-project&#39;);
+      return await client.askQuestion(&#39;Important question that must succeed&#39;);
+    }, {
+      maxAttempts: 5,
+      backoffMultiplier: 2,
+      onRetry: (attempt, error) =&gt; {
+        console.log(`🔄 Retry attempt ${attempt}: ${error.message}`);
+      }
+    });
+
+    return result;
+
+  } catch (error) {
+    // Comprehensive error handling
+    if (error.code === &#39;CONNECTION_LOST&#39;) {
+      console.log(&#39;🔌 Connection lost, attempting to reconnect...&#39;);
+      await client.reconnect();
+    } else if (error.code === &#39;RATE_LIMITED&#39;) {
+      console.log(&#39;⏳ Rate limited, waiting before retry...&#39;);
+      await new Promise(resolve =&gt; setTimeout(resolve, 60000));
+    } else {
+      console.error(&#39;❌ Unrecoverable error:&#39;, error);
+      throw error;
+    }
+  }
+}
+</code></pre>
+<h2 id="configuration-management">Configuration Management</h2>
+<pre class="typescript"><code>// config.ts
+export interface ChatGPTBuddyConfig {
+  serverUrl: string;
+  apiKey?: string;
+  retryAttempts?: number;
+  timeout?: number;
+  preferredTransport?: &#39;websocket&#39; | &#39;dbus&#39; | &#39;auto&#39;;
+  enableAnalytics?: boolean;
+  patternCache?: {
+    maxSize: number;
+    ttl: number;
+  };
+}
+
+// Load configuration from environment or config file
+const config: ChatGPTBuddyConfig = {
+  serverUrl: process.env.CHATGPT_BUDDY_SERVER_URL || &#39;http://localhost:3000&#39;,
+  apiKey: process.env.CHATGPT_BUDDY_API_KEY,
+  retryAttempts: parseInt(process.env.CHATGPT_BUDDY_RETRY_ATTEMPTS || &#39;3&#39;),
+  timeout: parseInt(process.env.CHATGPT_BUDDY_TIMEOUT || &#39;30000&#39;),
+  preferredTransport: &#39;auto&#39;,
+  enableAnalytics: true,
+  patternCache: {
+    maxSize: 100,
+    ttl: 3600000 // 1 hour
+  }
+};
+
+export default config;
+</code></pre>
+<p>Congratulations! You now have a comprehensive understanding of
+ChatGPT-Buddy's capabilities. From simple automations to complex
+pattern-based workflows, you can leverage the power of AI automation to
+streamline your development and content creation processes.</p>
+<p>Remember to check the <a href="development.org">Development Guide</a>
+for setting up a local development environment, and explore the <a
+href="research.org">Research Documentation</a> for advanced features
+like D-Bus integration and performance optimization.</p>
