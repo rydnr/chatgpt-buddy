@@ -1,0 +1,1045 @@
+#+TITLE: Getting Started with TypeScript-EDA Application
+#+SUBTITLE: Building Orchestrated Applications with Event-Driven Architecture
+#+AUTHOR: TypeScript-EDA Application Team
+#+DATE: 2025-07-03
+#+LAYOUT: project
+#+PROJECT: typescript-eda-application
+
+* Quick Start Guide
+
+TypeScript-EDA Application provides the orchestration layer that coordinates domain logic with infrastructure adapters. This guide will walk you through creating your first event-driven application with proper dependency injection and lifecycle management.
+
+** Prerequisites
+
+- Node.js 18+ and npm/pnpm
+- TypeScript 5+ knowledge
+- Basic understanding of dependency injection and event-driven patterns
+- Familiarity with @typescript-eda/domain and @typescript-eda/infrastructure
+
+** Installation
+
+#+BEGIN_SRC bash
+npm install @typescript-eda/application @typescript-eda/domain @typescript-eda/infrastructure
+# or with pnpm
+pnpm add @typescript-eda/application @typescript-eda/domain @typescript-eda/infrastructure
+#+END_SRC
+
+* Your First Application
+
+Let's build a complete user management application that demonstrates all the key concepts.
+
+** Step 1: Define Your Domain (Review)
+
+First, let's review the domain objects we'll be orchestrating:
+
+#+BEGIN_SRC typescript
+// Domain entities and events from @typescript-eda/domain
+import { Entity, ValueObject, Event, Repository } from '@typescript-eda/domain';
+
+export class UserId extends ValueObject {
+  constructor(private value: string) { super(); }
+  getValue(): string { return this.value; }
+  protected getEqualityComponents(): unknown[] { return [this.value]; }
+}
+
+export class Email extends ValueObject {
+  constructor(private value: string) { 
+    super(); 
+    this.validate(value);
+  }
+  
+  private validate(email: string): void {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      throw new Error(`Invalid email: ${email}`);
+    }
+  }
+  
+  getValue(): string { return this.value; }
+  protected getEqualityComponents(): unknown[] { return [this.value]; }
+}
+
+export class User extends Entity<UserId> {
+  constructor(
+    id: UserId,
+    private email: Email,
+    private name: string,
+    private status: UserStatus = UserStatus.PENDING
+  ) {
+    super(id);
+  }
+
+  @listen(EmailVerificationCompleted)
+  public async activateUser(event: EmailVerificationCompleted): Promise<UserActivated> {
+    if (!this.id.equals(event.userId)) return;
+    
+    this.status = UserStatus.ACTIVE;
+    return new UserActivated(this.id, new Date());
+  }
+
+  // Getters
+  public getEmail(): Email { return this.email; }
+  public getName(): string { return this.name; }
+  public getStatus(): UserStatus { return this.status; }
+}
+
+export enum UserStatus {
+  PENDING = 'pending',
+  ACTIVE = 'active',
+  SUSPENDED = 'suspended'
+}
+
+// Domain events
+export class UserRegistrationRequested extends Event {
+  public readonly type = 'UserRegistrationRequested';
+  
+  constructor(
+    public readonly email: Email,
+    public readonly name: string
+  ) {
+    super();
+  }
+
+  public toJSON(): Record<string, unknown> {
+    return {
+      type: this.type,
+      email: this.email.getValue(),
+      name: this.name,
+      timestamp: this.timestamp.toISOString(),
+      id: this.id
+    };
+  }
+}
+
+export class UserRegistered extends Event {
+  public readonly type = 'UserRegistered';
+  
+  constructor(
+    public readonly userId: UserId,
+    public readonly email: Email,
+    public readonly name: string
+  ) {
+    super();
+  }
+
+  public toJSON(): Record<string, unknown> {
+    return {
+      type: this.type,
+      userId: this.userId.getValue(),
+      email: this.email.getValue(),
+      name: this.name,
+      timestamp: this.timestamp.toISOString(),
+      id: this.id
+    };
+  }
+}
+
+export class EmailVerificationRequested extends Event {
+  public readonly type = 'EmailVerificationRequested';
+  
+  constructor(
+    public readonly userId: UserId,
+    public readonly email: Email,
+    public readonly verificationToken: string
+  ) {
+    super();
+  }
+
+  public toJSON(): Record<string, unknown> {
+    return {
+      type: this.type,
+      userId: this.userId.getValue(),
+      email: this.email.getValue(),
+      verificationToken: this.verificationToken,
+      timestamp: this.timestamp.toISOString(),
+      id: this.id
+    };
+  }
+}
+
+export class EmailVerificationCompleted extends Event {
+  public readonly type = 'EmailVerificationCompleted';
+  
+  constructor(
+    public readonly userId: UserId,
+    public readonly email: Email
+  ) {
+    super();
+  }
+
+  public toJSON(): Record<string, unknown> {
+    return {
+      type: this.type,
+      userId: this.userId.getValue(),
+      email: this.email.getValue(),
+      timestamp: this.timestamp.toISOString(),
+      id: this.id
+    };
+  }
+}
+
+// Repository interface
+export abstract class UserRepository extends Repository<User, UserId> {
+  public abstract findByEmail(email: Email): Promise<User | null>;
+  public abstract existsByEmail(email: Email): Promise<boolean>;
+}
+#+END_SRC
+
+** Step 2: Review Your Infrastructure Adapters
+
+We'll use the infrastructure adapters from @typescript-eda/infrastructure:
+
+#+BEGIN_SRC typescript
+// Infrastructure adapters from @typescript-eda/infrastructure
+import { AdapterFor } from '@typescript-eda/infrastructure';
+
+@AdapterFor(UserRepository)
+export class PostgresUserRepository extends UserRepository {
+  constructor(private connection: PostgresConnection) {
+    super();
+  }
+
+  public async save(user: User): Promise<void> {
+    // PostgreSQL persistence logic
+  }
+
+  public async findByEmail(email: Email): Promise<User | null> {
+    // PostgreSQL query logic
+  }
+
+  // ... other repository methods
+}
+
+@AdapterFor(NotificationPort)
+export class EmailNotificationAdapter extends NotificationPort {
+  constructor(private emailService: EmailService) {
+    super();
+  }
+
+  public async sendEmail(to: Email, subject: string, body: string): Promise<void> {
+    // Email sending logic
+  }
+}
+#+END_SRC
+
+** Step 3: Create Your First Application
+
+The application layer orchestrates domain and infrastructure:
+
+#+BEGIN_SRC typescript
+// src/application/user-management-application.ts
+import { Application, Enable, PrimaryPort } from '@typescript-eda/application';
+import { listen } from '@typescript-eda/domain';
+import { PostgresUserRepository } from '../infrastructure/database/postgres-user-repository';
+import { EmailNotificationAdapter } from '../infrastructure/notifications/email-notification-adapter';
+import { WebServerAdapter } from '../infrastructure/web/web-server-adapter';
+
+@Enable(PostgresUserRepository)
+@Enable(EmailNotificationAdapter)
+@Enable(WebServerAdapter)
+export class UserManagementApplication extends Application {
+  public readonly metadata = new Map([
+    ['name', 'User Management Application'],
+    ['description', 'Complete user lifecycle management with event-driven architecture'],
+    ['version', '1.0.0']
+  ]);
+
+  @listen(UserRegistrationRequested)
+  public async handleUserRegistration(event: UserRegistrationRequested): Promise<Event[]> {
+    console.log(`👤 Processing user registration for ${event.email.getValue()}`);
+
+    try {
+      // Business rule: Check if user already exists
+      const userRepository = Ports.resolve(UserRepository);
+      const existingUser = await userRepository.findByEmail(event.email);
+      
+      if (existingUser) {
+        throw new UserAlreadyExistsError(`User with email ${event.email.getValue()} already exists`);
+      }
+
+      // Create new user
+      const userId = new UserId(this.generateUserId());
+      const user = new User(userId, event.email, event.name);
+      
+      // Save user
+      await userRepository.save(user);
+
+      // Generate verification token
+      const verificationToken = this.generateVerificationToken();
+
+      // Return events for further processing
+      return [
+        new UserRegistered(userId, event.email, event.name),
+        new EmailVerificationRequested(userId, event.email, verificationToken)
+      ];
+    } catch (error) {
+      console.error('User registration failed:', error);
+      throw new UserRegistrationError('Failed to register user', error);
+    }
+  }
+
+  @listen(EmailVerificationRequested)
+  public async sendVerificationEmail(event: EmailVerificationRequested): Promise<void> {
+    console.log(`📧 Sending verification email to ${event.email.getValue()}`);
+
+    const notificationAdapter = Ports.resolve(NotificationPort);
+    
+    const verificationUrl = `${this.getBaseUrl()}/verify-email?token=${event.verificationToken}`;
+    const emailBody = this.buildVerificationEmailBody(verificationUrl);
+
+    await notificationAdapter.sendEmail(
+      event.email,
+      'Please verify your email address',
+      emailBody
+    );
+
+    console.log(`✅ Verification email sent to ${event.email.getValue()}`);
+  }
+
+  @listen(EmailVerificationCompleted)
+  public async handleEmailVerificationCompleted(event: EmailVerificationCompleted): Promise<Event[]> {
+    console.log(`✉️ Email verification completed for ${event.email.getValue()}`);
+
+    const notificationAdapter = Ports.resolve(NotificationPort);
+    
+    // Send welcome email
+    await notificationAdapter.sendEmail(
+      event.email,
+      'Welcome! Your account is now active',
+      this.buildWelcomeEmailBody()
+    );
+
+    return [
+      new UserActivated(event.userId, new Date())
+    ];
+  }
+
+  // Helper methods
+  private generateUserId(): string {
+    return `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  }
+
+  private generateVerificationToken(): string {
+    return Math.random().toString(36).substring(2, 15) + 
+           Math.random().toString(36).substring(2, 15);
+  }
+
+  private getBaseUrl(): string {
+    return process.env.BASE_URL || 'http://localhost:3000';
+  }
+
+  private buildVerificationEmailBody(verificationUrl: string): string {
+    return `
+      <h2>Welcome! Please verify your email address</h2>
+      <p>Click the link below to verify your email address and activate your account:</p>
+      <p><a href="${verificationUrl}">Verify Email Address</a></p>
+      <p>If you didn't request this, please ignore this email.</p>
+    `;
+  }
+
+  private buildWelcomeEmailBody(): string {
+    return `
+      <h2>Welcome to our platform!</h2>
+      <p>Your account has been successfully activated. You can now log in and start using our services.</p>
+      <p>Thank you for joining us!</p>
+    `;
+  }
+}
+
+// Custom errors
+export class UserAlreadyExistsError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'UserAlreadyExistsError';
+  }
+}
+
+export class UserRegistrationError extends Error {
+  constructor(message: string, public readonly cause?: Error) {
+    super(message);
+    this.name = 'UserRegistrationError';
+  }
+}
+#+END_SRC
+
+** Step 4: Create Primary Port Adapters
+
+Primary ports are entry points that drive your application:
+
+#+BEGIN_SRC typescript
+// src/infrastructure/web/web-server-adapter.ts
+import { AdapterFor, PrimaryPort } from '@typescript-eda/infrastructure';
+import { Application } from '@typescript-eda/application';
+import express from 'express';
+
+export abstract class WebServerPort extends Port {
+  public readonly name = 'WebServerPort';
+  public abstract startServer(port: number): Promise<void>;
+}
+
+@AdapterFor(WebServerPort)
+export class ExpressWebServerAdapter extends WebServerPort implements PrimaryPort {
+  private app: express.Application;
+
+  constructor() {
+    super();
+    this.app = express();
+    this.setupMiddleware();
+  }
+
+  public async accept(application: Application): Promise<void> {
+    this.setupRoutes(application);
+    const port = parseInt(process.env.PORT || '3000');
+    await this.startServer(port);
+  }
+
+  public async startServer(port: number): Promise<void> {
+    return new Promise((resolve) => {
+      this.app.listen(port, () => {
+        console.log(`🌐 Web server listening on port ${port}`);
+        resolve();
+      });
+    });
+  }
+
+  private setupMiddleware(): void {
+    this.app.use(express.json());
+    this.app.use(express.urlencoded({ extended: true }));
+    
+    // CORS middleware
+    this.app.use((req, res, next) => {
+      res.header('Access-Control-Allow-Origin', '*');
+      res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+      res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE');
+      next();
+    });
+  }
+
+  private setupRoutes(application: Application): void {
+    // User registration endpoint
+    this.app.post('/api/users/register', async (req, res) => {
+      try {
+        const { email, name } = req.body;
+        
+        if (!email || !name) {
+          return res.status(400).json({
+            error: 'Email and name are required'
+          });
+        }
+
+        const registrationEvent = new UserRegistrationRequested(
+          new Email(email),
+          name
+        );
+
+        await application.handle(registrationEvent);
+
+        res.status(201).json({
+          success: true,
+          message: 'User registration initiated. Please check your email for verification.'
+        });
+      } catch (error) {
+        console.error('Registration endpoint error:', error);
+        
+        if (error instanceof UserAlreadyExistsError) {
+          return res.status(409).json({
+            error: 'User with this email already exists'
+          });
+        }
+
+        res.status(500).json({
+          error: 'Internal server error'
+        });
+      }
+    });
+
+    // Email verification endpoint
+    this.app.get('/api/users/verify-email', async (req, res) => {
+      try {
+        const { token } = req.query;
+        
+        if (!token) {
+          return res.status(400).json({
+            error: 'Verification token is required'
+          });
+        }
+
+        // Find user by verification token
+        const userRepository = Ports.resolve(UserRepository);
+        const user = await this.findUserByVerificationToken(token as string);
+        
+        if (!user) {
+          return res.status(404).json({
+            error: 'Invalid or expired verification token'
+          });
+        }
+
+        const verificationEvent = new EmailVerificationCompleted(
+          user.id,
+          user.getEmail()
+        );
+
+        await application.handle(verificationEvent);
+
+        res.json({
+          success: true,
+          message: 'Email verified successfully. Your account is now active.'
+        });
+      } catch (error) {
+        console.error('Email verification error:', error);
+        res.status(500).json({
+          error: 'Internal server error'
+        });
+      }
+    });
+
+    // User status endpoint
+    this.app.get('/api/users/:email/status', async (req, res) => {
+      try {
+        const { email } = req.params;
+        const userRepository = Ports.resolve(UserRepository);
+        const user = await userRepository.findByEmail(new Email(email));
+        
+        if (!user) {
+          return res.status(404).json({
+            error: 'User not found'
+          });
+        }
+
+        res.json({
+          userId: user.id.getValue(),
+          email: user.getEmail().getValue(),
+          name: user.getName(),
+          status: user.getStatus()
+        });
+      } catch (error) {
+        console.error('User status error:', error);
+        res.status(500).json({
+          error: 'Internal server error'
+        });
+      }
+    });
+
+    // Health check endpoint
+    this.app.get('/health', (req, res) => {
+      res.json({
+        status: 'healthy',
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime()
+      });
+    });
+  }
+
+  private async findUserByVerificationToken(token: string): Promise<User | null> {
+    // In a real implementation, you would store and look up verification tokens
+    // For this example, we'll simulate finding a user
+    // This would typically involve a verification token repository
+    throw new Error('Method not implemented - requires verification token storage');
+  }
+
+  public async initialize(): Promise<void> {
+    console.log('🔧 Express web server adapter initialized');
+  }
+
+  public async shutdown(): Promise<void> {
+    console.log('🔌 Express web server adapter shut down');
+  }
+
+  public async isHealthy(): Promise<boolean> {
+    return true; // Web server health check logic
+  }
+}
+#+END_SRC
+
+** Step 5: Create a CLI Primary Port
+
+Add a command-line interface for administrative tasks:
+
+#+BEGIN_SRC typescript
+// src/infrastructure/cli/cli-adapter.ts
+import { AdapterFor, PrimaryPort } from '@typescript-eda/infrastructure';
+import { Application } from '@typescript-eda/application';
+
+export abstract class CLIPort extends Port {
+  public readonly name = 'CLIPort';
+  public abstract processCommand(args: string[]): Promise<void>;
+}
+
+@AdapterFor(CLIPort)
+export class UserCLIAdapter extends CLIPort implements PrimaryPort {
+  constructor() {
+    super();
+  }
+
+  public async accept(application: Application): Promise<void> {
+    const args = process.argv.slice(2);
+    
+    if (args.length === 0) {
+      this.showHelp();
+      return;
+    }
+
+    await this.processCommand(args, application);
+  }
+
+  public async processCommand(args: string[], application?: Application): Promise<void> {
+    const command = args[0];
+
+    switch (command) {
+      case 'register':
+        await this.handleRegisterCommand(args.slice(1), application!);
+        break;
+        
+      case 'verify':
+        await this.handleVerifyCommand(args.slice(1), application!);
+        break;
+        
+      case 'status':
+        await this.handleStatusCommand(args.slice(1), application!);
+        break;
+        
+      case 'help':
+        this.showHelp();
+        break;
+        
+      default:
+        console.error(`Unknown command: ${command}`);
+        this.showHelp();
+        process.exit(1);
+    }
+  }
+
+  private async handleRegisterCommand(args: string[], application: Application): Promise<void> {
+    if (args.length < 2) {
+      console.error('Usage: register <email> <name>');
+      return;
+    }
+
+    const [email, ...nameParts] = args;
+    const name = nameParts.join(' ');
+
+    try {
+      const registrationEvent = new UserRegistrationRequested(
+        new Email(email),
+        name
+      );
+
+      await application.handle(registrationEvent);
+      console.log(`✅ User registration initiated for ${email}`);
+    } catch (error) {
+      console.error(`❌ Registration failed: ${error.message}`);
+    }
+  }
+
+  private async handleVerifyCommand(args: string[], application: Application): Promise<void> {
+    if (args.length < 2) {
+      console.error('Usage: verify <email> <token>');
+      return;
+    }
+
+    const [email, token] = args;
+
+    try {
+      // Find user and verify token (simplified for example)
+      const userRepository = Ports.resolve(UserRepository);
+      const user = await userRepository.findByEmail(new Email(email));
+      
+      if (!user) {
+        console.error(`❌ User not found: ${email}`);
+        return;
+      }
+
+      const verificationEvent = new EmailVerificationCompleted(
+        user.id,
+        user.getEmail()
+      );
+
+      await application.handle(verificationEvent);
+      console.log(`✅ Email verified for ${email}`);
+    } catch (error) {
+      console.error(`❌ Verification failed: ${error.message}`);
+    }
+  }
+
+  private async handleStatusCommand(args: string[], application: Application): Promise<void> {
+    if (args.length < 1) {
+      console.error('Usage: status <email>');
+      return;
+    }
+
+    const email = args[0];
+
+    try {
+      const userRepository = Ports.resolve(UserRepository);
+      const user = await userRepository.findByEmail(new Email(email));
+      
+      if (!user) {
+        console.log(`❌ User not found: ${email}`);
+        return;
+      }
+
+      console.log(`👤 User Status for ${email}:`);
+      console.log(`   ID: ${user.id.getValue()}`);
+      console.log(`   Name: ${user.getName()}`);
+      console.log(`   Status: ${user.getStatus()}`);
+    } catch (error) {
+      console.error(`❌ Status check failed: ${error.message}`);
+    }
+  }
+
+  private showHelp(): void {
+    console.log(`
+User Management CLI
+
+Commands:
+  register <email> <name>   Register a new user
+  verify <email> <token>    Verify user's email address
+  status <email>            Check user status
+  help                      Show this help message
+
+Examples:
+  npm run cli register john@example.com "John Doe"
+  npm run cli verify john@example.com abc123def456
+  npm run cli status john@example.com
+    `);
+  }
+
+  public async initialize(): Promise<void> {
+    console.log('🔧 CLI adapter initialized');
+  }
+
+  public async shutdown(): Promise<void> {
+    console.log('🔌 CLI adapter shut down');
+  }
+
+  public async isHealthy(): Promise<boolean> {
+    return true;
+  }
+}
+#+END_SRC
+
+** Step 6: Application Entry Point
+
+Create the main entry point that starts your application:
+
+#+BEGIN_SRC typescript
+// src/main.ts
+import 'reflect-metadata'; // Required for decorators
+import { UserManagementApplication } from './application/user-management-application';
+
+async function main() {
+  try {
+    console.log('🚀 Starting User Management Application...');
+    
+    const application = new UserManagementApplication();
+    await application.start();
+    
+    console.log('✅ Application started successfully');
+    
+    // Handle graceful shutdown
+    process.on('SIGINT', async () => {
+      console.log('🛑 Shutting down application...');
+      await application.shutdown();
+      process.exit(0);
+    });
+    
+  } catch (error) {
+    console.error('❌ Failed to start application:', error);
+    process.exit(1);
+  }
+}
+
+// Only run if this file is executed directly
+if (require.main === module) {
+  main();
+}
+#+END_SRC
+
+** Step 7: Configuration and Environment
+
+Set up configuration management:
+
+#+BEGIN_SRC typescript
+// src/config/application-config.ts
+export interface DatabaseConfig {
+  host: string;
+  port: number;
+  database: string;
+  username: string;
+  password: string;
+}
+
+export interface EmailConfig {
+  provider: 'sendgrid' | 'smtp';
+  apiKey?: string;
+  smtpHost?: string;
+  smtpPort?: number;
+  smtpUsername?: string;
+  smtpPassword?: string;
+  fromEmail: string;
+}
+
+export interface ApplicationConfig {
+  port: number;
+  baseUrl: string;
+  database: DatabaseConfig;
+  email: EmailConfig;
+}
+
+export function loadApplicationConfig(): ApplicationConfig {
+  return {
+    port: parseInt(process.env.PORT || '3000'),
+    baseUrl: process.env.BASE_URL || 'http://localhost:3000',
+    database: {
+      host: process.env.DB_HOST || 'localhost',
+      port: parseInt(process.env.DB_PORT || '5432'),
+      database: process.env.DB_NAME || 'user_management',
+      username: process.env.DB_USERNAME || 'user',
+      password: process.env.DB_PASSWORD || 'password'
+    },
+    email: {
+      provider: (process.env.EMAIL_PROVIDER as any) || 'smtp',
+      apiKey: process.env.EMAIL_API_KEY,
+      smtpHost: process.env.SMTP_HOST || 'localhost',
+      smtpPort: parseInt(process.env.SMTP_PORT || '587'),
+      smtpUsername: process.env.SMTP_USERNAME,
+      smtpPassword: process.env.SMTP_PASSWORD,
+      fromEmail: process.env.FROM_EMAIL || 'noreply@example.com'
+    }
+  };
+}
+#+END_SRC
+
+* Testing Your Application
+
+Application layer testing focuses on orchestration logic and event coordination.
+
+** Step 8: Unit Testing the Application
+
+#+BEGIN_SRC typescript
+// tests/application/user-management-application.test.ts
+import { UserManagementApplication } from '../../src/application/user-management-application';
+import { UserRegistrationRequested, UserRegistered, EmailVerificationRequested } from '../../src/domain/events/user-events';
+import { Email } from '../../src/domain/value-objects/email';
+import { UserId } from '../../src/domain/value-objects/user-id';
+import { UserRepository } from '../../src/domain/repositories/user-repository';
+import { NotificationPort } from '../../src/domain/ports/notification-port';
+import { Ports } from '@typescript-eda/domain';
+
+describe('UserManagementApplication', () => {
+  let application: UserManagementApplication;
+  let mockUserRepository: jest.Mocked<UserRepository>;
+  let mockNotificationAdapter: jest.Mocked<NotificationPort>;
+
+  beforeEach(() => {
+    // Create mock adapters
+    mockUserRepository = {
+      save: jest.fn(),
+      findByEmail: jest.fn(),
+      existsByEmail: jest.fn(),
+      findById: jest.fn(),
+      delete: jest.fn(),
+      findAll: jest.fn(),
+      initialize: jest.fn(),
+      shutdown: jest.fn(),
+      isHealthy: jest.fn()
+    } as any;
+
+    mockNotificationAdapter = {
+      sendEmail: jest.fn(),
+      initialize: jest.fn(),
+      shutdown: jest.fn(),
+      isHealthy: jest.fn()
+    } as any;
+
+    // Create application
+    application = new UserManagementApplication();
+
+    // Inject mocks
+    Ports.set(UserRepository, mockUserRepository);
+    Ports.set(NotificationPort, mockNotificationAdapter);
+  });
+
+  describe('User Registration Orchestration', () => {
+    it('should orchestrate complete user registration flow', async () => {
+      // Given: A new user registration request
+      const email = new Email('test@example.com');
+      const name = 'Test User';
+      const registrationEvent = new UserRegistrationRequested(email, name);
+
+      // Mock: User doesn't exist yet
+      mockUserRepository.findByEmail.mockResolvedValue(null);
+      mockUserRepository.save.mockResolvedValue();
+
+      // When: Registration is processed
+      const resultingEvents = await application.handleUserRegistration(registrationEvent);
+
+      // Then: User should be saved and events should be generated
+      expect(mockUserRepository.findByEmail).toHaveBeenCalledWith(email);
+      expect(mockUserRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          email: email,
+          name: name
+        })
+      );
+
+      expect(resultingEvents).toHaveLength(2);
+      expect(resultingEvents[0]).toBeInstanceOf(UserRegistered);
+      expect(resultingEvents[1]).toBeInstanceOf(EmailVerificationRequested);
+    });
+
+    it('should reject registration for existing users', async () => {
+      // Given: An existing user
+      const email = new Email('existing@example.com');
+      const existingUser = new User(new UserId('existing-123'), email, 'Existing User');
+      
+      mockUserRepository.findByEmail.mockResolvedValue(existingUser);
+
+      const registrationEvent = new UserRegistrationRequested(email, 'New User');
+
+      // When/Then: Registration should be rejected
+      await expect(
+        application.handleUserRegistration(registrationEvent)
+      ).rejects.toThrow('User with email existing@example.com already exists');
+
+      expect(mockUserRepository.save).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Email Verification Orchestration', () => {
+    it('should send verification email', async () => {
+      // Given: A verification request
+      const userId = new UserId('user-123');
+      const email = new Email('test@example.com');
+      const verificationEvent = new EmailVerificationRequested(
+        userId,
+        email,
+        'verification-token-123'
+      );
+
+      // When: Verification email is sent
+      await application.sendVerificationEmail(verificationEvent);
+
+      // Then: Email should be sent with verification link
+      expect(mockNotificationAdapter.sendEmail).toHaveBeenCalledWith(
+        email,
+        'Please verify your email address',
+        expect.stringContaining('verification-token-123')
+      );
+    });
+
+    it('should handle email verification completion', async () => {
+      // Given: Email verification completion
+      const userId = new UserId('user-123');
+      const email = new Email('test@example.com');
+      const verificationEvent = new EmailVerificationCompleted(userId, email);
+
+      // When: Verification is completed
+      const resultingEvents = await application.handleEmailVerificationCompleted(verificationEvent);
+
+      // Then: Welcome email should be sent and user activated
+      expect(mockNotificationAdapter.sendEmail).toHaveBeenCalledWith(
+        email,
+        'Welcome! Your account is now active',
+        expect.stringContaining('Welcome to our platform!')
+      );
+
+      expect(resultingEvents).toHaveLength(1);
+      expect(resultingEvents[0]).toBeInstanceOf(UserActivated);
+    });
+  });
+});
+#+END_SRC
+
+** Step 9: Integration Testing
+
+#+BEGIN_SRC typescript
+// tests/integration/user-management-integration.test.ts
+import { UserManagementApplication } from '../../src/application/user-management-application';
+import { PostgresUserRepository } from '../../src/infrastructure/database/postgres-user-repository';
+import { EmailNotificationAdapter } from '../../src/infrastructure/notifications/email-notification-adapter';
+import { StartedTestContainer } from 'testcontainers';
+import { PostgreSqlContainer } from 'testcontainers/dist/modules/postgresql';
+
+describe('UserManagementApplication Integration', () => {
+  let application: UserManagementApplication;
+  let postgresContainer: StartedTestContainer;
+  let userRepository: PostgresUserRepository;
+
+  beforeAll(async () => {
+    // Start test database
+    postgresContainer = await new PostgreSqlContainer()
+      .withDatabase('test_db')
+      .withUsername('test_user')
+      .withPassword('test_pass')
+      .start();
+
+    // Set up real infrastructure
+    const connection = createConnection({
+      host: postgresContainer.getHost(),
+      port: postgresContainer.getFirstMappedPort(),
+      database: postgresContainer.getDatabase(),
+      username: postgresContainer.getUsername(),
+      password: postgresContainer.getPassword()
+    });
+
+    await runMigrations(connection);
+
+    userRepository = new PostgresUserRepository(connection);
+    const emailAdapter = new MockEmailNotificationAdapter();
+
+    // Create application with real infrastructure
+    application = new UserManagementApplication();
+    
+    // Wire dependencies
+    Ports.set(UserRepository, userRepository);
+    Ports.set(NotificationPort, emailAdapter);
+
+    await application.start();
+  }, 60000);
+
+  afterAll(async () => {
+    await application.shutdown();
+    await postgresContainer.stop();
+  });
+
+  it('should handle complete user lifecycle', async () => {
+    // Given: A user registration request
+    const email = new Email('integration@example.com');
+    const name = 'Integration Test User';
+    const registrationEvent = new UserRegistrationRequested(email, name);
+
+    // When: Full registration flow is processed
+    await application.handle(registrationEvent);
+
+    // Then: User should be persisted and verification should be initiated
+    const savedUser = await userRepository.findByEmail(email);
+    expect(savedUser).toBeDefined();
+    expect(savedUser!.getEmail().equals(email)).toBe(true);
+    expect(savedUser!.getName()).toBe(name);
+    expect(savedUser!.getStatus()).toBe(UserStatus.PENDING);
+
+    // When: Email verification is completed
+    const verificationEvent = new EmailVerificationCompleted(savedUser!.id, email);
+    await application.handle(verificationEvent);
+
+    // Then: User should be activated
+    const activatedUser = await userRepository.findById(savedUser!.id);
+    expect(activatedUser!.getStatus()).toBe(UserStatus.ACTIVE);
+  }, 30000);
+});
+
+class MockEmailNotificationAdapter extends NotificationPort {
+  public sentEmails: Array<{ to: Email; subject: string; body: string }> = [];
+
+  public async sendEmail(to: Email, subject: string, body: string): Promise<void> {
+    this.sentEmails.push({ to, subject, body });
+    console.log(`📧 Mock email sent to ${to.getValue()}: ${subject}`);
+  }
+
+  public async initialize(): Promise<void> {}
+  public async shutdown(): Promise<void> {}
+  public async isHealthy(): Promise<boolean> { return true; }
+}
+#+END_SRC
+
+You now have a complete application layer that orchestrates domain logic with infrastructure adapters using the @Enable decorator pattern and event-driven coordination. The application handles complex workflows while maintaining clear separation of concerns and testability.

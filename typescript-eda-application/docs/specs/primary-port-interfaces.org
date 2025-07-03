@@ -1,0 +1,934 @@
+#+TITLE: Primary Port Interface Specifications
+#+SUBTITLE: Complete specification for application entry point adapters
+#+AUTHOR: TypeScript-EDA Application Team
+#+DATE: 2025-07-03
+#+LAYOUT: spec
+#+PROJECT: typescript-eda-application
+
+* Primary Port Core Interface
+
+** Base Interface Requirements
+
+All primary ports MUST implement the PrimaryPort interface:
+
+#+BEGIN_SRC typescript
+/**
+ * Interface for primary adapters that serve as entry points to the application
+ * Primary ports receive external stimuli and convert them into domain events
+ */
+export interface PrimaryPort {
+  /**
+   * Accept the application instance and begin driving it
+   * This method is called during application startup to give control to the primary port
+   * 
+   * @param app - The application instance that will handle domain events
+   * @returns Promise that resolves when the primary port is ready to accept input
+   * @throws PrimaryPortError if the port cannot be started
+   */
+  accept(app: Application): Promise<void>;
+}
+#+END_SRC
+
+** Implementation Contract
+
+Primary port implementations MUST:
+
+1. **Accept Application Instance**: Store the application reference for event dispatching
+2. **Setup Input Mechanism**: Configure their specific input source (HTTP, CLI, messaging, etc.)
+3. **Convert to Events**: Transform external inputs into valid domain events
+4. **Dispatch Events**: Call `app.handle(event)` to trigger application processing
+5. **Handle Responses**: Convert application results back to appropriate output format
+6. **Manage Lifecycle**: Start and stop their input mechanisms appropriately
+
+#+BEGIN_SRC typescript
+export abstract class AbstractPrimaryPort implements PrimaryPort {
+  protected application?: Application;
+  
+  public async accept(app: Application): Promise<void> {
+    this.application = app;
+    await this.setupInputMechanism();
+    await this.startListening();
+  }
+  
+  protected abstract setupInputMechanism(): Promise<void>;
+  protected abstract startListening(): Promise<void>;
+  
+  protected async processInput(input: unknown): Promise<void> {
+    if (!this.application) {
+      throw new Error('Primary port not properly initialized');
+    }
+    
+    const event = this.convertToEvent(input);
+    await this.application.handle(event);
+  }
+  
+  protected abstract convertToEvent(input: unknown): Event;
+}
+#+END_SRC
+
+* HTTP Web Server Primary Port
+
+** Express.js Implementation
+
+Complete HTTP server primary port implementation:
+
+#+BEGIN_SRC typescript
+import express, { Express, Request, Response } from 'express';
+import { Application } from '@typescript-eda/application';
+import { PrimaryPort } from '@typescript-eda/application';
+import { AdapterFor } from '@typescript-eda/infrastructure';
+
+export abstract class WebServerPort extends Port {
+  public readonly name = 'WebServerPort';
+  public abstract startServer(port: number): Promise<void>;
+  public abstract setupRoutes(app: Application): void;
+}
+
+@AdapterFor(WebServerPort)
+export class ExpressWebServerAdapter extends WebServerPort implements PrimaryPort {
+  private expressApp: Express;
+  private application?: Application;
+  private server?: any;
+  
+  constructor(private readonly port: number = 3000) {
+    super();
+    this.expressApp = express();
+  }
+  
+  public async accept(app: Application): Promise<void> {
+    this.application = app;
+    this.setupMiddleware();
+    this.setupRoutes(app);
+    await this.startServer(this.port);
+  }
+  
+  public async startServer(port: number): Promise<void> {
+    return new Promise((resolve, reject) => {
+      this.server = this.expressApp.listen(port, (error?: Error) => {
+        if (error) {
+          reject(new PrimaryPortError(`Failed to start HTTP server on port ${port}`, error));
+        } else {
+          console.log(`🌐 HTTP server listening on port ${port}`);
+          resolve();
+        }
+      });
+    });
+  }
+  
+  private setupMiddleware(): void {
+    // JSON parsing middleware
+    this.expressApp.use(express.json({ limit: '10mb' }));
+    this.expressApp.use(express.urlencoded({ extended: true }));
+    
+    // CORS middleware
+    this.expressApp.use((req, res, next) => {
+      res.header('Access-Control-Allow-Origin', '*');
+      res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+      res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH');
+      next();
+    });
+    
+    // Request logging middleware
+    this.expressApp.use((req, res, next) => {
+      console.log(`📥 ${req.method} ${req.path} - ${req.ip}`);
+      next();
+    });
+    
+    // Error handling middleware
+    this.expressApp.use((error: Error, req: Request, res: Response, next: any) => {
+      console.error('HTTP request error:', error);
+      res.status(500).json({
+        error: 'Internal server error',
+        message: error.message
+      });
+    });
+  }
+  
+  public setupRoutes(app: Application): void {
+    // Health check endpoint
+    this.expressApp.get('/health', (req, res) => {
+      res.json({
+        status: 'healthy',
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime(),
+        application: app.metadata.get('name')
+      });
+    });
+    
+    // Generic event dispatch endpoint
+    this.expressApp.post('/api/events/:eventType', async (req, res) => {
+      try {
+        const eventType = req.params.eventType;
+        const payload = req.body;
+        
+        const event = this.createEventFromRequest(eventType, payload);
+        await app.handle(event);
+        
+        res.status(202).json({
+          success: true,
+          message: `Event ${eventType} accepted for processing`,
+          timestamp: new Date().toISOString()
+        });
+      } catch (error) {
+        this.handleRequestError(error, res);
+      }
+    });
+    
+    // User management endpoints
+    this.expressApp.post('/api/users/register', async (req, res) => {
+      try {
+        const { email, name } = req.body;
+        
+        if (!email || !name) {
+          return res.status(400).json({
+            error: 'Validation failed',
+            message: 'Email and name are required'
+          });
+        }
+        
+        const event = new UserRegistrationRequested(
+          new Email(email),
+          name
+        );
+        
+        await app.handle(event);
+        
+        res.status(201).json({
+          success: true,
+          message: 'User registration initiated',
+          data: {
+            email,
+            name,
+            status: 'pending_verification'
+          }
+        });
+      } catch (error) {
+        this.handleRequestError(error, res);
+      }
+    });
+    
+    // Email verification endpoint
+    this.expressApp.get('/api/users/verify-email', async (req, res) => {
+      try {
+        const { token } = req.query;
+        
+        if (!token) {
+          return res.status(400).json({
+            error: 'Validation failed',
+            message: 'Verification token is required'
+          });
+        }
+        
+        const event = new EmailVerificationRequested(
+          token as string
+        );
+        
+        await app.handle(event);
+        
+        res.json({
+          success: true,
+          message: 'Email verification processed'
+        });
+      } catch (error) {
+        this.handleRequestError(error, res);
+      }
+    });
+  }
+  
+  private createEventFromRequest(eventType: string, payload: any): Event {
+    // Dynamic event creation based on event type
+    // This would typically use a registry of available event types
+    switch (eventType) {
+      case 'UserRegistrationRequested':
+        return new UserRegistrationRequested(
+          new Email(payload.email),
+          payload.name
+        );
+      case 'EmailVerificationRequested':
+        return new EmailVerificationRequested(payload.token);
+      default:
+        throw new Error(`Unknown event type: ${eventType}`);
+    }
+  }
+  
+  private handleRequestError(error: Error, res: Response): void {
+    console.error('Request processing error:', error);
+    
+    if (error instanceof ValidationError) {
+      res.status(400).json({
+        error: 'Validation failed',
+        message: error.message
+      });
+    } else if (error instanceof BusinessRuleViolationError) {
+      res.status(422).json({
+        error: 'Business rule violation',
+        message: error.message
+      });
+    } else {
+      res.status(500).json({
+        error: 'Internal server error',
+        message: 'An unexpected error occurred'
+      });
+    }
+  }
+  
+  public async shutdown(): Promise<void> {
+    if (this.server) {
+      return new Promise((resolve) => {
+        this.server.close(() => {
+          console.log('🌐 HTTP server shut down');
+          resolve();
+        });
+      });
+    }
+  }
+  
+  public async isHealthy(): Promise<boolean> {
+    return this.server?.listening || false;
+  }
+}
+#+END_SRC
+
+** Fastify Implementation Alternative
+
+#+BEGIN_SRC typescript
+import fastify, { FastifyInstance } from 'fastify';
+
+@AdapterFor(WebServerPort)
+export class FastifyWebServerAdapter extends WebServerPort implements PrimaryPort {
+  private fastifyApp: FastifyInstance;
+  private application?: Application;
+  
+  constructor(private readonly port: number = 3000) {
+    super();
+    this.fastifyApp = fastify({ logger: true });
+  }
+  
+  public async accept(app: Application): Promise<void> {
+    this.application = app;
+    await this.setupRoutes(app);
+    await this.startServer(this.port);
+  }
+  
+  public async startServer(port: number): Promise<void> {
+    try {
+      await this.fastifyApp.listen({ port, host: '0.0.0.0' });
+      console.log(`🚀 Fastify server listening on port ${port}`);
+    } catch (error) {
+      throw new PrimaryPortError(`Failed to start Fastify server on port ${port}`, error);
+    }
+  }
+  
+  public async setupRoutes(app: Application): void {
+    // Fastify-specific route setup
+    this.fastifyApp.post('/api/users/register', async (request, reply) => {
+      const { email, name } = request.body as any;
+      const event = new UserRegistrationRequested(new Email(email), name);
+      await app.handle(event);
+      return { success: true };
+    });
+  }
+}
+#+END_SRC
+
+* Command Line Interface Primary Port
+
+** CLI Adapter Implementation
+
+Complete command-line interface primary port:
+
+#+BEGIN_SRC typescript
+export abstract class CommandLinePort extends Port {
+  public readonly name = 'CommandLinePort';
+  public abstract processCommand(args: string[]): Promise<void>;
+  public abstract showHelp(): void;
+}
+
+@AdapterFor(CommandLinePort)
+export class UserCLIAdapter extends CommandLinePort implements PrimaryPort {
+  private application?: Application;
+  
+  public async accept(app: Application): Promise<void> {
+    this.application = app;
+    const args = process.argv.slice(2);
+    
+    if (args.length === 0) {
+      this.showHelp();
+      return;
+    }
+    
+    await this.processCommand(args);
+  }
+  
+  public async processCommand(args: string[]): Promise<void> {
+    if (!this.application) {
+      throw new Error('CLI adapter not properly initialized');
+    }
+    
+    const command = args[0];
+    const subcommands = args.slice(1);
+    
+    try {
+      switch (command) {
+        case 'user':
+          await this.handleUserCommands(subcommands);
+          break;
+          
+        case 'system':
+          await this.handleSystemCommands(subcommands);
+          break;
+          
+        case 'help':
+          this.showHelp();
+          break;
+          
+        default:
+          console.error(`❌ Unknown command: ${command}`);
+          this.showHelp();
+          process.exit(1);
+      }
+    } catch (error) {
+      console.error(`❌ Command failed: ${error.message}`);
+      process.exit(1);
+    }
+  }
+  
+  private async handleUserCommands(args: string[]): Promise<void> {
+    const subcommand = args[0];
+    
+    switch (subcommand) {
+      case 'register':
+        await this.handleUserRegister(args.slice(1));
+        break;
+        
+      case 'verify':
+        await this.handleUserVerify(args.slice(1));
+        break;
+        
+      case 'status':
+        await this.handleUserStatus(args.slice(1));
+        break;
+        
+      default:
+        console.error(`❌ Unknown user command: ${subcommand}`);
+        this.showUserHelp();
+    }
+  }
+  
+  private async handleUserRegister(args: string[]): Promise<void> {
+    if (args.length < 2) {
+      console.error('Usage: user register <email> <name>');
+      return;
+    }
+    
+    const [email, ...nameParts] = args;
+    const name = nameParts.join(' ');
+    
+    try {
+      const event = new UserRegistrationRequested(
+        new Email(email),
+        name
+      );
+      
+      await this.application!.handle(event);
+      console.log(`✅ User registration initiated for ${email}`);
+      console.log(`📧 Verification email will be sent shortly`);
+    } catch (error) {
+      console.error(`❌ Registration failed: ${error.message}`);
+    }
+  }
+  
+  private async handleUserVerify(args: string[]): Promise<void> {
+    if (args.length < 1) {
+      console.error('Usage: user verify <token>');
+      return;
+    }
+    
+    const token = args[0];
+    
+    try {
+      const event = new EmailVerificationRequested(token);
+      await this.application!.handle(event);
+      console.log(`✅ Email verification processed`);
+    } catch (error) {
+      console.error(`❌ Verification failed: ${error.message}`);
+    }
+  }
+  
+  private async handleUserStatus(args: string[]): Promise<void> {
+    if (args.length < 1) {
+      console.error('Usage: user status <email>');
+      return;
+    }
+    
+    const email = args[0];
+    
+    try {
+      const userRepository = Ports.resolve(UserRepository);
+      const user = await userRepository.findByEmail(new Email(email));
+      
+      if (!user) {
+        console.log(`❌ User not found: ${email}`);
+        return;
+      }
+      
+      console.log(`👤 User Status for ${email}:`);
+      console.log(`   ID: ${user.id.getValue()}`);
+      console.log(`   Name: ${user.getName()}`);
+      console.log(`   Status: ${user.getStatus()}`);
+      console.log(`   Created: ${user.getCreatedAt().toISOString()}`);
+    } catch (error) {
+      console.error(`❌ Status check failed: ${error.message}`);
+    }
+  }
+  
+  private async handleSystemCommands(args: string[]): Promise<void> {
+    const subcommand = args[0];
+    
+    switch (subcommand) {
+      case 'status':
+        await this.showSystemStatus();
+        break;
+        
+      case 'health':
+        await this.showHealthStatus();
+        break;
+        
+      default:
+        console.error(`❌ Unknown system command: ${subcommand}`);
+    }
+  }
+  
+  private async showSystemStatus(): Promise<void> {
+    console.log(`📊 System Status:`);
+    console.log(`   Application: ${this.application!.metadata.get('name')}`);
+    console.log(`   Version: ${this.application!.metadata.get('version') || 'unknown'}`);
+    console.log(`   Uptime: ${process.uptime()} seconds`);
+    console.log(`   Memory Usage: ${JSON.stringify(process.memoryUsage(), null, 2)}`);
+  }
+  
+  private async showHealthStatus(): Promise<void> {
+    // Health check implementation would go here
+    console.log(`💚 Application is healthy`);
+  }
+  
+  public showHelp(): void {
+    console.log(`
+${this.application?.metadata.get('name') || 'Application'} CLI
+
+Usage: npm run cli <command> [options]
+
+Commands:
+  user register <email> <name>    Register a new user
+  user verify <token>             Verify user's email address
+  user status <email>             Check user status
+  
+  system status                   Show system status
+  system health                   Show health status
+  
+  help                           Show this help message
+
+Examples:
+  npm run cli user register john@example.com "John Doe"
+  npm run cli user verify abc123def456
+  npm run cli user status john@example.com
+  npm run cli system status
+    `);
+  }
+  
+  private showUserHelp(): void {
+    console.log(`
+User Management Commands:
+  register <email> <name>    Register a new user
+  verify <token>             Verify user's email address
+  status <email>             Check user status
+    `);
+  }
+  
+  public async initialize(): Promise<void> {
+    console.log('🔧 CLI adapter initialized');
+  }
+  
+  public async shutdown(): Promise<void> {
+    console.log('🔌 CLI adapter shut down');
+  }
+  
+  public async isHealthy(): Promise<boolean> {
+    return true;
+  }
+}
+#+END_SRC
+
+* Message Queue Primary Port
+
+** RabbitMQ Consumer Implementation
+
+Message queue-driven primary port:
+
+#+BEGIN_SRC typescript
+import amqp, { Connection, Channel, Message } from 'amqplib';
+
+export abstract class MessageQueuePort extends Port {
+  public readonly name = 'MessageQueuePort';
+  public abstract connect(): Promise<void>;
+  public abstract subscribe(queue: string, handler: (message: any) => Promise<void>): Promise<void>;
+}
+
+@AdapterFor(MessageQueuePort)
+export class RabbitMQConsumerAdapter extends MessageQueuePort implements PrimaryPort {
+  private connection?: Connection;
+  private channel?: Channel;
+  private application?: Application;
+  
+  constructor(
+    private readonly connectionUrl: string = 'amqp://localhost',
+    private readonly exchangeName: string = 'events',
+    private readonly queueName: string = 'application-events'
+  ) {
+    super();
+  }
+  
+  public async accept(app: Application): Promise<void> {
+    this.application = app;
+    await this.connect();
+    await this.setupExchangeAndQueue();
+    await this.startConsuming();
+  }
+  
+  public async connect(): Promise<void> {
+    try {
+      this.connection = await amqp.connect(this.connectionUrl);
+      this.channel = await this.connection.createChannel();
+      
+      console.log('🐰 Connected to RabbitMQ');
+    } catch (error) {
+      throw new PrimaryPortError('Failed to connect to RabbitMQ', error);
+    }
+  }
+  
+  private async setupExchangeAndQueue(): Promise<void> {
+    if (!this.channel) {
+      throw new Error('RabbitMQ channel not initialized');
+    }
+    
+    // Declare exchange
+    await this.channel.assertExchange(this.exchangeName, 'topic', { durable: true });
+    
+    // Declare queue
+    await this.channel.assertQueue(this.queueName, { durable: true });
+    
+    // Bind queue to exchange for all event types
+    await this.channel.bindQueue(this.queueName, this.exchangeName, '*.events.*');
+    
+    console.log(`📮 Queue ${this.queueName} bound to exchange ${this.exchangeName}`);
+  }
+  
+  private async startConsuming(): Promise<void> {
+    if (!this.channel) {
+      throw new Error('RabbitMQ channel not initialized');
+    }
+    
+    await this.channel.consume(this.queueName, async (message: Message | null) => {
+      if (message) {
+        try {
+          await this.processMessage(message);
+          this.channel!.ack(message);
+        } catch (error) {
+          console.error('Failed to process message:', error);
+          this.channel!.nack(message, false, false); // Send to dead letter queue
+        }
+      }
+    });
+    
+    console.log(`🎧 Consuming messages from queue: ${this.queueName}`);
+  }
+  
+  private async processMessage(message: Message): Promise<void> {
+    if (!this.application) {
+      throw new Error('Application not initialized');
+    }
+    
+    const content = message.content.toString();
+    const messageData = JSON.parse(content);
+    
+    console.log(`📨 Received message: ${messageData.type}`);
+    
+    // Convert message to domain event
+    const event = this.deserializeEvent(messageData);
+    
+    // Process through application
+    await this.application.handle(event);
+    
+    console.log(`✅ Processed message: ${messageData.type}`);
+  }
+  
+  private deserializeEvent(messageData: any): Event {
+    // Event deserialization logic
+    switch (messageData.type) {
+      case 'UserRegistrationRequested':
+        return new UserRegistrationRequested(
+          new Email(messageData.email),
+          messageData.name
+        );
+        
+      case 'EmailVerificationRequested':
+        return new EmailVerificationRequested(messageData.token);
+        
+      default:
+        throw new Error(`Unknown message type: ${messageData.type}`);
+    }
+  }
+  
+  public async subscribe(queue: string, handler: (message: any) => Promise<void>): Promise<void> {
+    if (!this.channel) {
+      throw new Error('RabbitMQ channel not initialized');
+    }
+    
+    await this.channel.consume(queue, async (message: Message | null) => {
+      if (message) {
+        const content = JSON.parse(message.content.toString());
+        await handler(content);
+        this.channel!.ack(message);
+      }
+    });
+  }
+  
+  public async shutdown(): Promise<void> {
+    if (this.channel) {
+      await this.channel.close();
+    }
+    if (this.connection) {
+      await this.connection.close();
+    }
+    console.log('🐰 RabbitMQ connection closed');
+  }
+  
+  public async isHealthy(): Promise<boolean> {
+    return !!(this.connection && !this.connection.connection.stream.destroyed);
+  }
+}
+#+END_SRC
+
+* WebSocket Primary Port
+
+** Real-time WebSocket Implementation
+
+WebSocket-based primary port for real-time applications:
+
+#+BEGIN_SRC typescript
+import WebSocket from 'ws';
+import { Server as HTTPServer } from 'http';
+
+export abstract class WebSocketPort extends Port {
+  public readonly name = 'WebSocketPort';
+  public abstract startServer(port: number): Promise<void>;
+  public abstract broadcast(message: any): void;
+}
+
+@AdapterFor(WebSocketPort)
+export class WebSocketServerAdapter extends WebSocketPort implements PrimaryPort {
+  private wss?: WebSocket.Server;
+  private httpServer?: HTTPServer;
+  private application?: Application;
+  private clients = new Set<WebSocket>();
+  
+  constructor(private readonly port: number = 8080) {
+    super();
+  }
+  
+  public async accept(app: Application): Promise<void> {
+    this.application = app;
+    await this.startServer(this.port);
+  }
+  
+  public async startServer(port: number): Promise<void> {
+    this.httpServer = new HTTPServer();
+    this.wss = new WebSocket.Server({ server: this.httpServer });
+    
+    this.wss.on('connection', (ws: WebSocket) => {
+      this.handleConnection(ws);
+    });
+    
+    return new Promise((resolve, reject) => {
+      this.httpServer!.listen(port, (error?: Error) => {
+        if (error) {
+          reject(new PrimaryPortError(`Failed to start WebSocket server on port ${port}`, error));
+        } else {
+          console.log(`🔌 WebSocket server listening on port ${port}`);
+          resolve();
+        }
+      });
+    });
+  }
+  
+  private handleConnection(ws: WebSocket): void {
+    console.log('🔗 New WebSocket connection established');
+    this.clients.add(ws);
+    
+    ws.on('message', async (data: WebSocket.Data) => {
+      try {
+        const message = JSON.parse(data.toString());
+        await this.processWebSocketMessage(ws, message);
+      } catch (error) {
+        console.error('WebSocket message processing error:', error);
+        ws.send(JSON.stringify({
+          type: 'error',
+          message: 'Invalid message format'
+        }));
+      }
+    });
+    
+    ws.on('close', () => {
+      console.log('🔗 WebSocket connection closed');
+      this.clients.delete(ws);
+    });
+    
+    ws.on('error', (error) => {
+      console.error('WebSocket error:', error);
+      this.clients.delete(ws);
+    });
+    
+    // Send welcome message
+    ws.send(JSON.stringify({
+      type: 'connected',
+      message: 'Welcome to the application',
+      timestamp: new Date().toISOString()
+    }));
+  }
+  
+  private async processWebSocketMessage(ws: WebSocket, message: any): Promise<void> {
+    if (!this.application) {
+      throw new Error('Application not initialized');
+    }
+    
+    console.log(`📨 WebSocket message received: ${message.type}`);
+    
+    try {
+      // Convert WebSocket message to domain event
+      const event = this.convertMessageToEvent(message);
+      
+      // Process through application
+      await this.application.handle(event);
+      
+      // Send acknowledgment
+      ws.send(JSON.stringify({
+        type: 'ack',
+        originalType: message.type,
+        success: true,
+        timestamp: new Date().toISOString()
+      }));
+    } catch (error) {
+      // Send error response
+      ws.send(JSON.stringify({
+        type: 'error',
+        originalType: message.type,
+        success: false,
+        error: error.message,
+        timestamp: new Date().toISOString()
+      }));
+    }
+  }
+  
+  private convertMessageToEvent(message: any): Event {
+    switch (message.type) {
+      case 'user_register':
+        return new UserRegistrationRequested(
+          new Email(message.data.email),
+          message.data.name
+        );
+        
+      case 'user_verify':
+        return new EmailVerificationRequested(message.data.token);
+        
+      default:
+        throw new Error(`Unknown message type: ${message.type}`);
+    }
+  }
+  
+  public broadcast(message: any): void {
+    const messageString = JSON.stringify({
+      ...message,
+      timestamp: new Date().toISOString()
+    });
+    
+    this.clients.forEach(client => {
+      if (client.readyState === WebSocket.OPEN) {
+        client.send(messageString);
+      }
+    });
+  }
+  
+  public async shutdown(): Promise<void> {
+    if (this.wss) {
+      this.wss.close();
+    }
+    if (this.httpServer) {
+      this.httpServer.close();
+    }
+    console.log('🔌 WebSocket server shut down');
+  }
+  
+  public async isHealthy(): Promise<boolean> {
+    return !!(this.httpServer && this.httpServer.listening);
+  }
+}
+#+END_SRC
+
+* Testing Primary Ports
+
+** Mock Primary Port for Testing
+
+#+BEGIN_SRC typescript
+export class MockPrimaryPort implements PrimaryPort {
+  private application?: Application;
+  public receivedEvents: Event[] = [];
+  
+  public async accept(app: Application): Promise<void> {
+    this.application = app;
+  }
+  
+  public async simulateInput(event: Event): Promise<void> {
+    if (!this.application) {
+      throw new Error('Mock primary port not initialized');
+    }
+    
+    this.receivedEvents.push(event);
+    await this.application.handle(event);
+  }
+  
+  public getReceivedEvents(): Event[] {
+    return [...this.receivedEvents];
+  }
+  
+  public clearEvents(): void {
+    this.receivedEvents = [];
+  }
+}
+
+// Usage in tests
+describe('Application with Primary Port', () => {
+  let app: TestApplication;
+  let mockPort: MockPrimaryPort;
+  
+  beforeEach(async () => {
+    mockPort = new MockPrimaryPort();
+    app = new TestApplication();
+    
+    await mockPort.accept(app);
+  });
+  
+  it('should process events through primary port', async () => {
+    const event = new UserRegistrationRequested(
+      new Email('test@example.com'),
+      'Test User'
+    );
+    
+    await mockPort.simulateInput(event);
+    
+    expect(mockPort.getReceivedEvents()).toHaveLength(1);
+    // Verify application processed the event
+  });
+});
+#+END_SRC
+
+This comprehensive specification provides a complete framework for implementing primary ports that serve as robust, type-safe entry points into TypeScript-EDA applications.

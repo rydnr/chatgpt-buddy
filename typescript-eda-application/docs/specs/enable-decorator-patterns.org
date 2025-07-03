@@ -1,0 +1,523 @@
+#+TITLE: @Enable Decorator Patterns Specification
+#+SUBTITLE: Declarative adapter configuration patterns and best practices
+#+AUTHOR: TypeScript-EDA Application Team
+#+DATE: 2025-07-03
+#+LAYOUT: spec
+#+PROJECT: typescript-eda-application
+
+* @Enable Decorator Core Specification
+
+** Basic Implementation Requirements
+
+The @Enable decorator MUST provide reflection-based metadata storage for adapter declarations:
+
+#+BEGIN_SRC typescript
+import 'reflect-metadata';
+
+/**
+ * Decorator to enable an adapter for an application
+ * @param adapter - The adapter class constructor to enable
+ * @returns Class decorator that stores adapter metadata
+ */
+export function Enable(adapter: new (...args: any[]) => any): ClassDecorator {
+  return (target: any) => {
+    // Initialize adapters metadata if it doesn't exist
+    if (!Reflect.hasMetadata('adapters', target)) {
+      Reflect.defineMetadata('adapters', [], target);
+    }
+    
+    // Get existing adapters list
+    const adapters: Array<new (...args: any[]) => any> = Reflect.getMetadata('adapters', target);
+    
+    // Add new adapter to the list
+    adapters.push(adapter);
+    
+    // Store updated metadata
+    Reflect.defineMetadata('adapters', adapters, target);
+    
+    console.log(`📦 Adapter enabled: ${adapter.name} for ${target.name}`);
+  };
+}
+#+END_SRC
+
+** Metadata Retrieval Requirements
+
+Applications MUST be able to retrieve enabled adapters during startup:
+
+#+BEGIN_SRC typescript
+public getEnabledAdapters(): Array<new (...args: any[]) => any> {
+  return Reflect.getMetadata('adapters', this.constructor) || [];
+}
+
+private async initializeAdapters(): Promise<void> {
+  const adapterClasses = this.getEnabledAdapters();
+  
+  for (const AdapterClass of adapterClasses) {
+    const adapter = new AdapterClass();
+    
+    // Initialize adapter if it supports lifecycle
+    if ('initialize' in adapter && typeof adapter.initialize === 'function') {
+      await adapter.initialize();
+    }
+    
+    // Register adapter for dependency injection
+    await this.registerAdapter(adapter);
+  }
+}
+#+END_SRC
+
+* Usage Patterns
+
+** Single Adapter Pattern
+
+Simple applications with minimal infrastructure needs:
+
+#+BEGIN_SRC typescript
+@Enable(InMemoryUserRepository)
+export class SimpleApplication extends Application {
+  public readonly metadata = new Map([
+    ['name', 'Simple Application'],
+    ['description', 'Basic application with in-memory storage']
+  ]);
+}
+#+END_SRC
+
+** Multi-Adapter Pattern
+
+Production applications with multiple infrastructure concerns:
+
+#+BEGIN_SRC typescript
+@Enable(PostgresUserRepository)
+@Enable(RedisSessionStore)
+@Enable(EmailNotificationAdapter)
+@Enable(StripePaymentAdapter)
+@Enable(ExpressWebServerAdapter)
+export class ProductionApplication extends Application {
+  public readonly metadata = new Map([
+    ['name', 'Production E-Commerce Application'],
+    ['description', 'Full-featured e-commerce platform'],
+    ['environment', 'production']
+  ]);
+}
+#+END_SRC
+
+** Environment-Specific Pattern
+
+Different adapters for different environments:
+
+#+BEGIN_SRC typescript
+// Development environment
+@Enable(InMemoryUserRepository)
+@Enable(ConsoleNotificationAdapter)
+@Enable(MockPaymentAdapter)
+@Enable(ExpressWebServerAdapter)
+export class DevelopmentApplication extends Application {
+  public readonly metadata = new Map([
+    ['name', 'Development Application'],
+    ['environment', 'development']
+  ]);
+}
+
+// Production environment  
+@Enable(PostgresUserRepository)
+@Enable(SendGridNotificationAdapter)
+@Enable(StripePaymentAdapter)
+@Enable(ExpressWebServerAdapter)
+export class ProductionApplication extends Application {
+  public readonly metadata = new Map([
+    ['name', 'Production Application'],
+    ['environment', 'production']
+  ]);
+}
+#+END_SRC
+
+** Primary Port Pattern
+
+Applications with multiple entry points:
+
+#+BEGIN_SRC typescript
+@Enable(PostgresUserRepository)
+@Enable(EmailNotificationAdapter)
+@Enable(ExpressWebServerAdapter)    // HTTP API entry point
+@Enable(UserCLIAdapter)             // CLI entry point
+@Enable(RabbitMQConsumerAdapter)    // Message queue entry point
+export class MultiChannelApplication extends Application {
+  public readonly metadata = new Map([
+    ['name', 'Multi-Channel Application'],
+    ['channels', ['http', 'cli', 'messaging']],
+    ['description', 'Application accessible via multiple interfaces']
+  ]);
+}
+#+END_SRC
+
+* Advanced Patterns
+
+** Conditional Adapter Enabling
+
+Adapters enabled based on configuration or environment:
+
+#+BEGIN_SRC typescript
+/**
+ * Conditionally enable an adapter based on a configuration flag
+ */
+export function ConditionalEnable(
+  adapter: new (...args: any[]) => any,
+  condition: string | (() => boolean)
+): ClassDecorator {
+  return (target: any) => {
+    let shouldEnable = false;
+    
+    if (typeof condition === 'string') {
+      // Configuration-based condition
+      shouldEnable = process.env[condition] === 'true';
+    } else {
+      // Function-based condition
+      shouldEnable = condition();
+    }
+    
+    if (shouldEnable) {
+      return Enable(adapter)(target);
+    }
+    
+    console.log(`⏭️  Adapter conditionally disabled: ${adapter.name}`);
+    return target;
+  };
+}
+
+// Usage example
+@Enable(UserRepository)
+@ConditionalEnable(AnalyticsAdapter, 'ENABLE_ANALYTICS')
+@ConditionalEnable(PremiumFeatureAdapter, () => process.env.NODE_ENV === 'production')
+export class ConditionalApplication extends Application {
+  public readonly metadata = new Map([
+    ['name', 'Conditional Feature Application']
+  ]);
+}
+#+END_SRC
+
+** Adapter Groups Pattern
+
+Group related adapters for easier management:
+
+#+BEGIN_SRC typescript
+/**
+ * Enable a group of related adapters
+ */
+export function EnableGroup(...adapters: Array<new (...args: any[]) => any>): ClassDecorator {
+  return (target: any) => {
+    for (const adapter of adapters) {
+      Enable(adapter)(target);
+    }
+    return target;
+  };
+}
+
+// Define adapter groups
+const DatabaseAdapters = [PostgresUserRepository, RedisSessionStore, ElasticsearchLogAdapter];
+const NotificationAdapters = [EmailNotificationAdapter, SMSNotificationAdapter, PushNotificationAdapter];
+const PaymentAdapters = [StripePaymentAdapter, PayPalPaymentAdapter];
+
+// Usage
+@EnableGroup(...DatabaseAdapters)
+@EnableGroup(...NotificationAdapters)
+@EnableGroup(...PaymentAdapters)
+@Enable(ExpressWebServerAdapter)
+export class GroupedApplication extends Application {
+  public readonly metadata = new Map([
+    ['name', 'Grouped Adapters Application']
+  ]);
+}
+#+END_SRC
+
+** Adapter Configuration Pattern
+
+Pass configuration to adapters during enabling:
+
+#+BEGIN_SRC typescript
+/**
+ * Enable adapter with specific configuration
+ */
+export function EnableWithConfig<T>(
+  adapter: new (config: T) => any,
+  config: T
+): ClassDecorator {
+  return (target: any) => {
+    // Store both adapter and its configuration
+    if (!Reflect.hasMetadata('configured-adapters', target)) {
+      Reflect.defineMetadata('configured-adapters', [], target);
+    }
+    
+    const configuredAdapters = Reflect.getMetadata('configured-adapters', target);
+    configuredAdapters.push({ adapter, config });
+    
+    console.log(`⚙️  Configured adapter enabled: ${adapter.name}`);
+    return target;
+  };
+}
+
+// Usage example
+@EnableWithConfig(DatabaseAdapter, {
+  host: 'localhost',
+  port: 5432,
+  database: 'myapp',
+  poolSize: 20
+})
+@EnableWithConfig(EmailAdapter, {
+  provider: 'sendgrid',
+  apiKey: process.env.SENDGRID_API_KEY,
+  fromEmail: 'noreply@myapp.com'
+})
+export class ConfiguredApplication extends Application {
+  public readonly metadata = new Map([
+    ['name', 'Configured Application']
+  ]);
+}
+#+END_SRC
+
+* Testing Patterns
+
+** Mock Adapter Pattern
+
+Replace real adapters with mocks for testing:
+
+#+BEGIN_SRC typescript
+@Enable(MockUserRepository)
+@Enable(MockNotificationAdapter)
+@Enable(TestWebServerAdapter)
+export class TestApplication extends Application {
+  public readonly metadata = new Map([
+    ['name', 'Test Application'],
+    ['environment', 'test']
+  ]);
+}
+
+// In tests
+describe('Application Behavior', () => {
+  let app: TestApplication;
+  
+  beforeEach(async () => {
+    app = new TestApplication();
+    await app.start();
+  });
+  
+  afterEach(async () => {
+    await app.shutdown();
+  });
+  
+  it('should process events with mock adapters', async () => {
+    const event = new UserRegistrationRequested(
+      new Email('test@example.com'),
+      'Test User'
+    );
+    
+    await app.handle(event);
+    
+    // Verify mock adapter interactions
+    const mockRepo = Ports.resolve(UserRepository) as MockUserRepository;
+    expect(mockRepo.savedUsers).toHaveLength(1);
+  });
+});
+#+END_SRC
+
+** Spy Adapter Pattern
+
+Wrap real adapters with spies for integration testing:
+
+#+BEGIN_SRC typescript
+/**
+ * Enable adapter with spy wrapper for testing
+ */
+export function EnableWithSpy<T>(adapter: new (...args: any[]) => T): ClassDecorator {
+  return (target: any) => {
+    const SpyWrapper = class extends (adapter as any) {
+      public readonly _calls: Array<{ method: string; args: any[] }> = [];
+      
+      constructor(...args: any[]) {
+        super(...args);
+        
+        // Wrap all methods with spies
+        const proto = Object.getPrototypeOf(this);
+        Object.getOwnPropertyNames(proto).forEach(name => {
+          if (typeof proto[name] === 'function' && name !== 'constructor') {
+            const original = proto[name];
+            proto[name] = (...args: any[]) => {
+              this._calls.push({ method: name, args });
+              return original.apply(this, args);
+            };
+          }
+        });
+      }
+    };
+    
+    return Enable(SpyWrapper)(target);
+  };
+}
+
+// Usage in integration tests
+@EnableWithSpy(PostgresUserRepository)
+@EnableWithSpy(EmailNotificationAdapter)
+export class SpyTestApplication extends Application {
+  public readonly metadata = new Map([
+    ['name', 'Spy Test Application']
+  ]);
+}
+#+END_SRC
+
+* Validation and Error Handling
+
+** Adapter Validation Requirements
+
+The @Enable decorator MUST validate adapter compatibility:
+
+#+BEGIN_SRC typescript
+export function Enable(adapter: new (...args: any[]) => any): ClassDecorator {
+  return (target: any) => {
+    // Validate adapter has required metadata
+    if (!Reflect.hasMetadata('port', adapter)) {
+      throw new Error(
+        `Adapter ${adapter.name} must be decorated with @AdapterFor to specify its port`
+      );
+    }
+    
+    // Validate adapter implements required interface
+    const port = Reflect.getMetadata('port', adapter);
+    if (!adapter.prototype || !isImplementationOf(adapter.prototype, port)) {
+      throw new Error(
+        `Adapter ${adapter.name} does not properly implement ${port.name}`
+      );
+    }
+    
+    // Store validated adapter
+    if (!Reflect.hasMetadata('adapters', target)) {
+      Reflect.defineMetadata('adapters', [], target);
+    }
+    
+    const adapters = Reflect.getMetadata('adapters', target);
+    adapters.push(adapter);
+    
+    return target;
+  };
+}
+#+END_SRC
+
+** Duplicate Adapter Detection
+
+Prevent enabling multiple adapters for the same port:
+
+#+BEGIN_SRC typescript
+private validateNoDuplicateAdapters(): void {
+  const adapters = this.getEnabledAdapters();
+  const portMap = new Map<string, string>();
+  
+  for (const AdapterClass of adapters) {
+    const port = Reflect.getMetadata('port', AdapterClass);
+    if (port) {
+      const portName = port.name;
+      if (portMap.has(portName)) {
+        throw new DuplicateAdapterError(
+          `Multiple adapters enabled for port ${portName}: ${portMap.get(portName)} and ${AdapterClass.name}`
+        );
+      }
+      portMap.set(portName, AdapterClass.name);
+    }
+  }
+}
+#+END_SRC
+
+** Runtime Adapter Health Checking
+
+Validate adapter health during application runtime:
+
+#+BEGIN_SRC typescript
+public async checkAdapterHealth(): Promise<AdapterHealthReport> {
+  const adapters = this.getEnabledAdapters();
+  const healthChecks: Array<{ name: string; healthy: boolean; error?: string }> = [];
+  
+  for (const AdapterClass of adapters) {
+    const adapter = Ports.resolve(this.getPortForAdapter(AdapterClass));
+    
+    if (adapter && 'isHealthy' in adapter) {
+      try {
+        const healthy = await adapter.isHealthy();
+        healthChecks.push({ name: AdapterClass.name, healthy });
+      } catch (error) {
+        healthChecks.push({ 
+          name: AdapterClass.name, 
+          healthy: false, 
+          error: error.message 
+        });
+      }
+    }
+  }
+  
+  return new AdapterHealthReport(healthChecks);
+}
+#+END_SRC
+
+* Performance Considerations
+
+** Lazy Adapter Initialization
+
+Initialize adapters only when needed:
+
+#+BEGIN_SRC typescript
+/**
+ * Enable adapter with lazy initialization
+ */
+export function EnableLazy(adapter: new (...args: any[]) => any): ClassDecorator {
+  return (target: any) => {
+    if (!Reflect.hasMetadata('lazy-adapters', target)) {
+      Reflect.defineMetadata('lazy-adapters', [], target);
+    }
+    
+    const lazyAdapters = Reflect.getMetadata('lazy-adapters', target);
+    lazyAdapters.push(adapter);
+    
+    console.log(`💤 Lazy adapter enabled: ${adapter.name}`);
+    return target;
+  };
+}
+
+// Lazy initialization implementation
+private async initializeLazyAdapter(AdapterClass: new (...args: any[]) => any): Promise<any> {
+  if (!this.lazyAdapterInstances.has(AdapterClass)) {
+    const adapter = new AdapterClass();
+    
+    if ('initialize' in adapter) {
+      await adapter.initialize();
+    }
+    
+    this.lazyAdapterInstances.set(AdapterClass, adapter);
+    await this.registerAdapter(adapter);
+  }
+  
+  return this.lazyAdapterInstances.get(AdapterClass);
+}
+#+END_SRC
+
+** Adapter Caching Strategy
+
+Cache adapter instances for performance:
+
+#+BEGIN_SRC typescript
+export class Application {
+  private readonly adapterCache = new Map<string, any>();
+  
+  protected async getAdapter<T>(port: new (...args: any[]) => T): Promise<T> {
+    const cacheKey = port.name;
+    
+    if (!this.adapterCache.has(cacheKey)) {
+      const adapter = Ports.resolve(port);
+      this.adapterCache.set(cacheKey, adapter);
+    }
+    
+    return this.adapterCache.get(cacheKey);
+  }
+  
+  public clearAdapterCache(): void {
+    this.adapterCache.clear();
+  }
+}
+#+END_SRC
+
+This comprehensive specification ensures that @Enable decorators provide a robust, flexible, and performant way to configure application adapters while maintaining type safety and clear dependency relationships.

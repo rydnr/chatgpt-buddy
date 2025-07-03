@@ -1,0 +1,567 @@
+#+TITLE: Application Orchestration Specification
+#+SUBTITLE: Complete specification for event-driven application coordination
+#+AUTHOR: TypeScript-EDA Application Team
+#+DATE: 2025-07-03
+#+LAYOUT: spec
+#+PROJECT: typescript-eda-application
+
+* Application Base Class Specification
+
+** Core Interface Requirements
+
+The Application base class MUST provide the following interface:
+
+#+BEGIN_SRC typescript
+export abstract class Application {
+  /**
+   * Application metadata including name, description, and configuration
+   */
+  public abstract readonly metadata: Map<string, unknown>;
+
+  /**
+   * Handle one or more events with cascading event processing
+   * @param events - Single event or array of events to process
+   * @returns Promise that resolves when all events are processed
+   */
+  public async handle(events: Event | Event[]): Promise<void>;
+
+  /**
+   * Start the application with full lifecycle management
+   * @returns Promise that resolves when application is fully started
+   */
+  public async start(): Promise<void>;
+
+  /**
+   * Gracefully shutdown the application
+   * @returns Promise that resolves when shutdown is complete
+   */
+  public async shutdown(): Promise<void>;
+}
+#+END_SRC
+
+** Event Processing Requirements
+
+The application MUST process events with the following characteristics:
+
+1. **Queue-based Processing**: Events MUST be processed in a breadth-first queue to ensure proper ordering and error isolation
+2. **Cascading Support**: Event handlers MAY return new events that MUST be added to the processing queue
+3. **Error Isolation**: Failure in one event listener MUST NOT prevent other listeners from executing
+4. **Listener Discovery**: The application MUST automatically discover event listeners using reflection
+
+#+BEGIN_SRC typescript
+// Example event processing flow
+const eventQueue = Array.isArray(events) ? [...events] : [events];
+
+while (eventQueue.length > 0) {
+  const event = eventQueue.shift();
+  const listeners = this.findEventListeners(event);
+  
+  for (const listener of listeners) {
+    try {
+      const result = await listener.handler(event);
+      if (result) {
+        const newEvents = Array.isArray(result) ? result : [result];
+        eventQueue.push(...newEvents);
+      }
+    } catch (error) {
+      await this.handleEventError(event, listener, error);
+    }
+  }
+}
+#+END_SRC
+
+** Lifecycle Management Requirements
+
+The application startup MUST follow this three-phase process:
+
+1. **Phase 1 - Initialize Adapters**: All adapters declared with @Enable MUST be instantiated and initialized
+2. **Phase 2 - Wire Dependencies**: Adapters MUST be registered in the Ports registry for dependency resolution
+3. **Phase 3 - Start Primary Ports**: Primary ports MUST be started and given control to drive the application
+
+#+BEGIN_SRC typescript
+public async start(): Promise<void> {
+  try {
+    await this.initializeAdapters();    // Phase 1
+    await this.wireDependencies();      // Phase 2
+    await this.startPrimaryPorts();     // Phase 3
+    
+    console.log(`✅ ${this.metadata.get('name')} started successfully`);
+  } catch (error) {
+    throw new ApplicationStartupError('Application startup failed', error);
+  }
+}
+#+END_SRC
+
+* @Enable Decorator Specification
+
+** Decorator Interface
+
+The @Enable decorator MUST provide declarative adapter configuration:
+
+#+BEGIN_SRC typescript
+/**
+ * Declares an adapter to be enabled for this application
+ * @param adapter - Adapter class constructor
+ * @returns Class decorator function
+ */
+export function Enable(adapter: new (...args: any[]) => any): ClassDecorator;
+#+END_SRC
+
+** Metadata Storage Requirements
+
+The decorator MUST store adapter declarations using reflection metadata:
+
+#+BEGIN_SRC typescript
+export function Enable(adapter: unknown): ClassDecorator {
+  return (target: unknown) => {
+    // Ensure adapters metadata exists
+    if (!Reflect.hasMetadata('adapters', target)) {
+      Reflect.defineMetadata('adapters', [], target);
+    }
+    
+    // Add adapter to the list
+    const adapters = Reflect.getMetadata('adapters', target);
+    adapters.push(adapter);
+    
+    console.log(`📦 Adapter enabled: ${adapter.constructor?.name || adapter}`);
+  };
+}
+#+END_SRC
+
+** Usage Requirements
+
+Applications MUST use @Enable decorators for all infrastructure adapters:
+
+#+BEGIN_SRC typescript
+@Enable(PostgresUserRepository)
+@Enable(EmailNotificationAdapter)
+@Enable(ExpressWebServerAdapter)
+export class UserManagementApplication extends Application {
+  public readonly metadata = new Map([
+    ['name', 'User Management Application'],
+    ['description', 'Complete user lifecycle management']
+  ]);
+}
+#+END_SRC
+
+* Primary Port Specification
+
+** Interface Requirements
+
+Primary ports MUST implement the PrimaryPort interface:
+
+#+BEGIN_SRC typescript
+/**
+ * Interface for primary adapters that drive the application
+ */
+export interface PrimaryPort {
+  /**
+   * Accept the application instance and start driving it
+   * @param app - The application instance to drive
+   * @returns Promise that resolves when the primary port is ready
+   */
+  accept(app: Application): Promise<void>;
+}
+#+END_SRC
+
+** Implementation Requirements
+
+Primary port implementations MUST:
+
+1. Accept the application instance through the `accept` method
+2. Set up their specific input mechanism (HTTP server, CLI, message queue, etc.)
+3. Convert external inputs into domain events
+4. Call `app.handle(event)` to trigger application processing
+5. Handle and return responses appropriately for their input mechanism
+
+#+BEGIN_SRC typescript
+@AdapterFor(WebServerPort)
+export class ExpressWebServerAdapter extends WebServerPort implements PrimaryPort {
+  public async accept(app: Application): Promise<void> {
+    const server = express();
+    
+    server.post('/api/users/register', async (req, res) => {
+      try {
+        const { email, name } = req.body;
+        const event = new UserRegistrationRequested(new Email(email), name);
+        
+        await app.handle(event);
+        res.status(201).json({ success: true });
+      } catch (error) {
+        res.status(400).json({ error: error.message });
+      }
+    });
+    
+    server.listen(3000, () => {
+      console.log('🌐 HTTP server listening on port 3000');
+    });
+  }
+}
+#+END_SRC
+
+** Multi-Channel Support
+
+Applications MAY enable multiple primary ports for multi-channel access:
+
+#+BEGIN_SRC typescript
+@Enable(ExpressWebServerAdapter)
+@Enable(UserCLIAdapter)
+@Enable(RabbitMQConsumerAdapter)
+export class MultiChannelApplication extends Application {
+  // Same application logic accessible via HTTP, CLI, and message queue
+}
+#+END_SRC
+
+* Event Listener Discovery Specification
+
+** Discovery Requirements
+
+The application MUST automatically discover event listeners in two contexts:
+
+1. **Domain Entity Listeners**: Methods decorated with @listen on domain entities
+2. **Application Listeners**: Methods decorated with @listen on the application class itself
+
+#+BEGIN_SRC typescript
+private findEventListeners(event: Event): EventListener[] {
+  const listeners: EventListener[] = [];
+  
+  // Discover domain entity listeners
+  const entityListeners = this.discoverEntityListeners(event);
+  listeners.push(...entityListeners);
+  
+  // Discover application-level listeners
+  const appListeners = this.discoverApplicationListeners(event);
+  listeners.push(...appListeners);
+  
+  return listeners;
+}
+#+END_SRC
+
+** Domain Entity Discovery
+
+The application MUST scan domain entities for @listen decorators:
+
+#+BEGIN_SRC typescript
+private discoverEntityListeners(event: Event): EventListener[] {
+  const listeners: EventListener[] = [];
+  
+  // Get all registered entities (implementation-specific)
+  const entities = this.getRegisteredEntities();
+  
+  for (const entity of entities) {
+    const methods = this.getListenerMethods(entity, event.constructor);
+    for (const method of methods) {
+      listeners.push({
+        handler: method.bind(entity),
+        source: 'domain',
+        target: entity.constructor.name
+      });
+    }
+  }
+  
+  return listeners;
+}
+#+END_SRC
+
+** Application Listener Discovery
+
+The application MUST scan its own methods for @listen decorators:
+
+#+BEGIN_SRC typescript
+private discoverApplicationListeners(event: Event): EventListener[] {
+  const listeners: EventListener[] = [];
+  const methods = this.getListenerMethods(this, event.constructor);
+  
+  for (const method of methods) {
+    listeners.push({
+      handler: method.bind(this),
+      source: 'application',
+      target: this.constructor.name
+    });
+  }
+  
+  return listeners;
+}
+#+END_SRC
+
+* Error Handling Specification
+
+** Error Isolation Requirements
+
+Event processing MUST implement error isolation:
+
+1. **Listener Isolation**: Failure in one listener MUST NOT prevent other listeners from executing
+2. **Event Isolation**: Failure processing one event MUST NOT prevent other events from being processed
+3. **Error Recovery**: Applications MUST provide configurable error recovery strategies
+
+#+BEGIN_SRC typescript
+for (const listener of listeners) {
+  try {
+    const result = await listener.handler(event);
+    // Process successful result
+  } catch (error) {
+    console.error(`Event listener failed for ${event.type}:`, error);
+    
+    // Implement error recovery strategy
+    await this.handleEventError(event, listener, error);
+  }
+}
+#+END_SRC
+
+** Error Recovery Strategies
+
+Applications MUST support configurable error recovery:
+
+#+BEGIN_SRC typescript
+private async handleEventError(
+  event: Event,
+  listener: EventListener,
+  error: Error
+): Promise<void> {
+  const strategy = this.getErrorStrategy(event.type);
+  
+  switch (strategy) {
+    case 'retry':
+      await this.retryWithBackoff(event, listener);
+      break;
+    case 'dead-letter':
+      await this.sendToDeadLetterQueue(event, error);
+      break;
+    case 'compensate':
+      await this.emitCompensationEvent(event, error);
+      break;
+    case 'ignore':
+      // Log and continue
+      break;
+  }
+}
+#+END_SRC
+
+** Custom Error Types
+
+Applications MUST define specific error types:
+
+#+BEGIN_SRC typescript
+export class ApplicationStartupError extends Error {
+  constructor(message: string, public readonly cause?: Error) {
+    super(message);
+    this.name = 'ApplicationStartupError';
+  }
+}
+
+export class EventProcessingError extends Error {
+  constructor(
+    message: string,
+    public readonly event: Event,
+    public readonly cause?: Error
+  ) {
+    super(message);
+    this.name = 'EventProcessingError';
+  }
+}
+#+END_SRC
+
+* Dependency Resolution Specification
+
+** Ports Registry Requirements
+
+The application MUST manage a dependency registry accessible to all components:
+
+#+BEGIN_SRC typescript
+// Global registry accessible throughout the application
+import { Ports } from '@typescript-eda/domain';
+
+// Applications inject adapters into the registry
+Ports.set(UserRepository, new PostgresUserRepository());
+
+// Domain entities and application logic resolve dependencies
+const userRepository = Ports.resolve(UserRepository);
+#+END_SRC
+
+** Automatic Adapter Wiring
+
+The application MUST automatically wire adapters based on @AdapterFor decorators:
+
+#+BEGIN_SRC typescript
+private async wireDependencies(): Promise<void> {
+  const adapters = Reflect.getMetadata('adapters', this.constructor) || [];
+  
+  for (const AdapterClass of adapters) {
+    const adapter = new AdapterClass();
+    
+    // Get the port this adapter implements
+    const port = Reflect.getMetadata('port', AdapterClass);
+    if (port) {
+      Ports.set(port, adapter);
+      console.log(`🔌 Adapter wired: ${AdapterClass.name} -> ${port.name}`);
+    }
+  }
+}
+#+END_SRC
+
+** Adapter Lifecycle Management
+
+Adapters MAY implement lifecycle methods that the application MUST call:
+
+#+BEGIN_SRC typescript
+interface AdapterLifecycle {
+  initialize?(): Promise<void>;
+  shutdown?(): Promise<void>;
+  isHealthy?(): Promise<boolean>;
+}
+
+// During application startup
+if ('initialize' in adapter && typeof adapter.initialize === 'function') {
+  await adapter.initialize();
+}
+
+// During application shutdown
+if ('shutdown' in adapter && typeof adapter.shutdown === 'function') {
+  await adapter.shutdown();
+}
+#+END_SRC
+
+* Testing Specification
+
+** Application Testing Strategy
+
+Application tests MUST focus on coordination logic rather than business rules:
+
+#+BEGIN_SRC typescript
+describe('UserManagementApplication', () => {
+  let application: UserManagementApplication;
+  let mockUserRepository: jest.Mocked<UserRepository>;
+  let mockNotificationAdapter: jest.Mocked<NotificationPort>;
+
+  beforeEach(() => {
+    // Create mock adapters
+    mockUserRepository = createMockUserRepository();
+    mockNotificationAdapter = createMockNotificationAdapter();
+
+    // Create application with mocks
+    application = new UserManagementApplication();
+    
+    // Inject mocks into ports registry
+    Ports.set(UserRepository, mockUserRepository);
+    Ports.set(NotificationPort, mockNotificationAdapter);
+  });
+
+  it('should coordinate user registration flow', async () => {
+    // Given: A user registration event
+    const event = new UserRegistrationRequested(
+      new Email('test@example.com'),
+      'Test User'
+    );
+
+    // When: Event is processed
+    await application.handle(event);
+
+    // Then: Verify coordination behavior
+    expect(mockUserRepository.save).toHaveBeenCalledWith(expect.any(User));
+    expect(mockNotificationAdapter.sendEmail).toHaveBeenCalledWith(
+      expect.any(Email),
+      'Welcome',
+      expect.stringContaining('verification')
+    );
+  });
+});
+#+END_SRC
+
+** Integration Testing Requirements
+
+Integration tests MUST use real infrastructure adapters with test doubles for external systems:
+
+#+BEGIN_SRC typescript
+describe('UserManagementApplication Integration', () => {
+  let application: UserManagementApplication;
+  let testDatabase: TestDatabase;
+
+  beforeAll(async () => {
+    // Set up test infrastructure
+    testDatabase = await TestDatabase.start();
+    
+    // Create application with real adapters
+    application = new UserManagementApplication();
+    await application.start();
+  });
+
+  afterAll(async () => {
+    await application.shutdown();
+    await testDatabase.stop();
+  });
+
+  it('should handle complete user lifecycle end-to-end', async () => {
+    // Full integration test with real database and mock external services
+  });
+});
+#+END_SRC
+
+** Performance Testing Requirements
+
+Applications MUST include performance benchmarks for event processing:
+
+#+BEGIN_SRC typescript
+describe('Application Performance', () => {
+  it('should process 1000 events within acceptable time limits', async () => {
+    const events = Array.from({ length: 1000 }, () => 
+      new UserRegistrationRequested(generateRandomEmail(), generateRandomName())
+    );
+
+    const startTime = Date.now();
+    await application.handle(events);
+    const duration = Date.now() - startTime;
+
+    expect(duration).toBeLessThan(5000); // 5 seconds max for 1000 events
+  });
+});
+#+END_SRC
+
+* Configuration Specification
+
+** Metadata Requirements
+
+Application metadata MUST include essential configuration information:
+
+#+BEGIN_SRC typescript
+public readonly metadata = new Map<string, unknown>([
+  ['name', 'Application Name'],              // Required: Human-readable name
+  ['description', 'Application description'], // Required: Purpose description
+  ['version', '1.0.0'],                      // Optional: Version identifier
+  ['environment', 'production'],             // Optional: Runtime environment
+  ['channels', ['http', 'cli']],             // Optional: Supported input channels
+  ['features', ['user-management']]          // Optional: Enabled features
+]);
+#+END_SRC
+
+** Environment Configuration
+
+Applications MUST support environment-specific configuration:
+
+#+BEGIN_SRC typescript
+export class ConfigurableApplication extends Application {
+  public readonly metadata = new Map([
+    ['name', 'Configurable Application'],
+    ['database.host', process.env.DB_HOST || 'localhost'],
+    ['database.port', parseInt(process.env.DB_PORT || '5432')],
+    ['api.baseUrl', process.env.API_BASE_URL || 'http://localhost:3000']
+  ]);
+}
+#+END_SRC
+
+** Feature Toggle Support
+
+Applications MAY implement feature toggles through metadata:
+
+#+BEGIN_SRC typescript
+@Enable(UserRepository)
+@Enable(NotificationAdapter)
+@ConditionalEnable(PremiumFeatureAdapter, 'features.premium')
+export class FeatureToggleApplication extends Application {
+  public readonly metadata = new Map([
+    ['features.premium', process.env.ENABLE_PREMIUM === 'true'],
+    ['features.analytics', process.env.ENABLE_ANALYTICS === 'true']
+  ]);
+}
+#+END_SRC
+
+This specification ensures consistent, reliable, and testable application layer implementation across all TypeScript-EDA applications.
