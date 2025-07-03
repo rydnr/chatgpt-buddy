@@ -280,7 +280,7 @@ describe('Message Dispatcher Tests', () => {
   describe('AutomationRequested Handler', () => {
     test('should handle automation requests successfully', async () => {
       const mockTab = { id: 123, title: 'Test Tab' };
-      mockChrome.tabs.query.mockResolvedValue([mockTab]);
+      (mockChrome.tabs.query as any).mockResolvedValue([mockTab]);
       
       const message = {
         type: 'AutomationRequested',
@@ -295,7 +295,7 @@ describe('Message Dispatcher Tests', () => {
     });
 
     test('should handle error when no active tab found', async () => {
-      mockChrome.tabs.query.mockResolvedValue([{}]); // Tab without id
+      (mockChrome.tabs.query as any).mockResolvedValue([{}]); // Tab without id
 
       const message = {
         type: 'AutomationRequested',
@@ -322,9 +322,9 @@ describe('Message Dispatcher Tests', () => {
         { id: 3, title: 'GitHub', url: 'https://github.com', windowId: 1 }
       ];
       
-      mockChrome.tabs.query.mockResolvedValue(mockTabs);
-      mockChrome.tabs.update.mockResolvedValue(undefined);
-      mockChrome.windows.update.mockResolvedValue(undefined);
+      (mockChrome.tabs.query as any).mockResolvedValue(mockTabs);
+      (mockChrome.tabs.update as any).mockResolvedValue(undefined);
+      (mockChrome.windows.update as any).mockResolvedValue(undefined);
 
       const message = {
         type: 'TabSwitchRequested',
@@ -350,7 +350,7 @@ describe('Message Dispatcher Tests', () => {
         { id: 1, title: 'GOOGLE SEARCH', url: 'https://google.com', windowId: 1 }
       ];
       
-      mockChrome.tabs.query.mockResolvedValue(mockTabs);
+      (mockChrome.tabs.query as any).mockResolvedValue(mockTabs);
 
       const message = {
         type: 'TabSwitchRequested',
@@ -368,7 +368,7 @@ describe('Message Dispatcher Tests', () => {
         { id: 1, title: 'Facebook', url: 'https://facebook.com', windowId: 1 }
       ];
       
-      mockChrome.tabs.query.mockResolvedValue(mockTabs);
+      (mockChrome.tabs.query as any).mockResolvedValue(mockTabs);
 
       const message = {
         type: 'TabSwitchRequested',
@@ -393,7 +393,7 @@ describe('Message Dispatcher Tests', () => {
         { id: 2, title: 'GitHub', url: 'https://github.com', windowId: 1 }
       ];
       
-      mockChrome.tabs.query.mockResolvedValue(mockTabs);
+      (mockChrome.tabs.query as any).mockResolvedValue(mockTabs);
 
       const message = {
         type: 'TabSwitchRequested',
@@ -492,7 +492,7 @@ describe('Message Dispatcher Tests', () => {
 
     test('should handle legacy automationRequested', async () => {
       const mockTab = { id: 123, title: 'Test Tab' };
-      mockChrome.tabs.query.mockResolvedValue([mockTab]);
+      (mockChrome.tabs.query as any).mockResolvedValue([mockTab]);
 
       const message = {
         type: 'automationRequested',
@@ -508,7 +508,7 @@ describe('Message Dispatcher Tests', () => {
 
   describe('Unknown Message Types', () => {
     test('should handle unknown message types gracefully', async () => {
-      const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
+      const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
 
       const message = {
         type: 'UnknownMessageType',
@@ -525,7 +525,7 @@ describe('Message Dispatcher Tests', () => {
 
   describe('Error Handling', () => {
     test('should handle Chrome API errors in tab switching', async () => {
-      mockChrome.tabs.query.mockRejectedValue(new Error('Chrome API error'));
+      (mockChrome.tabs.query as any).mockRejectedValue(new Error('Chrome API error'));
 
       const message = {
         type: 'TabSwitchRequested',
@@ -544,7 +544,7 @@ describe('Message Dispatcher Tests', () => {
     });
 
     test('should handle Chrome API errors in automation requests', async () => {
-      mockChrome.tabs.query.mockRejectedValue(new Error('Tab query failed'));
+      (mockChrome.tabs.query as any).mockRejectedValue(new Error('Tab query failed'));
 
       const message = {
         type: 'AutomationRequested',

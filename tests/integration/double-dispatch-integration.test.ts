@@ -58,9 +58,9 @@ describe('Double Dispatch Integration Tests', () => {
       { id: 2, title: 'GitHub', url: 'https://github.com', windowId: 1 }
     ];
     
-    mockChromeTabs.query.mockResolvedValue(mockTabs);
-    mockChromeTabs.update.mockResolvedValue(undefined);
-    mockChromeWindows.update.mockResolvedValue(undefined);
+    (mockChromeTabs.query as any).mockResolvedValue(mockTabs);
+    (mockChromeTabs.update as any).mockResolvedValue(undefined);
+    (mockChromeWindows.update as any).mockResolvedValue(undefined);
 
     // Simulate message processing as it would happen in the extension
     const message = {
@@ -91,7 +91,7 @@ describe('Double Dispatch Integration Tests', () => {
 
   test('should handle automation request with content script communication', async () => {
     const mockActiveTab = { id: 42, title: 'Active Tab', url: 'https://example.com' };
-    mockChromeTabs.query.mockResolvedValue([mockActiveTab]);
+    (mockChromeTabs.query as any).mockResolvedValue([mockActiveTab]);
 
     // Mock successful content script response
     const mockContentScriptResponse = {
@@ -100,7 +100,7 @@ describe('Double Dispatch Integration Tests', () => {
       data: { action: 'fillInput', value: 'test-value' }
     };
 
-    mockChromeTabs.sendMessage.mockImplementation((tabId: number, message: any, callback: any) => {
+    (mockChromeTabs.sendMessage as any).mockImplementation((tabId: any, message: any, callback: any) => {
       expect(tabId).toBe(42);
       expect(message.type).toBe('AutomationRequested');
       // Simulate async callback
@@ -136,9 +136,9 @@ describe('Double Dispatch Integration Tests', () => {
       { id: 3, title: 'Tab 3', windowId: 2 }
     ];
 
-    mockChromeTabs.query.mockResolvedValue(mockTabs);
-    mockChromeTabs.update.mockResolvedValue(undefined);
-    mockChromeWindows.update.mockResolvedValue(undefined);
+    (mockChromeTabs.query as any).mockResolvedValue(mockTabs);
+    (mockChromeTabs.update as any).mockResolvedValue(undefined);
+    (mockChromeWindows.update as any).mockResolvedValue(undefined);
 
     // Simulate concurrent requests
     const requests = [
@@ -170,7 +170,7 @@ describe('Double Dispatch Integration Tests', () => {
   test('should handle Chrome API errors gracefully', async () => {
     // Simulate Chrome API error
     const chromeError = new Error('Chrome extension context invalidated');
-    mockChromeTabs.query.mockRejectedValue(chromeError);
+    (mockChromeTabs.query as any).mockRejectedValue(chromeError);
 
     let caughtError: Error | null = null;
     
@@ -186,13 +186,13 @@ describe('Double Dispatch Integration Tests', () => {
 
   test('should handle content script not available error', async () => {
     const mockActiveTab = { id: 42, title: 'Active Tab' };
-    mockChromeTabs.query.mockResolvedValue([mockActiveTab]);
+    (mockChromeTabs.query as any).mockResolvedValue([mockActiveTab]);
     
     // Simulate chrome.runtime.lastError
     const originalLastError = chrome.runtime.lastError;
     chrome.runtime.lastError = { message: 'Could not establish connection. Receiving end does not exist.' };
 
-    mockChromeTabs.sendMessage.mockImplementation((tabId: number, message: any, callback: any) => {
+    (mockChromeTabs.sendMessage as any).mockImplementation((tabId: any, message: any, callback: any) => {
       // Simulate content script not available
       callback(undefined);
     });
@@ -269,9 +269,9 @@ describe('Double Dispatch Integration Tests', () => {
       { id: 2, title: 'Window 2 Tab', windowId: 200 }
     ];
 
-    mockChromeTabs.query.mockResolvedValue(mockTabs);
-    mockChromeTabs.update.mockResolvedValue(undefined);
-    mockChromeWindows.update.mockResolvedValue(undefined);
+    (mockChromeTabs.query as any).mockResolvedValue(mockTabs);
+    (mockChromeTabs.update as any).mockResolvedValue(undefined);
+    (mockChromeWindows.update as any).mockResolvedValue(undefined);
 
     // Test switching to tab in different window
     const tabs = await chrome.tabs.query({});

@@ -425,7 +425,7 @@ describe('🔄 Message Store Integration Tests', () => {
     });
 
     test('should handle store state changes', () => {
-      let currentState = {
+      let currentState: any = {
         messages: [],
         currentIndex: -1,
         isTimeTraveling: false,
@@ -443,7 +443,7 @@ describe('🔄 Message Store Integration Tests', () => {
 
       currentState = {
         ...currentState,
-        messages: [...currentState.messages, newMessage] as any[],
+        messages: [...currentState.messages, newMessage],
         currentIndex: 0
       };
 

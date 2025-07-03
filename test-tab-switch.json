@@ -1,0 +1,15 @@
+{
+  "target": {
+    "extensionId": "test-extension",
+    "tabId": 1
+  },
+  "message": {
+    "type": "TabSwitchRequested",
+    "payload": {
+      "title": "Google"
+    },
+    "correlationId": "tab-switch-test",
+    "timestamp": "2024-12-30T15:30:00Z",
+    "eventId": "tab-switch-test-1"
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "name": "ChatGPT-buddy D-Bus Integration PoC",
+  "version": "1.0.0",
+  "manifest_version": 3,
+  "description": "Proof of concept for D-Bus signal integration with ChatGPT-buddy",
+  
+  "permissions": [
+    "nativeMessaging",
+    "activeTab",
+    "storage"
+  ],
+  
+  "host_permissions": [
+    "*://*/*"
+  ],
+  
+  "background": {
+    "service_worker": "background-dbus.js"
+  },
+  
+  "content_scripts": [
+    {
+      "matches": ["*://*/*"],
+      "js": ["content-script.js"],
+      "run_at": "document_end"
+    }
+  ],
+  
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "ChatGPT-buddy D-Bus Monitor"
+  },
+  
+  "web_accessible_resources": [
+    {
+      "resources": ["dbus-status.html"],
+      "matches": ["*://*/*"]
+    }
+  ]
+}

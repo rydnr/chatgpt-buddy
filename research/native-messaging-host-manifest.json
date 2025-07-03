@@ -1,0 +1,10 @@
+{
+  "name": "chatgpt_buddy_dbus_host",
+  "description": "ChatGPT-buddy D-Bus Integration Native Messaging Host",
+  "path": "/home/chous/github/rydnr/chatgpt-buddy/research/dbus-monitor-poc.py",
+  "type": "stdio",
+  "allowed_origins": [
+    "chrome-extension://*/",
+    "moz-extension://*/"
+  ]
+}

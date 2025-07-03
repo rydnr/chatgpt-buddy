@@ -72,26 +72,8 @@ function connectWebSocket(serverUrl) {
             // Store for E2E testing
             globalThis.extensionTestData.lastReceivedMessage = message;
             globalThis.extensionTestData.webSocketMessages.push(message);
-            // Handle different message types
-            if (message.type === 'automationRequested') {
-                handleAutomationRequest(message);
-            }
-            else if (message.type === 'ping') {
-                handlePingMessage(message);
-            }
-            else if (message.type === 'registrationAck') {
-                console.log('✅ Registration acknowledged by server');
-                connectionStatus.lastMessage = 'Registered with server';
-                updateStatus();
-            }
-            else if (message.type === 'heartbeatAck') {
-                console.log('💓 Heartbeat acknowledged by server');
-                connectionStatus.lastMessage = `Heartbeat (${new Date().toLocaleTimeString()})`;
-                updateStatus();
-            }
-            else {
-                console.log('⚠️ Unknown message type:', message.type);
-            }
+            // Handle different message types using double dispatch
+            messageDispatcher.dispatch(message);
         }
         catch (error) {
             console.error('❌ Error parsing WebSocket message:', error);
@@ -209,6 +191,77 @@ async function handleAutomationRequest(message) {
         globalThis.extensionTestData.lastResponse = errorResponse;
     }
 }
+async function handleTabSwitchRequest(message) {
+    try {
+        const { payload, correlationId } = message;
+        const { title } = payload;
+        
+        console.log(`🔄 Switching to tab with title: "${title}"`);
+        
+        // Query all tabs to find the one with matching title
+        const tabs = await chrome.tabs.query({});
+        console.log(`🔍 Found ${tabs.length} total tabs`);
+        
+        // Find tab with matching title (case-insensitive partial match)
+        const matchingTabs = tabs.filter(tab => 
+            tab.title && tab.title.toLowerCase().includes(title.toLowerCase())
+        );
+        
+        if (matchingTabs.length === 0) {
+            const errorResponse = {
+                correlationId: correlationId,
+                status: 'error',
+                error: `No tab found with title containing: "${title}"`,
+                timestamp: new Date().toISOString(),
+                availableTabs: tabs.map(tab => ({ id: tab.id, title: tab.title, url: tab.url }))
+            };
+            ws?.send(JSON.stringify(errorResponse));
+            globalThis.extensionTestData.lastResponse = errorResponse;
+            return;
+        }
+        
+        // Use the first matching tab
+        const targetTab = matchingTabs[0];
+        console.log(`✅ Found matching tab: "${targetTab.title}" (ID: ${targetTab.id})`);
+        
+        // Switch to the tab by updating it (making it active) and focusing its window
+        await chrome.tabs.update(targetTab.id, { active: true });
+        await chrome.windows.update(targetTab.windowId, { focused: true });
+        
+        console.log(`🎯 Successfully switched to tab: "${targetTab.title}"`);
+        
+        const successResponse = {
+            correlationId: correlationId,
+            status: 'success',
+            data: {
+                action: 'TabSwitchRequested',
+                switchedTo: {
+                    id: targetTab.id,
+                    title: targetTab.title,
+                    url: targetTab.url,
+                    windowId: targetTab.windowId
+                },
+                totalMatches: matchingTabs.length
+            },
+            timestamp: new Date().toISOString()
+        };
+        
+        ws?.send(JSON.stringify(successResponse));
+        globalThis.extensionTestData.lastResponse = successResponse;
+        
+    } catch (error) {
+        console.error('❌ Error handling tab switch request:', error);
+        const errorResponse = {
+            correlationId: message.correlationId,
+            status: 'error',
+            error: error instanceof Error ? error.message : 'Unknown tab switch error',
+            timestamp: new Date().toISOString()
+        };
+        ws?.send(JSON.stringify(errorResponse));
+        globalThis.extensionTestData.lastResponse = errorResponse;
+    }
+}
+
 function handlePingMessage(message) {
     const pongResponse = {
         type: 'pong',

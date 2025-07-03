@@ -1,0 +1,18 @@
+{
+  "target": {
+    "extensionId": "test-extension",
+    "tabId": 1
+  },
+  "message": {
+    "type": "automationRequested",
+    "payload": {
+      "action": "testAction",
+      "parameters": {
+        "message": "Hello from automation test!"
+      }
+    },
+    "correlationId": "test-simple",
+    "timestamp": "2024-12-30T15:30:00Z",
+    "eventId": "automation-test-simple"
+  }
+}
