@@ -1,0 +1,677 @@
+---
+title: "Getting Started with Web-Buddy"
+subtitle: "Build Your First Multi-Site Automation Framework"
+author: "Web-Buddy Team"
+date: "2025-07-02"
+layout: project
+project: web-buddy
+---
+
+<h1 id="quick-start-guide">Quick Start Guide</h1>
+<p>Web-Buddy is a generic web automation framework that extends
+TypeScript-EDA for browser automation. This guide will walk you through
+creating your first multi-site automation using the three-layer
+architecture.</p>
+<h2 id="prerequisites">Prerequisites</h2>
+<ul>
+<li>Node.js 18+ and pnpm 8+</li>
+<li>TypeScript 5+ knowledge</li>
+<li>Basic understanding of TypeScript-EDA (recommended)</li>
+<li>Familiarity with browser automation concepts</li>
+</ul>
+<h2 id="installation">Installation</h2>
+<pre class="bash"><code># Create a new project
+mkdir my-web-automation &amp;&amp; cd my-web-automation
+npm init -y
+
+# Install Web-Buddy framework
+npm install @web-buddy/core @web-buddy/client
+
+# Install TypeScript-EDA foundation
+npm install @typescript-eda/core @typescript-eda/decorators
+
+# Install development dependencies
+npm install -D typescript @types/node ts-node nodemon
+</code></pre>
+<h2 id="project-setup">Project Setup</h2>
+<p>Create a <code>tsconfig.json</code> with Web-Buddy configuration:</p>
+<pre class="json"><code>{
+  &quot;compilerOptions&quot;: {
+    &quot;target&quot;: &quot;ES2022&quot;,
+    &quot;module&quot;: &quot;commonjs&quot;,
+    &quot;lib&quot;: [&quot;es2022&quot;, &quot;dom&quot;],
+    &quot;strict&quot;: true,
+    &quot;esModuleInterop&quot;: true,
+    &quot;skipLibCheck&quot;: true,
+    &quot;forceConsistentCasingInFileNames&quot;: true,
+    &quot;experimentalDecorators&quot;: true,
+    &quot;emitDecoratorMetadata&quot;: true,
+    &quot;outDir&quot;: &quot;./dist&quot;,
+    &quot;rootDir&quot;: &quot;./src&quot;
+  },
+  &quot;include&quot;: [&quot;src/**/*&quot;],
+  &quot;exclude&quot;: [&quot;node_modules&quot;, &quot;dist&quot;]
+}
+</code></pre>
+<h1 id="your-first-web-automation-framework">Your First Web Automation
+Framework</h1>
+<p>Let's build a simple framework that can automate both Google Search
+and Wikipedia, demonstrating the power of Web-Buddy's layered
+architecture.</p>
+<h2 id="step-1-set-up-the-core-infrastructure">Step 1: Set Up the Core
+Infrastructure</h2>
+<p>Create the base Web-Buddy client:</p>
+<pre class="typescript"><code>// src/core/web-buddy-client.ts
+import { createWebBuddyClient, WebBuddyMessage } from &#39;@web-buddy/core&#39;;
+
+export class WebBuddyClient {
+  private client: any;
+
+  constructor(serverUrl: string) {
+    this.client = createWebBuddyClient({ serverUrl });
+  }
+
+  async sendMessage(message: WebBuddyMessage): Promise&lt;any&gt; {
+    return this.client.sendMessage(message);
+  }
+
+  generateCorrelationId(): string {
+    return `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  }
+}
+</code></pre>
+<h2 id="step-2-create-domain-specific-messages">Step 2: Create
+Domain-Specific Messages</h2>
+<p>Define messages for Google Search automation:</p>
+<pre class="typescript"><code>// src/domains/google/messages.ts
+import { BaseMessage } from &#39;@web-buddy/core&#39;;
+
+export const GoogleMessages = {
+  ENTER_SEARCH_TERM: &#39;ENTER_SEARCH_TERM&#39;,
+  CLICK_RESULT: &#39;CLICK_RESULT&#39;,
+  GET_RESULTS: &#39;GET_RESULTS&#39;
+} as const;
+
+export class EnterSearchTermMessage extends BaseMessage {
+  public readonly type = GoogleMessages.ENTER_SEARCH_TERM;
+
+  constructor(
+    public readonly searchTerm: string,
+    correlationId?: string
+  ) {
+    super({ searchTerm }, correlationId, &#39;google.com&#39;);
+  }
+}
+
+export class GetResultsMessage extends BaseMessage {
+  public readonly type = GoogleMessages.GET_RESULTS;
+
+  constructor(correlationId?: string) {
+    super({}, correlationId, &#39;google.com&#39;);
+  }
+}
+</code></pre>
+<p>Define messages for Wikipedia automation:</p>
+<pre class="typescript"><code>// src/domains/wikipedia/messages.ts
+import { BaseMessage } from &#39;@web-buddy/core&#39;;
+
+export const WikipediaMessages = {
+  SEARCH_ARTICLE: &#39;SEARCH_ARTICLE&#39;,
+  GET_ARTICLE_CONTENT: &#39;GET_ARTICLE_CONTENT&#39;,
+  GET_ARTICLE_LINKS: &#39;GET_ARTICLE_LINKS&#39;
+} as const;
+
+export class SearchArticleMessage extends BaseMessage {
+  public readonly type = WikipediaMessages.SEARCH_ARTICLE;
+
+  constructor(
+    public readonly articleTitle: string,
+    correlationId?: string
+  ) {
+    super({ articleTitle }, correlationId, &#39;wikipedia.org&#39;);
+  }
+}
+
+export class GetArticleContentMessage extends BaseMessage {
+  public readonly type = WikipediaMessages.GET_ARTICLE_CONTENT;
+
+  constructor(correlationId?: string) {
+    super({}, correlationId, &#39;wikipedia.org&#39;);
+  }
+}
+</code></pre>
+<h2 id="step-3-create-domain-specific-handlers">Step 3: Create
+Domain-Specific Handlers</h2>
+<p>Implement Google automation handlers:</p>
+<pre class="typescript"><code>// src/domains/google/handlers.ts
+import { MessageHandler, WebBuddyMessage } from &#39;@web-buddy/core&#39;;
+import { GoogleMessages } from &#39;./messages&#39;;
+
+export class GoogleHandler implements MessageHandler {
+  async handle(message: WebBuddyMessage): Promise&lt;any&gt; {
+    switch (message.type) {
+      case GoogleMessages.ENTER_SEARCH_TERM:
+        return this.enterSearchTerm(message.payload);
+      case GoogleMessages.GET_RESULTS:
+        return this.getResults();
+      default:
+        throw new Error(`Unknown Google message type: ${message.type}`);
+    }
+  }
+
+  private async enterSearchTerm(payload: any): Promise&lt;any&gt; {
+    // Simulate DOM interaction (in real implementation, this runs in content script)
+    const searchBox = document.querySelector(&#39;input[name=&quot;q&quot;]&#39;);
+    if (searchBox) {
+      (searchBox as HTMLInputElement).value = payload.searchTerm;
+      searchBox.dispatchEvent(new Event(&#39;input&#39;, { bubbles: true }));
+
+      // Press Enter to search
+      const form = searchBox.closest(&#39;form&#39;);
+      if (form) {
+        form.dispatchEvent(new Event(&#39;submit&#39;, { bubbles: true }));
+      }
+    }
+
+    return { 
+      success: true, 
+      searchTerm: payload.searchTerm,
+      timestamp: Date.now()
+    };
+  }
+
+  private async getResults(): Promise&lt;any&gt; {
+    // Wait for results to load and extract them
+    const results = Array.from(document.querySelectorAll(&#39;div[data-result-index]&#39;))
+      .map(result =&gt; ({
+        title: result.querySelector(&#39;h3&#39;)?.textContent || &#39;&#39;,
+        url: result.querySelector(&#39;a&#39;)?.href || &#39;&#39;,
+        snippet: result.querySelector(&#39;.VwiC3b&#39;)?.textContent || &#39;&#39;
+      }));
+
+    return {
+      success: true,
+      results: results,
+      count: results.length,
+      timestamp: Date.now()
+    };
+  }
+}
+</code></pre>
+<p>Implement Wikipedia automation handlers:</p>
+<pre class="typescript"><code>// src/domains/wikipedia/handlers.ts
+import { MessageHandler, WebBuddyMessage } from &#39;@web-buddy/core&#39;;
+import { WikipediaMessages } from &#39;./messages&#39;;
+
+export class WikipediaHandler implements MessageHandler {
+  async handle(message: WebBuddyMessage): Promise&lt;any&gt; {
+    switch (message.type) {
+      case WikipediaMessages.SEARCH_ARTICLE:
+        return this.searchArticle(message.payload);
+      case WikipediaMessages.GET_ARTICLE_CONTENT:
+        return this.getArticleContent();
+      default:
+        throw new Error(`Unknown Wikipedia message type: ${message.type}`);
+    }
+  }
+
+  private async searchArticle(payload: any): Promise&lt;any&gt; {
+    const searchBox = document.querySelector(&#39;#searchInput&#39;);
+    if (searchBox) {
+      (searchBox as HTMLInputElement).value = payload.articleTitle;
+
+      // Trigger search
+      const searchButton = document.querySelector(&#39;#searchButton&#39;);
+      if (searchButton) {
+        (searchButton as HTMLElement).click();
+      }
+    }
+
+    return {
+      success: true,
+      articleTitle: payload.articleTitle,
+      timestamp: Date.now()
+    };
+  }
+
+  private async getArticleContent(): Promise&lt;any&gt; {
+    const contentElement = document.querySelector(&#39;#mw-content-text&#39;);
+    const titleElement = document.querySelector(&#39;#firstHeading&#39;);
+
+    return {
+      success: true,
+      title: titleElement?.textContent || &#39;&#39;,
+      content: contentElement?.textContent || &#39;&#39;,
+      wordCount: contentElement?.textContent?.split(/\s+/).length || 0,
+      timestamp: Date.now()
+    };
+  }
+}
+</code></pre>
+<h2 id="step-4-create-convenient-client-apis">Step 4: Create Convenient
+Client APIs</h2>
+<p>Build a Google-specific client:</p>
+<pre class="typescript"><code>// src/domains/google/client.ts
+import { WebBuddyClient } from &#39;../../core/web-buddy-client&#39;;
+import { EnterSearchTermMessage, GetResultsMessage } from &#39;./messages&#39;;
+
+export interface SearchResult {
+  title: string;
+  url: string;
+  snippet: string;
+}
+
+export class GoogleBuddyClient {
+  constructor(private webBuddyClient: WebBuddyClient) {}
+
+  async search(searchTerm: string): Promise&lt;SearchResult[]&gt; {
+    const correlationId = this.webBuddyClient.generateCorrelationId();
+
+    // Enter search term
+    await this.webBuddyClient.sendMessage(
+      new EnterSearchTermMessage(searchTerm, correlationId)
+    );
+
+    // Get results
+    const response = await this.webBuddyClient.sendMessage(
+      new GetResultsMessage(correlationId)
+    );
+
+    return response.results || [];
+  }
+
+  async searchAndClickFirst(searchTerm: string): Promise&lt;any&gt; {
+    const results = await this.search(searchTerm);
+
+    if (results.length &gt; 0) {
+      // Simulate clicking first result
+      window.location.href = results[0].url;
+      return { 
+        success: true, 
+        clickedResult: results[0],
+        timestamp: Date.now()
+      };
+    }
+
+    throw new Error(&#39;No search results found&#39;);
+  }
+
+  async batchSearch(searchTerms: string[]): Promise&lt;SearchResult[][]&gt; {
+    const allResults = await Promise.all(
+      searchTerms.map(term =&gt; this.search(term))
+    );
+
+    return allResults;
+  }
+}
+</code></pre>
+<p>Build a Wikipedia-specific client:</p>
+<pre class="typescript"><code>// src/domains/wikipedia/client.ts
+import { WebBuddyClient } from &#39;../../core/web-buddy-client&#39;;
+import { SearchArticleMessage, GetArticleContentMessage } from &#39;./messages&#39;;
+
+export interface ArticleContent {
+  title: string;
+  content: string;
+  wordCount: number;
+}
+
+export class WikipediaBuddyClient {
+  constructor(private webBuddyClient: WebBuddyClient) {}
+
+  async getArticle(articleTitle: string): Promise&lt;ArticleContent&gt; {
+    const correlationId = this.webBuddyClient.generateCorrelationId();
+
+    // Search for article
+    await this.webBuddyClient.sendMessage(
+      new SearchArticleMessage(articleTitle, correlationId)
+    );
+
+    // Get article content
+    const response = await this.webBuddyClient.sendMessage(
+      new GetArticleContentMessage(correlationId)
+    );
+
+    return {
+      title: response.title,
+      content: response.content,
+      wordCount: response.wordCount
+    };
+  }
+
+  async getMultipleArticles(articleTitles: string[]): Promise&lt;ArticleContent[]&gt; {
+    const articles = await Promise.all(
+      articleTitles.map(title =&gt; this.getArticle(title))
+    );
+
+    return articles;
+  }
+
+  async searchAndSummarize(articleTitle: string, maxWords: number = 100): Promise&lt;string&gt; {
+    const article = await this.getArticle(articleTitle);
+
+    // Simple summarization by taking first N words
+    const words = article.content.split(/\s+/);
+    const summary = words.slice(0, maxWords).join(&#39; &#39;);
+
+    return summary + (words.length &gt; maxWords ? &#39;...&#39; : &#39;&#39;);
+  }
+}
+</code></pre>
+<h2 id="step-5-create-multi-site-application">Step 5: Create Multi-Site
+Application</h2>
+<p>Build an application that demonstrates cross-site automation:</p>
+<pre class="typescript"><code>// src/research-automation.ts
+import { WebBuddyClient } from &#39;./core/web-buddy-client&#39;;
+import { GoogleBuddyClient } from &#39;./domains/google/client&#39;;
+import { WikipediaBuddyClient } from &#39;./domains/wikipedia/client&#39;;
+
+export class ResearchAutomationApp {
+  private webClient: WebBuddyClient;
+  private googleClient: GoogleBuddyClient;
+  private wikipediaClient: WikipediaBuddyClient;
+
+  constructor(serverUrl: string = &#39;http://localhost:3000&#39;) {
+    this.webClient = new WebBuddyClient(serverUrl);
+    this.googleClient = new GoogleBuddyClient(this.webClient);
+    this.wikipediaClient = new WikipediaBuddyClient(this.webClient);
+  }
+
+  async conductResearch(topic: string): Promise&lt;any&gt; {
+    console.log(`🔍 Starting research on: ${topic}`);
+
+    // Phase 1: Google Search
+    console.log(&#39;📊 Phase 1: Google Search&#39;);
+    const searchResults = await this.googleClient.search(`${topic} overview`);
+    console.log(`Found ${searchResults.length} Google results`);
+
+    // Phase 2: Wikipedia Research
+    console.log(&#39;📚 Phase 2: Wikipedia Research&#39;);
+    const article = await this.wikipediaClient.getArticle(topic);
+    console.log(`Wikipedia article: ${article.title} (${article.wordCount} words)`);
+
+    // Phase 3: Cross-Reference
+    console.log(&#39;🔗 Phase 3: Cross-Reference&#39;);
+    const summary = await this.wikipediaClient.searchAndSummarize(topic, 150);
+
+    // Compile research report
+    const report = {
+      topic: topic,
+      timestamp: new Date().toISOString(),
+      sources: {
+        google: {
+          resultCount: searchResults.length,
+          topResults: searchResults.slice(0, 3).map(r =&gt; ({
+            title: r.title,
+            url: r.url
+          }))
+        },
+        wikipedia: {
+          title: article.title,
+          wordCount: article.wordCount,
+          summary: summary
+        }
+      },
+      insights: this.generateInsights(searchResults, article)
+    };
+
+    console.log(&#39;✅ Research completed!&#39;);
+    return report;
+  }
+
+  async batchResearch(topics: string[]): Promise&lt;any[]&gt; {
+    console.log(`🔍 Starting batch research on ${topics.length} topics`);
+
+    const reports = await Promise.all(
+      topics.map(topic =&gt; this.conductResearch(topic))
+    );
+
+    console.log(&#39;✅ Batch research completed!&#39;);
+    return reports;
+  }
+
+  private generateInsights(googleResults: any[], wikipediaArticle: any): string[] {
+    const insights = [];
+
+    // Analyze search result diversity
+    const uniqueDomains = new Set(
+      googleResults.map(r =&gt; new URL(r.url).hostname)
+    );
+    insights.push(`Found content from ${uniqueDomains.size} different domains`);
+
+    // Analyze content depth
+    if (wikipediaArticle.wordCount &gt; 1000) {
+      insights.push(&#39;Wikipedia article provides comprehensive coverage&#39;);
+    } else {
+      insights.push(&#39;Wikipedia article provides basic coverage&#39;);
+    }
+
+    // Cross-reference analysis
+    const googleTitles = googleResults.map(r =&gt; r.title.toLowerCase()).join(&#39; &#39;);
+    const wikipediaTitle = wikipediaArticle.title.toLowerCase();
+
+    if (googleTitles.includes(wikipediaTitle)) {
+      insights.push(&#39;Wikipedia article appears in Google search results&#39;);
+    }
+
+    return insights;
+  }
+}
+</code></pre>
+<h2 id="step-6-create-entry-point">Step 6: Create Entry Point</h2>
+<pre class="typescript"><code>// src/main.ts
+import { ResearchAutomationApp } from &#39;./research-automation&#39;;
+
+async function main() {
+  const app = new ResearchAutomationApp();
+
+  try {
+    // Single topic research
+    if (process.argv[2] === &#39;single&#39;) {
+      const topic = process.argv[3] || &#39;TypeScript&#39;;
+      const report = await app.conductResearch(topic);
+      console.log(&#39;\n📋 Research Report:&#39;);
+      console.log(JSON.stringify(report, null, 2));
+    }
+
+    // Batch research
+    else if (process.argv[2] === &#39;batch&#39;) {
+      const topics = [&#39;TypeScript&#39;, &#39;React&#39;, &#39;Node.js&#39;];
+      const reports = await app.batchResearch(topics);
+      console.log(&#39;\n📋 Batch Research Reports:&#39;);
+      reports.forEach((report, index) =&gt; {
+        console.log(`\n=== Report ${index + 1}: ${report.topic} ===`);
+        console.log(JSON.stringify(report, null, 2));
+      });
+    }
+
+    // Demo all features
+    else {
+      console.log(&#39;🎯 Running Web-Buddy Demo...\n&#39;);
+
+      const report = await app.conductResearch(&#39;Web Automation&#39;);
+      console.log(&#39;\n📋 Final Report:&#39;);
+      console.log(`Topic: ${report.topic}`);
+      console.log(`Google Results: ${report.sources.google.resultCount}`);
+      console.log(`Wikipedia: ${report.sources.wikipedia.title}`);
+      console.log(&#39;Insights:&#39;, report.insights);
+    }
+
+  } catch (error) {
+    console.error(&#39;❌ Automation failed:&#39;, error);
+    process.exit(1);
+  }
+}
+
+main();
+</code></pre>
+<h2 id="step-7-add-package-scripts">Step 7: Add Package Scripts</h2>
+<p>Update your <code>package.json</code>:</p>
+<pre class="json"><code>{
+  &quot;scripts&quot;: {
+    &quot;build&quot;: &quot;tsc&quot;,
+    &quot;start&quot;: &quot;node dist/main.js&quot;,
+    &quot;dev&quot;: &quot;nodemon --exec ts-node src/main.ts&quot;,
+    &quot;demo&quot;: &quot;npm run build &amp;&amp; node dist/main.js&quot;,
+    &quot;research&quot;: &quot;npm run build &amp;&amp; node dist/main.js single&quot;,
+    &quot;batch&quot;: &quot;npm run build &amp;&amp; node dist/main.js batch&quot;
+  }
+}
+</code></pre>
+<h1 id="running-your-multi-site-automation">Running Your Multi-Site
+Automation</h1>
+<pre class="bash"><code># Build the application
+npm run build
+
+# Run the demo
+npm run demo
+
+# Research a specific topic
+npm run research &quot;Machine Learning&quot;
+
+# Run batch research
+npm run batch
+
+# Output example:
+# 🔍 Starting research on: Machine Learning
+# 📊 Phase 1: Google Search
+# Found 10 Google results
+# 📚 Phase 2: Wikipedia Research
+# Wikipedia article: Machine Learning (3245 words)
+# 🔗 Phase 3: Cross-Reference
+# ✅ Research completed!
+</code></pre>
+<h1 id="understanding-the-architecture">Understanding the
+Architecture</h1>
+<h2 id="the-three-layer-approach">The Three-Layer Approach</h2>
+<ol>
+<li><strong>Core Layer</strong> (<code>WebBuddyClient</code>): Generic
+message passing and correlation</li>
+<li><strong>Domain Layer</strong> (Google/Wikipedia Messages &amp;
+Handlers): Site-specific logic</li>
+<li><strong>API Layer</strong> (GoogleBuddyClient/WikipediaBuddyClient):
+Developer convenience</li>
+</ol>
+<h2 id="benefits-demonstrated">Benefits Demonstrated</h2>
+<ul>
+<li><strong>Reusable Infrastructure</strong>: Same core client for all
+sites</li>
+<li><strong>Domain Separation</strong>: Google and Wikipedia logic
+completely independent</li>
+<li><strong>API Flexibility</strong>: Choose between generic messages or
+convenient methods</li>
+<li><strong>Multi-Site Workflows</strong>: Easy to combine different
+sites in single workflow</li>
+</ul>
+<h2 id="event-flow-tracing">Event Flow Tracing</h2>
+<pre class="ascii"><code>ResearchApp.conductResearch()
+         ↓
+  GoogleBuddyClient.search()
+         ↓
+  WebBuddyClient.sendMessage()
+         ↓
+    EnterSearchTermMessage
+         ↓
+     GoogleHandler.handle()
+         ↓
+     DOM Manipulation
+         ↓
+      Search Results
+</code></pre>
+<h1 id="next-steps">Next Steps</h1>
+<h2 id="add-more-sites">Add More Sites</h2>
+<p>Extend your framework to support additional websites:</p>
+<pre class="typescript"><code>// Add GitHub automation
+export class GitHubBuddyClient {
+  async searchRepositories(query: string): Promise&lt;Repository[]&gt; { ... }
+  async getRepositoryInfo(repo: string): Promise&lt;RepoInfo&gt; { ... }
+}
+
+// Add Stack Overflow automation  
+export class StackOverflowBuddyClient {
+  async searchQuestions(query: string): Promise&lt;Question[]&gt; { ... }
+  async getAnswers(questionId: string): Promise&lt;Answer[]&gt; { ... }
+}
+</code></pre>
+<h2 id="add-browser-extension">Add Browser Extension</h2>
+<p>Integrate with actual browser automation:</p>
+<pre class="typescript"><code>// Create browser extension that handles the actual DOM manipulation
+// Connect via WebSocket to your Web-Buddy server
+// Use the same message format for consistency
+</code></pre>
+<h2 id="add-advanced-features">Add Advanced Features</h2>
+<p>Enhance your automation with advanced patterns:</p>
+<pre class="typescript"><code>// Pattern recording and playback
+export class PatternManager {
+  async recordPattern(name: string): Promise&lt;Pattern&gt; { ... }
+  async executePattern(pattern: Pattern): Promise&lt;any&gt; { ... }
+}
+
+// Intelligent automation
+export class AIAutomationAssistant {
+  async suggestOptimizations(workflow: Workflow): Promise&lt;Suggestion[]&gt; { ... }
+  async generateAutomation(description: string): Promise&lt;Pattern&gt; { ... }
+}
+</code></pre>
+<h2 id="testing-your-framework">Testing Your Framework</h2>
+<pre class="typescript"><code>// test/multi-site-automation.test.ts
+import { ResearchAutomationApp } from &#39;../src/research-automation&#39;;
+
+describe(&#39;Multi-Site Automation&#39;, () =&gt; {
+  let app: ResearchAutomationApp;
+
+  beforeEach(() =&gt; {
+    app = new ResearchAutomationApp(&#39;http://localhost:3000&#39;);
+  });
+
+  it(&#39;should conduct research across multiple sites&#39;, async () =&gt; {
+    const report = await app.conductResearch(&#39;TypeScript&#39;);
+
+    expect(report.topic).toBe(&#39;TypeScript&#39;);
+    expect(report.sources.google.resultCount).toBeGreaterThan(0);
+    expect(report.sources.wikipedia.title).toContain(&#39;TypeScript&#39;);
+    expect(report.insights).toBeInstanceOf(Array);
+  });
+
+  it(&#39;should handle batch research efficiently&#39;, async () =&gt; {
+    const topics = [&#39;React&#39;, &#39;Vue&#39;, &#39;Angular&#39;];
+    const reports = await app.batchResearch(topics);
+
+    expect(reports).toHaveLength(3);
+    expect(reports.every(r =&gt; r.sources.google.resultCount &gt; 0)).toBe(true);
+  });
+});
+</code></pre>
+<h1 id="best-practices">Best Practices</h1>
+<h2 id="framework-design">Framework Design</h2>
+<ul>
+<li>Keep core infrastructure generic and reusable</li>
+<li>Isolate domain-specific logic in separate modules</li>
+<li>Provide both generic and convenient APIs</li>
+<li>Use consistent message patterns across all domains</li>
+</ul>
+<h2 id="message-design">Message Design</h2>
+<ul>
+<li>Include correlation IDs for tracing and debugging</li>
+<li>Make messages serializable and immutable</li>
+<li>Use clear, descriptive message types</li>
+<li>Include all necessary data in message payload</li>
+</ul>
+<h2 id="error-handling">Error Handling</h2>
+<ul>
+<li>Implement graceful degradation for failed operations</li>
+<li>Provide detailed error messages with correlation IDs</li>
+<li>Use retry logic for transient failures</li>
+<li>Log errors with sufficient context for debugging</li>
+</ul>
+<h2 id="testing-strategy">Testing Strategy</h2>
+<ul>
+<li>Test at all three layers: core, domain, and API</li>
+<li>Use mocking for external dependencies</li>
+<li>Create integration tests for multi-site workflows</li>
+<li>Include performance testing for concurrent operations</li>
+</ul>
+<p>You now have a complete multi-site automation framework built on
+Web-Buddy! The layered architecture makes it easy to add new sites, the
+event-driven design ensures reliability, and the flexible APIs provide
+both power and convenience.</p>

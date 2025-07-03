@@ -1,0 +1,289 @@
+#+TITLE: Web-Buddy - Generic Web Automation Framework
+#+SUBTITLE: Event-Driven Browser Automation for Any Website
+#+AUTHOR: Web-Buddy Team
+#+DATE: 2025-07-02
+#+LAYOUT: project
+#+PROJECT: web-buddy
+
+* Overview
+
+Web-Buddy is a generic web automation framework built on TypeScript-EDA that transforms single-purpose browser automation tools into extensible, maintainable platforms. It provides a three-layer architecture that separates generic infrastructure from domain-specific logic.
+
+** The Web-Buddy Philosophy
+
+Web-Buddy believes that web automation should be:
+- *Generic at the Core*: Reusable message-passing infrastructure
+- *Specific at the Domain*: Site-specific automation logic
+- *Convenient at the API*: Developer-friendly client wrappers
+- *Event-Driven Throughout*: Consistent communication patterns
+
+** Architecture Layers
+
+#+BEGIN_SRC ascii
+┌─────────────────────────────────────────────────┐
+│                API LAYER                        │ ← Developer-friendly methods
+│         GoogleBuddyClient.search()             │   chatGPTClient.selectProject()
+├─────────────────────────────────────────────────┤
+│               DOMAIN LAYER                      │ ← Site-specific messages & handlers
+│      {'ENTER_SEARCH_TERM': ...}                │   {'SELECT_PROJECT': ...}
+├─────────────────────────────────────────────────┤
+│               CORE LAYER                        │ ← Generic messaging infrastructure
+│         WebBuddyClient.sendMessage()           │   WebBuddyServer, WebBuddyExtension
+└─────────────────────────────────────────────────┘
+#+END_SRC
+
+** Key Components
+
+1. *Web-Buddy Core*: Generic messaging infrastructure, correlation IDs, event routing
+2. *Domain Implementations*: Site-specific messages, handlers, and business logic  
+3. *Client Wrappers*: Convenient APIs built on top of the core messaging system
+4. *Extension Framework*: Reusable browser extension infrastructure
+5. *Testing Framework*: ATDD utilities for browser automation testing
+
+* Features
+
+** 🌐 Multi-Site Support
+- Generic infrastructure works with any website
+- Easy to add new site automation by implementing domain messages
+- Shared patterns across different web automation projects
+
+** 🔄 Event-Driven Architecture
+- All communication through domain events with correlation IDs
+- Loose coupling between client, server, and browser extension
+- Natural audit trail and debugging capabilities
+
+** 🧱 Layered Design
+- Clear separation between generic and specific concerns
+- Domain implementations don't modify core infrastructure
+- API layer provides convenience without coupling
+
+** 🧪 Test-Driven Development
+- ATDD with Playwright for browser automation specification
+- Walking skeleton approach ensures incremental, working features
+- Comprehensive testing at unit, integration, and end-to-end levels
+
+** 📦 Package Ecosystem
+- Core framework: ~@web-buddy/core~
+- Client SDK: ~@web-buddy/client~
+- Extension framework: ~@web-buddy/extension-framework~
+- Testing utilities: ~@web-buddy/testing~
+
+* Quick Example
+
+** Generic Core Usage
+
+#+BEGIN_SRC typescript
+import { createWebBuddyClient } from '@web-buddy/core';
+
+const webClient = createWebBuddyClient({ 
+  serverUrl: 'http://localhost:3000' 
+});
+
+// Generic message sending
+const response = await webClient.sendMessage({
+  'CUSTOM_ACTION': {
+    data: 'any data',
+    correlationId: 'unique-id-123'
+  }
+});
+#+END_SRC
+
+** Domain-Specific Usage
+
+#+BEGIN_SRC typescript
+import { GoogleBuddyClient } from '@google-buddy/client';
+
+// Higher-level, convenient API
+const googleClient = new GoogleBuddyClient(webClient);
+const results = await googleClient.search('TypeScript EDA patterns');
+console.log(`Found ${results.length} results`);
+#+END_SRC
+
+** Multi-Site Workflow
+
+#+BEGIN_SRC typescript
+// Use multiple domain clients together
+const googleClient = new GoogleBuddyClient(webClient);
+const chatGPTClient = new ChatGPTBuddyClient(webClient);
+
+// Research workflow
+const searchResults = await googleClient.search('React best practices');
+const topResult = await googleClient.getFirstResult();
+
+// Analyze with ChatGPT
+await chatGPTClient.selectProject('web-development');
+const analysis = await chatGPTClient.askQuestion(
+  `Analyze this article: ${topResult.title}. What are the key takeaways?`
+);
+#+END_SRC
+
+* Benefits
+
+** For Framework Developers
+- *Reusable Infrastructure*: Don't rebuild message passing, correlation, and extension frameworks
+- *Proven Patterns*: Battle-tested architecture from real-world usage
+- *Event-Driven Foundation*: Built on TypeScript-EDA principles
+- *Extensible Design*: Easy to add new features without breaking existing functionality
+
+** For Domain Implementers  
+- *Clear Boundaries*: Focus on site-specific logic, not infrastructure
+- *Consistent Patterns*: Same message and handler patterns across all sites
+- *Rich Testing*: Comprehensive testing framework included
+- *Documentation*: Clear examples and best practices
+
+** For End Users
+- *Choice of APIs*: Use generic or convenient APIs based on needs
+- *Familiar Patterns*: Consistent experience across different site automations
+- *Reliable Foundation*: Built on proven architectural principles
+- *Active Development*: Regular updates and community support
+
+* Architecture Deep Dive
+
+** Message Flow
+
+#+BEGIN_SRC ascii
+Client API
+    ↓
+Domain Message Creation
+    ↓  
+WebBuddyClient.sendMessage()
+    ↓
+HTTP Request to Server
+    ↓
+Server Message Routing
+    ↓
+WebSocket to Extension
+    ↓
+Extension Message Handling
+    ↓
+Content Script Execution
+    ↓
+Browser DOM Manipulation
+    ↓
+Response Chain (reverse)
+#+END_SRC
+
+** Core Infrastructure
+
+1. *Message System*
+   - Standardized message format with correlation IDs
+   - Type-safe message definitions
+   - Automatic serialization/deserialization
+
+2. *Client Framework*
+   - HTTP communication with server
+   - Promise-based API for async operations
+   - Error handling and retry logic
+
+3. *Server Framework*  
+   - Message routing and validation
+   - WebSocket management for extensions
+   - Session and state management
+
+4. *Extension Framework*
+   - Background script for server communication
+   - Content script for DOM manipulation
+   - Standard patterns for event handling
+
+** Domain Implementation Pattern
+
+Each domain implementation follows a consistent pattern:
+
+#+BEGIN_SRC typescript
+// 1. Define Messages
+export const SiteMessages = {
+  SITE_ACTION: 'SITE_ACTION'
+} as const;
+
+export class SiteActionMessage extends BaseMessage {
+  public readonly type = SiteMessages.SITE_ACTION;
+  constructor(data: SiteActionData, correlationId?: string) {
+    super(data, correlationId, 'site.com');
+  }
+}
+
+// 2. Implement Handlers
+export class SiteHandler implements MessageHandler {
+  async handle(message: WebBuddyMessage): Promise<any> {
+    // Site-specific DOM manipulation
+  }
+}
+
+// 3. Create Client Wrapper
+export class SiteBuddyClient {
+  constructor(private webBuddyClient: WebBuddyClient) {}
+  
+  async siteAction(data: SiteActionData): Promise<any> {
+    return this.webBuddyClient.sendMessage({
+      [SiteMessages.SITE_ACTION]: data
+    });
+  }
+}
+#+END_SRC
+
+* Real-World Examples
+
+** Google Search Automation
+
+#+BEGIN_SRC typescript
+// Simple search
+const results = await googleClient.search('TypeScript');
+
+// Search and click first result
+const clickResult = await googleClient.searchAndClickFirst('TypeScript tutorial');
+
+// Batch search multiple terms  
+const batchResults = await googleClient.batchSearch([
+  'TypeScript', 'JavaScript', 'React'
+]);
+
+// Advanced filtering
+const filteredResults = await googleClient.searchWithFilter(
+  'web frameworks',
+  (result) => result.title.includes('React')
+);
+#+END_SRC
+
+** ChatGPT Automation
+
+#+BEGIN_SRC typescript
+// Project selection and interaction
+await chatGPTClient.selectProject('web-development');
+const response = await chatGPTClient.askQuestion('Explain React hooks');
+
+// File upload and analysis
+await chatGPTClient.uploadFile('/path/to/code.ts');
+const analysis = await chatGPTClient.analyzeCode();
+
+// Conversation management
+const conversationId = await chatGPTClient.startNewConversation();
+await chatGPTClient.switchToConversation(conversationId);
+#+END_SRC
+
+* Getting Started
+
+Ready to build web automation with Web-Buddy? Check out our [[file:getting-started.org][Getting Started Guide]] to create your first multi-site automation, or read the [[file:story.org][Web-Buddy Story]] to understand the evolution from single-purpose tools to generic frameworks.
+
+** Quick Links
+
+- [[file:getting-started.org][🚀 Getting Started]]: Build your first automation
+- [[file:roadmap.org][🗺️ Roadmap]]: Current development priorities  
+- [[file:examples.org][💡 Examples]]: Real-world usage patterns
+- [[https://github.com/rydnr/web-buddy][📁 GitHub Repository]]: Source code and issues
+- [[https://www.npmjs.com/package/@web-buddy/core][📦 NPM Package]]: Installation and versions
+
+** Project Status
+
+Web-Buddy is actively developed and used in production. The framework has evolved from the successful ChatGPT-Buddy project and incorporates lessons learned from real-world usage.
+
+*** Current Version
+- *Framework*: v2.0.0 (stable)
+- *Domain Implementations*: Google-Buddy, ChatGPT-Buddy
+- *Testing*: Comprehensive ATDD and unit test coverage
+- *Documentation*: Complete with examples and best practices
+
+*** Upcoming Features
+- Additional domain implementations (Wikipedia, GitHub, etc.)
+- Enhanced testing utilities and mocking capabilities
+- Performance optimization and monitoring tools
+- Visual automation designer and pattern sharing

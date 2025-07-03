@@ -48,6 +48,8 @@
     "ws": "^8.18.3"
   },
   "workspaces": [
-    "packages/*"
+    "packages/*",
+    "typescript-eda",
+    "web-buddy"
   ]
 }

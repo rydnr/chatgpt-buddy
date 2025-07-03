@@ -1,0 +1,43 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "commonjs",
+    "lib": ["es2022", "dom"],
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "outDir": "./dist",
+    "rootDir": "./",
+    "baseUrl": "./",
+    "paths": {
+      "@web-buddy/core": ["./packages/core/src"],
+      "@web-buddy/testing": ["./packages/testing/src"],
+      "@web-buddy/google-buddy": ["./packages/google-buddy/src"],
+      "@web-buddy/wikipedia-buddy": ["./packages/wikipedia-buddy/src"]
+    }
+  },
+  "include": [
+    "packages/*/src/**/*",
+    "implementations/*/src/**/*",
+    "examples/**/*",
+    "shared/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "**/node_modules",
+    "**/dist"
+  ],
+  "references": [
+    { "path": "./packages/core" },
+    { "path": "./packages/testing" },
+    { "path": "./packages/google-buddy" },
+    { "path": "./packages/wikipedia-buddy" }
+  ]
+}

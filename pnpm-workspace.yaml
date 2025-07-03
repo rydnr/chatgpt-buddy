@@ -1,5 +1,6 @@
 packages:
   - 'packages/*'
-  - 'implementations/*'
-  - 'apps/*'
   - 'typescript-eda'
+  - 'web-buddy'
+  - 'web-buddy/packages/*'
+  - 'web-buddy/implementations/*'
