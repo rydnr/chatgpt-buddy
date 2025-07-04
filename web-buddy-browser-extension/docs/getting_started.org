@@ -1,0 +1,835 @@
+#+TITLE: Getting Started with Web-Buddy Browser Extension
+#+SUBTITLE: Build Intelligent Web Automation with Event-Driven Architecture
+#+AUTHOR: Web-Buddy Browser Extension Team
+#+DATE: 2025-07-03
+#+LAYOUT: project
+#+PROJECT: web-buddy-browser-extension
+
+* Quick Start Guide
+
+The Web-Buddy Browser Extension provides a powerful framework for building intelligent web automation systems. This guide will walk you through creating your first browser extension with training capabilities, pattern recognition, and automated execution.
+
+** Prerequisites
+
+- Node.js 18+ and npm/pnpm
+- TypeScript 5+ knowledge
+- Basic understanding of browser extension development
+- Familiarity with @typescript-eda patterns
+- Chrome/Firefox browser for testing
+
+** Installation
+
+#+BEGIN_SRC bash
+npm install @web-buddy/browser-extension @typescript-eda/domain @typescript-eda/infrastructure @typescript-eda/application
+# or with pnpm
+pnpm add @web-buddy/browser-extension @typescript-eda/domain @typescript-eda/infrastructure @typescript-eda/application
+#+END_SRC
+
+* Your First Intelligent Browser Extension
+
+Let's build a complete browser extension that can learn user workflows and automate them across different websites.
+
+** Step 1: Extension Manifest and Structure
+
+Create the basic extension structure:
+
+#+BEGIN_SRC json
+// manifest.json
+{
+  "manifest_version": 3,
+  "name": "My Web-Buddy Extension",
+  "version": "1.0.0",
+  "description": "Intelligent web automation with learning capabilities",
+  
+  "permissions": [
+    "storage",
+    "activeTab",
+    "tabs",
+    "downloads",
+    "scripting"
+  ],
+  
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content-script.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Web-Buddy"
+  },
+  
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}
+#+END_SRC
+
+** Step 2: Background Script with Event-Driven Architecture
+
+Create your main background application:
+
+#+BEGIN_SRC typescript
+// src/background/my-extension-app.ts
+import { Application, Enable } from '@typescript-eda/application';
+import { listen } from '@typescript-eda/domain';
+import { 
+  WebSocketConnectionAdapter,
+  TabManagementAdapter,
+  MessageStoreAdapter,
+  ExtensionLifecycleAdapter 
+} from '@web-buddy/browser-extension';
+import {
+  ConnectionRequestedEvent,
+  TabSwitchRequestedEvent,
+  AutomationRequestedEvent,
+  TrainingModeActivatedEvent
+} from './events/extension-events';
+
+@Enable(WebSocketConnectionAdapter)
+@Enable(TabManagementAdapter)
+@Enable(MessageStoreAdapter)
+@Enable(ExtensionLifecycleAdapter)
+export class MyWebBuddyExtension extends Application {
+  public readonly metadata = new Map([
+    ['name', 'My Web-Buddy Extension'],
+    ['description', 'Intelligent web automation with learning capabilities'],
+    ['version', '1.0.0'],
+    ['capabilities', ['training', 'automation', 'pattern-recognition', 'cross-site']]
+  ]);
+
+  private serverUrl = 'ws://localhost:3003/ws';
+  private isTrainingMode = false;
+
+  @listen(ConnectionRequestedEvent)
+  public async handleConnectionRequest(event: ConnectionRequestedEvent): Promise<void> {
+    console.log(`🔌 Connecting to Web-Buddy server: ${event.serverUrl}`);
+    
+    // Connection logic will be handled by WebSocketConnectionAdapter
+    // This is the coordination layer
+    await this.notifyConnectionStatus('connecting');
+  }
+
+  @listen(TrainingModeActivatedEvent)
+  public async handleTrainingActivation(event: TrainingModeActivatedEvent): Promise<void> {
+    console.log('🎓 Training mode activated');
+    this.isTrainingMode = true;
+    
+    // Inject training UI into active tab
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (tab.id) {
+      await chrome.tabs.sendMessage(tab.id, {
+        type: 'ACTIVATE_TRAINING_MODE',
+        payload: { sessionId: event.sessionId }
+      });
+    }
+  }
+
+  @listen(AutomationRequestedEvent) 
+  public async handleAutomationRequest(event: AutomationRequestedEvent): Promise<void> {
+    console.log(`🤖 Executing automation: ${event.patternName}`);
+    
+    // Get target tab
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (tab.id) {
+      await chrome.tabs.sendMessage(tab.id, {
+        type: 'EXECUTE_AUTOMATION',
+        payload: {
+          pattern: event.pattern,
+          context: event.context
+        }
+      });
+    }
+  }
+
+  @listen(TabSwitchRequestedEvent)
+  public async handleTabSwitch(event: TabSwitchRequestedEvent): Promise<void> {
+    console.log(`🔄 Switching to tab: ${event.title}`);
+    
+    // Tab switching will be handled by TabManagementAdapter
+    // This coordinates the overall workflow
+  }
+
+  private async notifyConnectionStatus(status: string): Promise<void> {
+    // Notify popup and content scripts of connection status
+    try {
+      await chrome.runtime.sendMessage({
+        type: 'CONNECTION_STATUS_UPDATE',
+        payload: { status, timestamp: new Date().toISOString() }
+      });
+    } catch (error) {
+      console.log('Could not notify connection status (popup may be closed)');
+    }
+  }
+}
+
+// Initialize the extension
+const extension = new MyWebBuddyExtension();
+extension.start().then(() => {
+  console.log('🚀 My Web-Buddy Extension started successfully');
+}).catch(error => {
+  console.error('❌ Failed to start extension:', error);
+});
+#+END_SRC
+
+** Step 3: Content Script with Training and Automation
+
+Create the content script that handles page interaction:
+
+#+BEGIN_SRC typescript
+// src/content/content-script-app.ts
+import { Application, Enable } from '@typescript-eda/application';
+import { listen } from '@typescript-eda/domain';
+import {
+  TrainingUIAdapter,
+  ElementSelectorAdapter,
+  PatternRecognitionAdapter,
+  AutomationExecutorAdapter
+} from '@web-buddy/browser-extension';
+import {
+  TrainingModeActivatedEvent,
+  ElementSelectedEvent,
+  AutomationExecutionRequestedEvent,
+  PatternCapturedEvent
+} from './events/content-events';
+
+@Enable(TrainingUIAdapter)
+@Enable(ElementSelectorAdapter)  
+@Enable(PatternRecognitionAdapter)
+@Enable(AutomationExecutorAdapter)
+export class ContentScriptApplication extends Application {
+  public readonly metadata = new Map([
+    ['name', 'Web-Buddy Content Script'],
+    ['url', window.location.href],
+    ['domain', window.location.hostname]
+  ]);
+
+  private currentTrainingSession: string | null = null;
+  private capturedActions: UserAction[] = [];
+
+  @listen(TrainingModeActivatedEvent)
+  public async activateTrainingMode(event: TrainingModeActivatedEvent): Promise<void> {
+    console.log('🎓 Training mode activated in content script');
+    this.currentTrainingSession = event.sessionId;
+    
+    // Show training overlay
+    this.showTrainingOverlay();
+    
+    // Start capturing user interactions
+    this.startActionCapture();
+  }
+
+  @listen(ElementSelectedEvent)
+  public async handleElementSelection(event: ElementSelectedEvent): Promise<void> {
+    console.log('🎯 Element selected for training:', event.element);
+    
+    if (!this.currentTrainingSession) return;
+    
+    // Capture the action
+    const action = new UserAction(
+      event.actionType,
+      event.element,
+      event.data,
+      this.getElementContext(event.element)
+    );
+    
+    this.capturedActions.push(action);
+    
+    // Analyze for patterns
+    await this.analyzeActionPattern(action);
+    
+    // Provide feedback to user
+    this.showActionFeedback(action);
+  }
+
+  @listen(AutomationExecutionRequestedEvent)
+  public async executeAutomation(event: AutomationExecutionRequestedEvent): Promise<void> {
+    console.log('🤖 Executing automation pattern:', event.pattern.name);
+    
+    try {
+      // Execute each step in the pattern
+      for (const step of event.pattern.steps) {
+        await this.executeAutomationStep(step);
+        
+        // Wait for step completion
+        await this.waitForStepCompletion(step);
+      }
+      
+      console.log('✅ Automation completed successfully');
+      
+      // Report success to background
+      chrome.runtime.sendMessage({
+        type: 'AUTOMATION_COMPLETED',
+        payload: {
+          patternId: event.pattern.id,
+          success: true,
+          duration: Date.now() - event.startTime
+        }
+      });
+      
+    } catch (error) {
+      console.error('❌ Automation failed:', error);
+      
+      // Report failure to background
+      chrome.runtime.sendMessage({
+        type: 'AUTOMATION_FAILED',
+        payload: {
+          patternId: event.pattern.id,
+          error: error.message,
+          step: error.step
+        }
+      });
+    }
+  }
+
+  private showTrainingOverlay(): void {
+    const overlay = document.createElement('div');
+    overlay.id = 'web-buddy-training-overlay';
+    overlay.style.cssText = `
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      z-index: 10000;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 15px 20px;
+      border-radius: 10px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+      font-family: system-ui, -apple-system, sans-serif;
+      font-size: 14px;
+      max-width: 300px;
+    `;
+    
+    overlay.innerHTML = `
+      <div style="font-weight: bold; margin-bottom: 8px;">🎓 Training Mode Active</div>
+      <div style="font-size: 12px; opacity: 0.9;">
+        Click on elements to teach the automation pattern.
+        <div style="margin-top: 8px;">
+          <button id="save-pattern" style="background: rgba(255,255,255,0.2); border: none; color: white; padding: 5px 10px; border-radius: 5px; cursor: pointer; margin-right: 5px;">Save Pattern</button>
+          <button id="cancel-training" style="background: rgba(255,255,255,0.2); border: none; color: white; padding: 5px 10px; border-radius: 5px; cursor: pointer;">Cancel</button>
+        </div>
+      </div>
+    `;
+    
+    document.body.appendChild(overlay);
+    
+    // Add event listeners
+    overlay.querySelector('#save-pattern')?.addEventListener('click', () => {
+      this.saveCurrentPattern();
+    });
+    
+    overlay.querySelector('#cancel-training')?.addEventListener('click', () => {
+      this.cancelTraining();
+    });
+  }
+
+  private startActionCapture(): void {
+    // Capture clicks
+    document.addEventListener('click', this.handleClick.bind(this), true);
+    
+    // Capture form inputs
+    document.addEventListener('input', this.handleInput.bind(this), true);
+    
+    // Capture form submissions
+    document.addEventListener('submit', this.handleSubmit.bind(this), true);
+    
+    console.log('👂 Started capturing user actions');
+  }
+
+  private handleClick(event: MouseEvent): void {
+    if (!this.currentTrainingSession) return;
+    
+    // Skip if clicking training overlay
+    const target = event.target as HTMLElement;
+    if (target.closest('#web-buddy-training-overlay')) return;
+    
+    event.preventDefault();
+    event.stopPropagation();
+    
+    // Highlight the clicked element
+    this.highlightElement(target);
+    
+    // Emit element selection event
+    this.handle(new ElementSelectedEvent(
+      'click',
+      target,
+      null,
+      this.currentTrainingSession
+    ));
+  }
+
+  private handleInput(event: InputEvent): void {
+    if (!this.currentTrainingSession) return;
+    
+    const target = event.target as HTMLInputElement;
+    
+    // Emit input event
+    this.handle(new ElementSelectedEvent(
+      'input',
+      target,
+      target.value,
+      this.currentTrainingSession
+    ));
+  }
+
+  private async executeAutomationStep(step: AutomationStep): Promise<void> {
+    const element = await this.findElement(step.selector);
+    
+    if (!element) {
+      throw new AutomationError(`Element not found: ${step.selector}`, step);
+    }
+    
+    switch (step.action) {
+      case 'click':
+        element.click();
+        break;
+        
+      case 'input':
+        if (element instanceof HTMLInputElement) {
+          element.value = step.data || '';
+          element.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+        break;
+        
+      case 'submit':
+        if (element instanceof HTMLFormElement) {
+          element.submit();
+        } else {
+          element.click();
+        }
+        break;
+        
+      default:
+        throw new AutomationError(`Unknown action: ${step.action}`, step);
+    }
+    
+    console.log(`✅ Executed step: ${step.action} on ${step.selector}`);
+  }
+
+  private async findElement(selector: string): Promise<HTMLElement | null> {
+    // Try multiple selector strategies
+    let element = document.querySelector(selector) as HTMLElement;
+    
+    if (!element) {
+      // Try semantic selectors
+      element = this.findBySemantic(selector);
+    }
+    
+    if (!element) {
+      // Try fuzzy matching
+      element = this.findByFuzzyMatch(selector);
+    }
+    
+    return element;
+  }
+
+  private getElementContext(element: HTMLElement): ElementContext {
+    return {
+      tagName: element.tagName,
+      id: element.id,
+      className: element.className,
+      textContent: element.textContent?.trim() || '',
+      attributes: this.getElementAttributes(element),
+      position: element.getBoundingClientRect(),
+      xpath: this.getXPath(element),
+      cssSelector: this.generateCSSSelector(element)
+    };
+  }
+
+  private highlightElement(element: HTMLElement): void {
+    // Remove previous highlights
+    document.querySelectorAll('.web-buddy-highlight').forEach(el => {
+      el.classList.remove('web-buddy-highlight');
+    });
+    
+    // Add highlight to current element
+    element.classList.add('web-buddy-highlight');
+    
+    // Add highlight styles if not already present
+    if (!document.querySelector('#web-buddy-highlight-styles')) {
+      const styles = document.createElement('style');
+      styles.id = 'web-buddy-highlight-styles';
+      styles.textContent = `
+        .web-buddy-highlight {
+          outline: 3px solid #667eea !important;
+          outline-offset: 2px !important;
+          background-color: rgba(102, 126, 234, 0.1) !important;
+        }
+      `;
+      document.head.appendChild(styles);
+    }
+  }
+
+  private async saveCurrentPattern(): Promise<void> {
+    if (this.capturedActions.length === 0) {
+      alert('No actions captured. Please interact with elements first.');
+      return;
+    }
+    
+    const patternName = prompt('Enter a name for this automation pattern:');
+    if (!patternName) return;
+    
+    const pattern = new AutomationPattern(
+      patternName,
+      this.capturedActions,
+      window.location.hostname,
+      new Date()
+    );
+    
+    // Save pattern to storage
+    await chrome.runtime.sendMessage({
+      type: 'SAVE_PATTERN',
+      payload: pattern.toJSON()
+    });
+    
+    console.log(`💾 Pattern saved: ${patternName}`);
+    this.cancelTraining();
+  }
+
+  private cancelTraining(): void {
+    this.currentTrainingSession = null;
+    this.capturedActions = [];
+    
+    // Remove training overlay
+    document.querySelector('#web-buddy-training-overlay')?.remove();
+    
+    // Remove highlights
+    document.querySelectorAll('.web-buddy-highlight').forEach(el => {
+      el.classList.remove('web-buddy-highlight');
+    });
+    
+    // Remove event listeners
+    document.removeEventListener('click', this.handleClick.bind(this), true);
+    document.removeEventListener('input', this.handleInput.bind(this), true);
+    document.removeEventListener('submit', this.handleSubmit.bind(this), true);
+    
+    console.log('🛑 Training mode cancelled');
+  }
+}
+
+// Initialize content script
+const contentApp = new ContentScriptApplication();
+contentApp.start().then(() => {
+  console.log('🚀 Content script application started');
+}).catch(error => {
+  console.error('❌ Failed to start content script:', error);
+});
+
+// Listen for messages from background script
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  console.log('📨 Content script received message:', message.type);
+  
+  switch (message.type) {
+    case 'ACTIVATE_TRAINING_MODE':
+      contentApp.handle(new TrainingModeActivatedEvent(message.payload.sessionId));
+      sendResponse({ success: true });
+      break;
+      
+    case 'EXECUTE_AUTOMATION':
+      contentApp.handle(new AutomationExecutionRequestedEvent(
+        message.payload.pattern,
+        Date.now()
+      ));
+      sendResponse({ success: true });
+      break;
+      
+    default:
+      console.log(`⚠️ Unknown message type: ${message.type}`);
+  }
+  
+  return true;
+});
+#+END_SRC
+
+** Step 4: Storage and Pattern Management
+
+Create pattern storage using IndexedDB:
+
+#+BEGIN_SRC typescript
+// src/storage/pattern-storage.ts
+import { AdapterFor, Port } from '@typescript-eda/infrastructure';
+
+export abstract class PatternStoragePort extends Port {
+  public readonly name = 'PatternStoragePort';
+  
+  public abstract savePattern(pattern: AutomationPattern): Promise<void>;
+  public abstract loadPattern(id: string): Promise<AutomationPattern | null>;
+  public abstract getAllPatterns(): Promise<AutomationPattern[]>;
+  public abstract deletePattern(id: string): Promise<void>;
+  public abstract searchPatterns(query: string): Promise<AutomationPattern[]>;
+}
+
+@AdapterFor(PatternStoragePort)
+export class IndexedDBPatternStorage extends PatternStoragePort {
+  private readonly dbName = 'WebBuddyPatterns';
+  private readonly dbVersion = 1;
+  private readonly storeName = 'patterns';
+
+  public async savePattern(pattern: AutomationPattern): Promise<void> {
+    const db = await this.getDatabase();
+    const transaction = db.transaction([this.storeName], 'readwrite');
+    const store = transaction.objectStore(this.storeName);
+    
+    const patternData = {
+      id: pattern.id,
+      name: pattern.name,
+      domain: pattern.domain,
+      steps: pattern.steps.map(step => step.toJSON()),
+      metadata: pattern.metadata,
+      created: pattern.created,
+      lastUsed: pattern.lastUsed,
+      useCount: pattern.useCount
+    };
+    
+    await store.put(patternData);
+    console.log(`💾 Pattern saved: ${pattern.name}`);
+  }
+
+  public async loadPattern(id: string): Promise<AutomationPattern | null> {
+    const db = await this.getDatabase();
+    const transaction = db.transaction([this.storeName], 'readonly');
+    const store = transaction.objectStore(this.storeName);
+    
+    const patternData = await store.get(id);
+    
+    if (!patternData) return null;
+    
+    return AutomationPattern.fromJSON(patternData);
+  }
+
+  public async getAllPatterns(): Promise<AutomationPattern[]> {
+    const db = await this.getDatabase();
+    const transaction = db.transaction([this.storeName], 'readonly');
+    const store = transaction.objectStore(this.storeName);
+    
+    const patterns = await store.getAll();
+    
+    return patterns.map(data => AutomationPattern.fromJSON(data));
+  }
+
+  public async searchPatterns(query: string): Promise<AutomationPattern[]> {
+    const allPatterns = await this.getAllPatterns();
+    
+    return allPatterns.filter(pattern => 
+      pattern.name.toLowerCase().includes(query.toLowerCase()) ||
+      pattern.domain.includes(query) ||
+      pattern.steps.some(step => 
+        step.description?.toLowerCase().includes(query.toLowerCase())
+      )
+    );
+  }
+
+  private async getDatabase(): Promise<IDBDatabase> {
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open(this.dbName, this.dbVersion);
+      
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve(request.result);
+      
+      request.onupgradeneeded = (event) => {
+        const db = (event.target as IDBOpenDBRequest).result;
+        
+        if (!db.objectStoreNames.contains(this.storeName)) {
+          const store = db.createObjectStore(this.storeName, { keyPath: 'id' });
+          store.createIndex('name', 'name', { unique: false });
+          store.createIndex('domain', 'domain', { unique: false });
+          store.createIndex('created', 'created', { unique: false });
+        }
+      };
+    });
+  }
+}
+#+END_SRC
+
+** Step 5: Build Configuration
+
+Create build configuration with webpack:
+
+#+BEGIN_SRC javascript
+// webpack.config.js
+const path = require('path');
+const CopyWebpackPlugin = require('copy-webpack-plugin');
+
+module.exports = {
+  mode: 'production',
+  entry: {
+    background: './src/background/index.ts',
+    'content-script': './src/content/index.ts',
+    popup: './src/popup/index.ts'
+  },
+  output: {
+    path: path.resolve(__dirname, 'dist'),
+    filename: '[name].js',
+    clean: true
+  },
+  module: {
+    rules: [
+      {
+        test: /\.ts$/,
+        use: 'ts-loader',
+        exclude: /node_modules/
+      }
+    ]
+  },
+  resolve: {
+    extensions: ['.ts', '.js']
+  },
+  plugins: [
+    new CopyWebpackPlugin({
+      patterns: [
+        { from: 'manifest.json', to: 'manifest.json' },
+        { from: 'src/popup/popup.html', to: 'popup.html' },
+        { from: 'assets', to: 'assets' }
+      ]
+    })
+  ]
+};
+#+END_SRC
+
+* Advanced Features
+
+** Cross-Site Pattern Recognition
+
+Enable patterns to work across different websites:
+
+#+BEGIN_SRC typescript
+export class CrossSitePatternMatcher {
+  public async adaptPattern(pattern: AutomationPattern, targetSite: string): Promise<AutomationPattern> {
+    const adaptedSteps = await Promise.all(
+      pattern.steps.map(step => this.adaptStep(step, targetSite))
+    );
+    
+    return new AutomationPattern(
+      `${pattern.name} (adapted for ${targetSite})`,
+      adaptedSteps,
+      targetSite,
+      new Date()
+    );
+  }
+
+  private async adaptStep(step: AutomationStep, targetSite: string): Promise<AutomationStep> {
+    // Use semantic analysis to find equivalent elements
+    const semanticSelector = this.generateSemanticSelector(step);
+    const adaptedSelector = await this.findEquivalentElement(semanticSelector, targetSite);
+    
+    return new AutomationStep(
+      step.action,
+      adaptedSelector,
+      step.data,
+      step.waitCondition
+    );
+  }
+}
+#+END_SRC
+
+** Pattern Sharing and Collaboration
+
+Enable users to share patterns:
+
+#+BEGIN_SRC typescript
+export class PatternSharingService {
+  public async exportPattern(pattern: AutomationPattern): Promise<string> {
+    const exportData = {
+      ...pattern.toJSON(),
+      exported: new Date().toISOString(),
+      version: '1.0'
+    };
+    
+    return btoa(JSON.stringify(exportData));
+  }
+
+  public async importPattern(exportedData: string): Promise<AutomationPattern> {
+    const data = JSON.parse(atob(exportedData));
+    return AutomationPattern.fromJSON(data);
+  }
+}
+#+END_SRC
+
+* Testing Your Extension
+
+** Unit Testing
+
+#+BEGIN_SRC typescript
+// tests/pattern-recognition.test.ts
+describe('PatternRecognition', () => {
+  let recognizer: PatternRecognizer;
+  
+  beforeEach(() => {
+    recognizer = new PatternRecognizer();
+  });
+
+  it('should recognize login patterns', () => {
+    const actions = [
+      new UserAction('input', '#username', 'test@example.com'),
+      new UserAction('input', '#password', 'password'),
+      new UserAction('click', '#login-button', null)
+    ];
+    
+    const pattern = recognizer.analyzeActions(actions);
+    expect(pattern.type).toBe('login');
+    expect(pattern.confidence).toBeGreaterThan(0.8);
+  });
+});
+#+END_SRC
+
+** Integration Testing
+
+#+BEGIN_SRC typescript
+// tests/extension-integration.test.ts
+describe('Extension Integration', () => {
+  let extension: MyWebBuddyExtension;
+  
+  beforeEach(async () => {
+    extension = new MyWebBuddyExtension();
+    await extension.start();
+  });
+
+  it('should activate training mode', async () => {
+    const event = new TrainingModeActivatedEvent('session-123');
+    await extension.handle(event);
+    
+    // Verify training mode was activated
+    expect(extension.isTrainingActive()).toBe(true);
+  });
+});
+#+END_SRC
+
+* Deployment and Distribution
+
+** Building for Production
+
+#+BEGIN_SRC bash
+# Build the extension
+npm run build
+
+# Package for Chrome Web Store
+npm run package
+
+# Package for Firefox Add-ons
+npm run package:firefox
+#+END_SRC
+
+** Extension Store Submission
+
+1. **Chrome Web Store**: Upload the built extension ZIP file
+2. **Firefox Add-ons**: Submit the signed XPI file
+3. **Edge Add-ons**: Upload the same package as Chrome
+
+Your intelligent browser extension is now complete! Users can train it by demonstrating workflows, and it will automatically recognize patterns and execute automations across different websites.
+
+The event-driven architecture ensures the extension is modular, testable, and can easily be extended with new capabilities like AI integration, cloud pattern sync, and collaborative features.

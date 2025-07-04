@@ -1,0 +1,682 @@
+#+TITLE: Training System Specification
+#+SUBTITLE: Complete specification for browser extension training and learning capabilities
+#+AUTHOR: Web-Buddy Browser Extension Team
+#+DATE: 2025-07-03
+#+LAYOUT: spec
+#+PROJECT: web-buddy-browser-extension
+
+* Training System Overview
+
+The Web-Buddy browser extension training system enables users to teach automation patterns through demonstration rather than programming. This specification defines the complete training architecture, user interaction patterns, and technical implementation requirements.
+
+** Core Training Principles
+
+1. **Demonstration-Based Learning**: Users show the system what to do instead of describing it
+2. **Real-Time Pattern Recognition**: Immediate feedback about learned patterns
+3. **Cross-Site Adaptability**: Patterns work across different websites with similar functionality
+4. **Semantic Understanding**: Focus on user intent rather than specific DOM elements
+5. **Progressive Enhancement**: Simple patterns can evolve into complex workflows
+
+* Training Mode Architecture
+
+** Training Session Lifecycle
+
+#+BEGIN_SRC typescript
+export interface TrainingSession {
+  id: string;
+  userId?: string;
+  startTime: Date;
+  endTime?: Date;
+  status: TrainingStatus;
+  context: TrainingContext;
+  capturedActions: UserAction[];
+  recognizedPatterns: RecognizedPattern[];
+  metadata: TrainingMetadata;
+}
+
+export enum TrainingStatus {
+  ACTIVE = 'active',
+  PAUSED = 'paused',
+  COMPLETED = 'completed',
+  CANCELLED = 'cancelled',
+  ERROR = 'error'
+}
+
+export interface TrainingContext {
+  domain: string;
+  url: string;
+  pageTitle: string;
+  userAgent: string;
+  viewport: Viewport;
+  sessionType: 'single-page' | 'multi-page' | 'cross-site';
+}
+#+END_SRC
+
+** Training UI Requirements
+
+The training interface MUST provide:
+
+1. **Activation Controls**: Clear start/stop training controls
+2. **Visual Feedback**: Real-time indication of captured actions
+3. **Pattern Confidence**: Display pattern recognition confidence
+4. **Action Preview**: Show what actions have been captured
+5. **Save/Cancel Options**: Easy pattern save or training cancellation
+
+#+BEGIN_SRC typescript
+export interface TrainingUIRequirements {
+  // Visual overlay that doesn't interfere with page functionality
+  overlay: {
+    position: 'fixed';
+    zIndex: 10000;
+    nonIntrusive: true;
+    responsive: true;
+  };
+  
+  // Real-time feedback elements
+  feedback: {
+    actionCounter: boolean;
+    confidenceIndicator: boolean;
+    patternPreview: boolean;
+    nextActionSuggestion: boolean;
+  };
+  
+  // Accessibility requirements
+  accessibility: {
+    keyboardNavigation: true;
+    screenReaderCompatible: true;
+    contrastCompliant: true;
+    focusManagement: true;
+  };
+}
+#+END_SRC
+
+* Action Capture Specification
+
+** User Action Types
+
+The system MUST capture and analyze these action types:
+
+#+BEGIN_SRC typescript
+export enum ActionType {
+  CLICK = 'click',
+  INPUT = 'input',
+  SELECT = 'select',
+  SUBMIT = 'submit',
+  NAVIGATE = 'navigate',
+  SCROLL = 'scroll',
+  HOVER = 'hover',
+  KEYBOARD = 'keyboard',
+  DRAG_DROP = 'drag_drop',
+  CONTEXT_MENU = 'context_menu'
+}
+
+export interface UserAction {
+  id: string;
+  type: ActionType;
+  timestamp: Date;
+  element: ElementDescriptor;
+  data?: ActionData;
+  context: ActionContext;
+  metadata: ActionMetadata;
+}
+
+export interface ElementDescriptor {
+  // Multiple selector strategies for robustness
+  selectors: {
+    css: string;
+    xpath: string;
+    semantic: string;
+    dataTestId?: string;
+    ariaLabel?: string;
+  };
+  
+  // Element properties for cross-site matching
+  properties: {
+    tagName: string;
+    type?: string;
+    role?: string;
+    textContent?: string;
+    placeholder?: string;
+    value?: string;
+  };
+  
+  // Positional and contextual information
+  position: ElementPosition;
+  context: ElementContext;
+}
+#+END_SRC
+
+** Action Data Handling
+
+Different action types require different data capture strategies:
+
+#+BEGIN_SRC typescript
+export interface ActionDataHandlers {
+  [ActionType.CLICK]: {
+    captureMousePosition: boolean;
+    captureModifierKeys: boolean;
+    captureButtonType: boolean;
+  };
+  
+  [ActionType.INPUT]: {
+    captureValue: 'masked' | 'full' | 'pattern';
+    detectInputType: boolean;
+    captureValidation: boolean;
+  };
+  
+  [ActionType.SELECT]: {
+    captureSelectedValue: boolean;
+    captureSelectedText: boolean;
+    captureAvailableOptions: boolean;
+  };
+  
+  [ActionType.NAVIGATE]: {
+    captureUrl: boolean;
+    captureNavigationType: boolean;
+    captureReferrer: boolean;
+  };
+}
+#+END_SRC
+
+* Pattern Recognition Engine
+
+** Pattern Detection Algorithms
+
+The system MUST implement multiple pattern recognition strategies:
+
+#+BEGIN_SRC typescript
+export interface PatternRecognitionEngine {
+  // Sequential pattern detection
+  sequentialPatterns: {
+    minActions: 2;
+    maxActions: 50;
+    confidenceThreshold: 0.7;
+    algorithms: ['temporal', 'structural', 'semantic'];
+  };
+  
+  // Form workflow detection
+  formPatterns: {
+    detectFormBoundaries: boolean;
+    recognizeFieldTypes: boolean;
+    identifyValidationSteps: boolean;
+    captureSubmissionFlow: boolean;
+  };
+  
+  // Navigation pattern detection
+  navigationPatterns: {
+    detectPageTransitions: boolean;
+    recognizeSearchFlows: boolean;
+    identifyLoginSequences: boolean;
+    captureMultiStepProcesses: boolean;
+  };
+  
+  // Cross-site pattern matching
+  crossSiteMatching: {
+    semanticSimilarity: number; // 0.0 - 1.0
+    structuralSimilarity: number; // 0.0 - 1.0
+    functionalSimilarity: number; // 0.0 - 1.0
+    adaptationConfidence: number; // 0.0 - 1.0
+  };
+}
+#+END_SRC
+
+** Pattern Confidence Calculation
+
+Pattern confidence MUST be calculated using multiple factors:
+
+#+BEGIN_SRC typescript
+export class PatternConfidenceCalculator {
+  public calculateConfidence(pattern: CapturedPattern): PatternConfidence {
+    const factors = {
+      // Action sequence coherence (0.0 - 1.0)
+      sequenceCoherence: this.analyzeSequenceCoherence(pattern.actions),
+      
+      // Element relationship strength (0.0 - 1.0)
+      elementRelationships: this.analyzeElementRelationships(pattern.actions),
+      
+      // Semantic consistency (0.0 - 1.0)
+      semanticConsistency: this.analyzeSemanticConsistency(pattern.actions),
+      
+      // Temporal patterns (0.0 - 1.0)
+      temporalCoherence: this.analyzeTemporalPatterns(pattern.actions),
+      
+      // User intent clarity (0.0 - 1.0)
+      intentClarity: this.analyzeIntentClarity(pattern.actions)
+    };
+    
+    // Weighted confidence calculation
+    const weights = {
+      sequenceCoherence: 0.25,
+      elementRelationships: 0.20,
+      semanticConsistency: 0.25,
+      temporalCoherence: 0.15,
+      intentClarity: 0.15
+    };
+    
+    const overallConfidence = Object.entries(factors)
+      .reduce((sum, [key, value]) => sum + (value * weights[key]), 0);
+    
+    return new PatternConfidence(
+      overallConfidence,
+      factors,
+      this.generateConfidenceExplanation(factors)
+    );
+  }
+}
+#+END_SRC
+
+* Cross-Site Adaptation Specification
+
+** Semantic Element Matching
+
+The system MUST implement semantic element matching for cross-site pattern execution:
+
+#+BEGIN_SRC typescript
+export interface SemanticMatcher {
+  // Element similarity scoring
+  calculateElementSimilarity(
+    sourceElement: ElementDescriptor,
+    targetElement: ElementDescriptor
+  ): SimilarityScore;
+  
+  // Context-aware matching
+  findEquivalentElements(
+    sourceElement: ElementDescriptor,
+    targetDocument: Document,
+    context: MatchingContext
+  ): ElementMatch[];
+  
+  // Adaptive selector generation
+  generateAdaptiveSelector(
+    sourceElement: ElementDescriptor,
+    targetContext: SiteContext
+  ): AdaptiveSelector;
+}
+
+export interface SimilarityScore {
+  overall: number; // 0.0 - 1.0
+  breakdown: {
+    textSimilarity: number;
+    structuralSimilarity: number;
+    functionalSimilarity: number;
+    positionalSimilarity: number;
+    semanticSimilarity: number;
+  };
+  confidence: number;
+  explanation: string;
+}
+
+export interface ElementMatch {
+  element: ElementDescriptor;
+  score: SimilarityScore;
+  adaptationRequired: AdaptationRequirement[];
+  executionStrategy: ExecutionStrategy;
+}
+#+END_SRC
+
+** Pattern Adaptation Strategies
+
+Different patterns require different adaptation approaches:
+
+#+BEGIN_SRC typescript
+export interface PatternAdaptationStrategies {
+  // Login patterns
+  loginPatterns: {
+    usernameFieldDetection: SemanticFieldDetector;
+    passwordFieldDetection: SemanticFieldDetector;
+    submitButtonDetection: SemanticButtonDetector;
+    errorHandling: LoginErrorHandler;
+  };
+  
+  // Search patterns  
+  searchPatterns: {
+    searchFieldDetection: SemanticFieldDetector;
+    searchButtonDetection: SemanticButtonDetector;
+    resultsPageDetection: ResultsPageDetector;
+    paginationHandling: PaginationHandler;
+  };
+  
+  // Form filling patterns
+  formPatterns: {
+    fieldTypeDetection: FieldTypeDetector;
+    validationHandling: ValidationHandler;
+    progressIndicatorDetection: ProgressDetector;
+    multiStepHandling: MultiStepHandler;
+  };
+  
+  // E-commerce patterns
+  ecommercePatterns: {
+    productSelectionDetection: ProductDetector;
+    cartManagementDetection: CartDetector;
+    checkoutFlowDetection: CheckoutDetector;
+    paymentHandling: PaymentHandler;
+  };
+}
+#+END_SRC
+
+* Storage and Persistence Specification
+
+** Pattern Storage Requirements
+
+Learned patterns MUST be stored with complete metadata for future retrieval and execution:
+
+#+BEGIN_SRC typescript
+export interface PatternStorageSchema {
+  // Core pattern data
+  pattern: {
+    id: string;
+    name: string;
+    description?: string;
+    category: PatternCategory;
+    createdAt: Date;
+    updatedAt: Date;
+    version: string;
+  };
+  
+  // Execution data
+  execution: {
+    steps: AutomationStep[];
+    metadata: ExecutionMetadata;
+    dependencies: PatternDependency[];
+    alternatives: AlternativeStep[];
+  };
+  
+  // Adaptation data
+  adaptation: {
+    originalSite: SiteInfo;
+    testedSites: SiteCompatibility[];
+    adaptationRules: AdaptationRule[];
+    semanticSignature: SemanticSignature;
+  };
+  
+  // Usage analytics
+  analytics: {
+    executionCount: number;
+    successRate: number;
+    averageExecutionTime: number;
+    lastExecuted: Date;
+    failureReasons: FailureReason[];
+  };
+  
+  // Privacy and security
+  privacy: {
+    containsSensitiveData: boolean;
+    dataClassification: DataClassification;
+    sharingPermissions: SharingPermission[];
+    anonymizationLevel: AnonymizationLevel;
+  };
+}
+#+END_SRC
+
+** IndexedDB Storage Implementation
+
+The storage implementation MUST provide efficient pattern retrieval:
+
+#+BEGIN_SRC typescript
+export interface PatternStorageAdapter {
+  // Basic CRUD operations
+  savePattern(pattern: AutomationPattern): Promise<void>;
+  loadPattern(id: string): Promise<AutomationPattern | null>;
+  updatePattern(id: string, updates: PatternUpdates): Promise<void>;
+  deletePattern(id: string): Promise<void>;
+  
+  // Advanced querying
+  searchPatterns(query: PatternQuery): Promise<AutomationPattern[]>;
+  findSimilarPatterns(pattern: AutomationPattern): Promise<SimilarPattern[]>;
+  getPatternsByCategory(category: PatternCategory): Promise<AutomationPattern[]>;
+  getRecentPatterns(limit: number): Promise<AutomationPattern[]>;
+  
+  // Performance optimization
+  preloadFrequentPatterns(): Promise<void>;
+  optimizePatternIndex(): Promise<void>;
+  cachePatternMetadata(): Promise<void>;
+  
+  // Data management
+  exportPatterns(filter?: PatternFilter): Promise<ExportedPatterns>;
+  importPatterns(data: ExportedPatterns): Promise<ImportResult>;
+  validatePatternIntegrity(): Promise<ValidationResult>;
+}
+#+END_SRC
+
+* Error Handling and Recovery
+
+** Training Error Recovery
+
+The training system MUST handle errors gracefully:
+
+#+BEGIN_SRC typescript
+export interface TrainingErrorHandler {
+  // Action capture errors
+  handleActionCaptureFailure(
+    action: FailedAction,
+    context: TrainingContext
+  ): Promise<RecoveryAction>;
+  
+  // Pattern recognition errors
+  handlePatternRecognitionFailure(
+    actions: UserAction[],
+    error: RecognitionError
+  ): Promise<RecoveryStrategy>;
+  
+  // UI interaction errors
+  handleUIInteractionFailure(
+    interaction: UIInteraction,
+    error: InteractionError
+  ): Promise<UIRecoveryAction>;
+  
+  // Storage errors
+  handleStorageFailure(
+    operation: StorageOperation,
+    error: StorageError
+  ): Promise<StorageRecoveryAction>;
+}
+
+export interface RecoveryAction {
+  type: RecoveryType;
+  description: string;
+  automatic: boolean;
+  userAction?: UserActionRequired;
+  fallbackStrategy?: FallbackStrategy;
+}
+#+END_SRC
+
+** Pattern Execution Error Recovery
+
+Automation execution MUST include sophisticated error recovery:
+
+#+BEGIN_SRC typescript
+export interface ExecutionErrorRecovery {
+  // Element not found recovery
+  elementNotFound: {
+    strategies: [
+      'alternative_selectors',
+      'semantic_search',
+      'fuzzy_matching',
+      'user_assistance'
+    ];
+    timeouts: {
+      selectorRetry: 2000;
+      semanticSearch: 5000;
+      userResponse: 30000;
+    };
+  };
+  
+  // Timing error recovery
+  timingErrors: {
+    strategies: [
+      'exponential_backoff',
+      'dynamic_waiting',
+      'element_ready_detection',
+      'page_load_detection'
+    ];
+    maxRetries: 3;
+    backoffMultiplier: 1.5;
+  };
+  
+  // Content change recovery
+  contentChanges: {
+    strategies: [
+      'pattern_reanalysis',
+      'adaptive_selectors',
+      'fallback_patterns',
+      'user_intervention'
+    ];
+    changeDetectionThreshold: 0.3;
+    adaptationConfidenceThreshold: 0.7;
+  };
+}
+#+END_SRC
+
+* Performance Requirements
+
+** Training Performance Targets
+
+The training system MUST meet these performance requirements:
+
+#+BEGIN_SRC typescript
+export interface PerformanceRequirements {
+  // UI responsiveness
+  uiResponsiveness: {
+    overlayDisplayTime: 200; // milliseconds
+    actionCaptureLatency: 50; // milliseconds
+    feedbackUpdateTime: 100; // milliseconds
+    patternAnalysisTime: 500; // milliseconds
+  };
+  
+  // Pattern recognition performance
+  patternRecognition: {
+    maxAnalysisTime: 1000; // milliseconds per action
+    confidenceCalculationTime: 200; // milliseconds
+    crossSiteMatchingTime: 2000; // milliseconds
+    maxMemoryUsage: 50; // MB for pattern analysis
+  };
+  
+  // Storage performance
+  storage: {
+    patternSaveTime: 500; // milliseconds
+    patternLoadTime: 200; // milliseconds
+    searchQueryTime: 1000; // milliseconds
+    indexUpdateTime: 100; // milliseconds
+  };
+  
+  // Browser resource usage
+  resourceUsage: {
+    maxCPUUsage: 10; // percentage during training
+    maxMemoryUsage: 100; // MB total extension memory
+    maxNetworkUsage: 1; // MB per minute during training
+    batteryImpact: 'minimal'; // on mobile devices
+  };
+}
+#+END_SRC
+
+** Performance Monitoring
+
+The system MUST include performance monitoring:
+
+#+BEGIN_SRC typescript
+export interface PerformanceMonitor {
+  // Real-time metrics
+  collectMetrics(): PerformanceMetrics;
+  
+  // Performance alerts
+  monitorThresholds(thresholds: PerformanceThresholds): void;
+  
+  // Optimization recommendations
+  analyzePerformance(): OptimizationRecommendations;
+  
+  // Resource usage tracking
+  trackResourceUsage(): ResourceUsageReport;
+}
+
+export interface PerformanceMetrics {
+  trainingSessionMetrics: TrainingSessionMetrics;
+  patternRecognitionMetrics: PatternRecognitionMetrics;
+  executionPerformanceMetrics: ExecutionPerformanceMetrics;
+  storagePerformanceMetrics: StoragePerformanceMetrics;
+  browserResourceMetrics: BrowserResourceMetrics;
+}
+#+END_SRC
+
+* Security and Privacy Specifications
+
+** Data Protection Requirements
+
+The training system MUST implement comprehensive data protection:
+
+#+BEGIN_SRC typescript
+export interface DataProtectionRequirements {
+  // Data classification
+  dataClassification: {
+    publicData: DataHandlingRules;
+    personalData: DataHandlingRules;
+    sensitiveData: DataHandlingRules;
+    confidentialData: DataHandlingRules;
+  };
+  
+  // Anonymization requirements
+  anonymization: {
+    automaticAnonymization: boolean;
+    userControlledAnonymization: boolean;
+    anonymizationLevels: AnonymizationLevel[];
+    reversibilityOptions: ReversibilityOption[];
+  };
+  
+  // Data retention
+  dataRetention: {
+    trainingDataRetention: Duration;
+    patternDataRetention: Duration;
+    analyticsDataRetention: Duration;
+    automaticCleanup: boolean;
+  };
+  
+  // User consent
+  consent: {
+    explicitConsent: boolean;
+    granularConsent: boolean;
+    consentWithdrawal: boolean;
+    consentAuditing: boolean;
+  };
+}
+#+END_SRC
+
+** Security Requirements
+
+Security measures MUST be implemented at all levels:
+
+#+BEGIN_SRC typescript
+export interface SecurityRequirements {
+  // Content Security Policy
+  csp: {
+    strictCSP: boolean;
+    noinlineScripts: boolean;
+    noEval: boolean;
+    sandboxedIframes: boolean;
+  };
+  
+  // Input validation
+  inputValidation: {
+    validateUserInput: boolean;
+    sanitizePatternData: boolean;
+    validateSelectors: boolean;
+    preventInjection: boolean;
+  };
+  
+  // Communication security
+  communication: {
+    encryptedCommunication: boolean;
+    certificateValidation: boolean;
+    secureWebSockets: boolean;
+    messageAuthentication: boolean;
+  };
+  
+  // Extension permissions
+  permissions: {
+    minimumPermissions: boolean;
+    runtimePermissions: boolean;
+    permissionAuditing: boolean;
+    userPermissionControl: boolean;
+  };
+}
+#+END_SRC
+
+This comprehensive specification ensures that the Web-Buddy browser extension training system provides a secure, performant, and user-friendly experience for learning and executing web automation patterns.
