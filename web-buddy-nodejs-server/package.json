@@ -1,0 +1,83 @@
+{
+  "name": "@web-buddy/nodejs-server",
+  "version": "1.0.0",
+  "description": "Event-driven Node.js server framework for coordinating browser extension automation",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "ts-node src/index.ts",
+    "start": "node dist/index.js",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "lint": "eslint src/**/*.ts",
+    "lint:fix": "eslint src/**/*.ts --fix",
+    "docs": "typedoc src --out docs",
+    "clean": "rimraf dist"
+  },
+  "keywords": [
+    "automation",
+    "browser-extension",
+    "nodejs",
+    "coordination",
+    "event-driven",
+    "typescript-eda",
+    "websocket",
+    "api-gateway"
+  ],
+  "author": "Web-Buddy Team",
+  "license": "GPL-3.0",
+  "dependencies": {
+    "@typescript-eda/domain": "^1.0.0",
+    "@typescript-eda/infrastructure": "^1.0.0", 
+    "@typescript-eda/application": "^1.0.0",
+    "ws": "^8.14.2",
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "helmet": "^7.1.0",
+    "compression": "^1.7.4",
+    "reflect-metadata": "^0.1.13",
+    "uuid": "^9.0.1",
+    "joi": "^17.11.0",
+    "winston": "^3.11.0",
+    "redis": "^4.6.10",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.8.0",
+    "@types/ws": "^8.5.8",
+    "@types/express": "^4.17.19",
+    "@types/cors": "^2.8.15",
+    "@types/compression": "^1.7.4",
+    "@types/uuid": "^9.0.5",
+    "@types/jest": "^29.5.5",
+    "typescript": "^5.2.2",
+    "ts-node": "^10.9.1",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.1",
+    "eslint": "^8.51.0",
+    "@typescript-eslint/eslint-plugin": "^6.7.4",
+    "@typescript-eslint/parser": "^6.7.4",
+    "typedoc": "^0.25.2",
+    "rimraf": "^5.0.5",
+    "supertest": "^6.3.3",
+    "@types/supertest": "^2.0.14"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rydnr/web-buddy-nodejs-server.git"
+  },
+  "bugs": {
+    "url": "https://github.com/rydnr/web-buddy-nodejs-server/issues"
+  },
+  "homepage": "https://github.com/rydnr/web-buddy-nodejs-server#readme",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ]
+}
