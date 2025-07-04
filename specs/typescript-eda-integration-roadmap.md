@@ -726,6 +726,432 @@ const workflow = await client.executeFullChatGPTWorkflow(
 - **Production-Ready Examples**: Enterprise-grade workflows and error handling
 - **Self-Guided Learning**: Comprehensive tutorials with step-by-step guidance
 
+### Phase 17: Web Application Contract Protocol Research & Implementation (Weeks 25-30)
+
+#### 17.1 Revolutionary Paradigm Shift: From Selector-Based to Contract-Based Automation
+
+**Problem Statement**: Current web automation relies on fragile DOM selectors that break when websites change their UI structure. This creates maintenance overhead, unreliable E2E tests, and forces developers to reverse-engineer web application interfaces.
+
+**Vision**: Transform web automation from brittle selector-based approaches to robust, contract-driven systems where web applications declaratively announce their automation capabilities.
+
+#### 17.2 Web Application Contract Specification Research
+
+**Research Objectives**:
+- **Standard Protocol Definition**: Design a universal contract format for web applications to declare supported automation events
+- **Industry Analysis**: Research existing standards (OpenAPI, JSON Schema, Web Components, etc.) for inspiration
+- **Developer Experience**: Create intuitive contract authoring that doesn't burden web application developers
+- **Backward Compatibility**: Ensure gradual adoption path from selector-based to contract-based automation
+
+**Contract Specification Format**:
+```typescript
+interface WebApplicationContract {
+  applicationId: string;
+  version: string;
+  domain: string;
+  name: string;
+  description: string;
+  
+  // Declarative automation capabilities
+  supportedEvents: {
+    [eventType: string]: {
+      description: string;
+      parameters: JSONSchema;
+      response: JSONSchema;
+      examples: AutomationExample[];
+      stability: 'stable' | 'beta' | 'experimental';
+      deprecated?: boolean;
+    };
+  };
+  
+  // Direct JavaScript function calls for supported operations
+  automationMethods: {
+    [methodName: string]: {
+      function: string; // JavaScript function name available on window
+      parameters: JSONSchema;
+      returnType: JSONSchema;
+      examples: MethodExample[];
+    };
+  };
+  
+  // Metadata for plugin discovery
+  metadata: {
+    categories: string[];
+    tags: string[];
+    maintainer: string;
+    documentation: string;
+    repository?: string;
+  };
+}
+```
+
+#### 17.3 JavaScript Contract Declaration Library
+
+**Core Library Implementation**:
+```typescript
+// Web applications would include this lightweight library
+class WebBuddyContract {
+  private contract: WebApplicationContract;
+  
+  constructor(config: ContractConfig) {
+    this.contract = this.buildContract(config);
+  }
+  
+  // Declarative event registration
+  public declareEvent(eventType: string, spec: EventSpecification): void {
+    this.contract.supportedEvents[eventType] = spec;
+  }
+  
+  // Register callable methods for direct automation
+  public registerMethod(name: string, fn: Function, spec: MethodSpecification): void {
+    window[`webbuddy_${name}`] = fn;
+    this.contract.automationMethods[name] = spec;
+  }
+  
+  // Publish contract for discovery
+  public publish(): void {
+    window.__webBuddyContract = this.contract;
+    this.broadcastContractAvailability();
+  }
+}
+
+// Example usage in a web application
+const contract = new WebBuddyContract({
+  applicationId: 'chatgpt-web-interface',
+  domain: 'chat.openai.com',
+  name: 'ChatGPT Web Interface'
+});
+
+// Declare supported automation events
+contract.declareEvent('SUBMIT_PROMPT', {
+  description: 'Submit a prompt to ChatGPT',
+  parameters: {
+    type: 'object',
+    properties: {
+      prompt: { type: 'string' },
+      model: { type: 'string', enum: ['gpt-4', 'gpt-3.5-turbo'] }
+    },
+    required: ['prompt']
+  },
+  response: {
+    type: 'object',
+    properties: {
+      success: { type: 'boolean' },
+      messageId: { type: 'string' }
+    }
+  }
+});
+
+// Register direct automation methods
+contract.registerMethod('submitPrompt', (prompt: string, model?: string) => {
+  // Direct DOM manipulation or API calls
+  const textarea = document.querySelector('[data-testid="prompt-textarea"]');
+  if (textarea) {
+    textarea.value = prompt;
+    // Trigger submission...
+    return { success: true, messageId: generateId() };
+  }
+  return { success: false, error: 'Prompt textarea not found' };
+}, {
+  parameters: { /* schema */ },
+  returnType: { /* schema */ }
+});
+
+contract.publish();
+```
+
+#### 17.4 Contract Discovery and Plugin Architecture
+
+**Web-Buddy Browser Extension Enhancement**:
+```typescript
+// Enhanced background application with contract discovery
+@Enable(ContractDiscoveryAdapter)
+@Enable(PluginManagerAdapter) 
+@Enable(DomainPluginStoreAdapter)
+export class ContractAwareBackgroundApplication extends BackgroundApplication {
+  
+  @listen(TabNavigationEvent)
+  public async handleTabNavigation(event: TabNavigationEvent): Promise<void> {
+    // Discover contracts when navigating to new domains
+    const contract = await this.discoverWebApplicationContract(event.url);
+    if (contract) {
+      await this.loadDomainPlugin(contract.domain);
+    }
+  }
+  
+  @listen(ContractDiscoveredEvent)
+  public async handleContractDiscovered(event: ContractDiscoveredEvent): Promise<void> {
+    // Register contract capabilities with plugin system
+    await this.registerContractCapabilities(event.contract);
+    
+    // Suggest available plugins for this domain
+    const availablePlugins = await this.findPluginsForDomain(event.contract.domain);
+    if (availablePlugins.length > 0) {
+      await this.suggestPluginInstallation(availablePlugins);
+    }
+  }
+  
+  private async discoverWebApplicationContract(url: string): Promise<WebApplicationContract | null> {
+    // Inject contract discovery script into page
+    const contract = await this.executeInTab(`
+      if (window.__webBuddyContract) {
+        return window.__webBuddyContract;
+      }
+      return null;
+    `);
+    
+    return contract;
+  }
+}
+```
+
+**Plugin Architecture Transformation**:
+- **ChatGPT-Buddy as Plugin**: Refactor ChatGPT-buddy from standalone extension to Web-Buddy plugin
+- **Domain-Specific Plugins**: Each major website gets its own plugin (GitHub-buddy, Gmail-buddy, etc.)
+- **Plugin Store**: Centralized registry filtered by domain with automated discovery
+- **Hot Plugin Loading**: Dynamic plugin installation without browser restart
+
+#### 17.5 Contract-to-SDK Generator
+
+**Automated SDK Generation Pipeline**:
+```typescript
+// Generator creates type-safe clients from contracts
+class ContractSDKGenerator {
+  public generateTypeScriptSDK(contract: WebApplicationContract): string {
+    const events = this.generateEventClasses(contract.supportedEvents);
+    const methods = this.generateMethodWrappers(contract.automationMethods);
+    const client = this.generateClientClass(contract, events, methods);
+    
+    return `
+      ${events}
+      ${methods}
+      ${client}
+    `;
+  }
+  
+  public generatePythonSDK(contract: WebApplicationContract): string {
+    // Similar generation for Python
+  }
+  
+  private generateEventClasses(supportedEvents: any): string {
+    return Object.entries(supportedEvents).map(([eventType, spec]) => `
+      export class ${eventType}Event extends Event {
+        public readonly type = '${eventType}';
+        constructor(${this.generateParameters(spec.parameters)}) {
+          super();
+          // Assign parameters...
+        }
+      }
+    `).join('\n');
+  }
+}
+
+// Generated SDK example for ChatGPT contract
+export class ChatGPTWebClient extends WebBuddyClient {
+  public async submitPrompt(prompt: string, model?: string): Promise<SubmitPromptResponse> {
+    if (this.hasDirectMethod('submitPrompt')) {
+      // Use direct method call for better performance
+      return await this.callDirectMethod('submitPrompt', { prompt, model });
+    } else {
+      // Fallback to event-based automation
+      return await this.sendEvent(new SubmitPromptEvent(prompt, model));
+    }
+  }
+  
+  public async getConversationHistory(): Promise<ConversationMessage[]> {
+    return await this.callDirectMethod('getConversationHistory');
+  }
+}
+```
+
+#### 17.6 Plugin Store and Ecosystem
+
+**Domain-Based Plugin Discovery**:
+```typescript
+interface PluginStoreEntry {
+  pluginId: string;
+  name: string;
+  description: string;
+  supportedDomains: string[];
+  contractCompatibility: string[]; // Contract version ranges
+  version: string;
+  author: string;
+  downloads: number;
+  rating: number;
+  
+  // Plugin metadata
+  installation: {
+    bundle: string; // JavaScript bundle URL
+    permissions: string[];
+    dependencies: string[];
+  };
+  
+  // Quality indicators
+  verification: {
+    verified: boolean;
+    contractCompliance: number; // 0-1 score
+    testCoverage: number;
+    communityTesting: boolean;
+  };
+}
+
+class DomainPluginStore {
+  public async findPluginsForDomain(domain: string): Promise<PluginStoreEntry[]> {
+    const plugins = await this.queryStore({
+      supportedDomains: { contains: domain },
+      verified: true
+    });
+    
+    return plugins.sort((a, b) => {
+      // Rank by relevance, verification, rating
+      return (b.rating * b.verification.contractCompliance) - 
+             (a.rating * a.verification.contractCompliance);
+    });
+  }
+  
+  public async installPlugin(pluginId: string): Promise<void> {
+    const plugin = await this.downloadPlugin(pluginId);
+    await this.validatePlugin(plugin);
+    await this.loadPlugin(plugin);
+  }
+}
+```
+
+#### 17.7 Fragility Reduction Research & Validation
+
+**Research Methodology**:
+1. **Controlled Comparison Study**: 
+   - Implement same automation scenarios using both approaches
+   - Measure failure rates when websites change their UI
+   - Track maintenance overhead over 6-month period
+
+2. **Real-World Website Integration**:
+   - Partner with major web applications (ChatGPT, GitHub, Gmail)
+   - Implement contract-based automation
+   - Compare reliability with existing selector-based automation
+
+3. **E2E Test Stability Analysis**:
+   - Convert existing E2E test suites to contract-based approach
+   - Measure test flakiness reduction
+   - Document maintenance time savings
+
+**Expected Benefits Validation**:
+```typescript
+// Research metrics to track
+interface FragilityReductionMetrics {
+  // Reliability metrics
+  automationSuccessRate: {
+    selectorBased: number;
+    contractBased: number;
+    improvementPercentage: number;
+  };
+  
+  // Maintenance overhead
+  maintenanceHours: {
+    selectorBased: number; // Hours spent fixing broken selectors
+    contractBased: number; // Hours spent on contract updates
+    timeSavings: number;
+  };
+  
+  // Development velocity
+  timeToImplement: {
+    newWebsiteAutomation: {
+      selectorBased: number; // Hours to reverse-engineer and implement
+      contractBased: number; // Hours with available contract
+    };
+    e2eTestCreation: {
+      selectorBased: number;
+      contractBased: number;
+    };
+  };
+  
+  // Quality metrics
+  testStability: {
+    flakyTestPercentage: {
+      selectorBased: number;
+      contractBased: number;
+    };
+    falsePositiveRate: {
+      selectorBased: number;
+      contractBased: number;
+    };
+  };
+}
+```
+
+#### 17.8 Reference Implementation and Adoption Strategy
+
+**Proof of Concept Applications**:
+1. **ChatGPT Interface Contract**: Complete contract implementation for chat.openai.com
+2. **GitHub Automation Contract**: Repository management, issue tracking, PR workflows
+3. **Gmail Contract**: Email composition, search, organization
+4. **Google Docs Contract**: Document editing, sharing, commenting
+
+**Adoption Strategy**:
+1. **Developer Advocacy**: Conference talks, blog posts, community education
+2. **Framework Integration**: Partnerships with testing frameworks (Playwright, Cypress)
+3. **Tool Integration**: IDE plugins, CLI tools, CI/CD integrations
+4. **Standard Proposal**: Work toward web standard through W3C or similar bodies
+
+#### 17.9 Economic Model and Sustainability
+
+**Business Model Innovation**:
+- **Plugin Marketplace**: Revenue sharing with plugin developers
+- **Enterprise Contracts**: Paid support for custom contract implementations
+- **SaaS Platform**: Hosted plugin store and contract registry
+- **Consulting Services**: Help enterprises migrate from selector-based to contract-based automation
+
+**Cost Reduction Benefits**:
+- **Reduced QA Costs**: Fewer broken E2E tests mean less QA maintenance
+- **Faster Development**: Generated SDKs eliminate manual API discovery
+- **Lower Support Burden**: Reliable automation reduces support tickets
+- **Improved CI/CD**: Stable tests mean faster, more confident deployments
+
+#### 17.10 Technical Implementation Phases
+
+**Phase 17A: Research & Specification (Weeks 25-26)**
+- Complete industry analysis and standards research
+- Design contract specification format
+- Create reference implementation for ChatGPT interface
+- Validate approach with simple proof-of-concept
+
+**Phase 17B: Core Infrastructure (Weeks 27-28)**
+- Implement JavaScript contract declaration library
+- Build contract discovery system in Web-Buddy
+- Create plugin architecture and loading system
+- Develop basic SDK generator for TypeScript
+
+**Phase 17C: Plugin Store & Ecosystem (Weeks 29-30)**
+- Build domain-based plugin store
+- Implement plugin verification and quality metrics
+- Create plugin development toolkit
+- Refactor ChatGPT-buddy as reference plugin
+
+**Phase 17D: Validation & Documentation (Week 31)**
+- Complete fragility reduction research study
+- Document all APIs and development patterns
+- Create comprehensive migration guides
+- Prepare for community beta testing
+
+### Phase 17 Revolutionary Impact
+
+**Technical Revolution**:
+- **End of Selector Fragility**: Eliminate the primary cause of E2E test failures
+- **Self-Documenting Automation**: Contracts serve as living API documentation
+- **Type-Safe Web Automation**: Generated SDKs provide compile-time guarantees
+- **Universal Plugin Architecture**: Any website can be automated through plugins
+
+**Business Impact**:
+- **Democratized Automation**: Non-technical users can build reliable automation
+- **Reduced Development Costs**: Generated SDKs eliminate manual integration work
+- **Improved Software Quality**: Stable E2E tests enable confident deployments
+- **New Revenue Streams**: Plugin marketplace creates sustainable ecosystem
+
+**Developer Experience Revolution**:
+- **Zero Reverse Engineering**: Contracts eliminate need to inspect DOM structures
+- **Instant SDK Generation**: From contract to working client in seconds
+- **Plugin Development**: Clear patterns for extending automation to any website
+- **Community Ecosystem**: Shared automation knowledge and implementations
+
 ## Conclusion
 
 This roadmap transforms chatgpt-buddy into a modern, event-driven system that exemplifies best practices in software architecture while revolutionizing user experience through interactive training capabilities and world-class developer documentation. The migration results in a more maintainable, testable, and extensible codebase that serves as a reference implementation for:
@@ -734,6 +1160,8 @@ This roadmap transforms chatgpt-buddy into a modern, event-driven system that ex
 - **User-Friendly Automation Design**: Interactive training that democratizes web automation  
 - **Developer Experience Excellence**: Documentation that enables 5-minute onboarding to production deployment
 - **Extensible Architecture Patterns**: Clear templates for building automation for any website
+- **Contract-Driven Automation**: Revolutionary approach eliminating fragile selector-based automation
+- **Plugin Ecosystem Innovation**: Sustainable marketplace for domain-specific automation capabilities
 
 ### Key Innovations
 
@@ -745,13 +1173,28 @@ This roadmap transforms chatgpt-buddy into a modern, event-driven system that ex
 
 4. **Zero-Code Automation**: Non-technical users can create complex automation workflows simply by demonstrating the desired actions in their browser.
 
+5. **Contract-Based Web Integration**: Revolutionary paradigm shift from fragile DOM selectors to robust, declarative contracts that web applications can implement to announce their automation capabilities.
+
+6. **Plugin Ecosystem Architecture**: Transform from monolithic extensions to modular plugin systems where domain-specific automation (ChatGPT-buddy, GitHub-buddy, etc.) becomes lightweight plugins.
+
+7. **Automated SDK Generation**: Generate type-safe client SDKs directly from web application contracts, eliminating manual integration work and ensuring API consistency.
+
 ### Transformative Impact
 
-The phased approach ensures minimal disruption to existing users while delivering incremental value throughout the transformation process. The final system will be more robust, performant, and developer-friendly, positioning chatgpt-buddy as a flagship example of both:
+The phased approach ensures minimal disruption to existing users while delivering incremental value throughout the transformation process. The final system will be more robust, performant, and developer-friendly, positioning chatgpt-buddy as a flagship example of:
 
 - **Event-driven architecture** in browser automation tools
 - **Interactive machine learning** for web automation
 - **User-centered design** in developer tools
 - **Progressive enhancement** of existing systems
+- **Contract-driven integration** eliminating brittle automation
+- **Plugin marketplace ecosystems** for sustainable community development
+- **Automated toolchain generation** from declarative specifications
 
-This integration of TypeScript-EDA with interactive training represents a paradigm shift from configuration-heavy automation tools to intuitive, self-teaching systems that democratize web automation for users of all technical backgrounds.
+This integration of TypeScript-EDA with interactive training and contract-based automation represents a paradigm shift from:
+- **Configuration-heavy automation tools** → **Intuitive, self-teaching systems**
+- **Fragile selector-based automation** → **Robust, contract-driven integration** 
+- **Monolithic browser extensions** → **Modular plugin ecosystems**
+- **Manual SDK development** → **Automated toolchain generation**
+
+The result democratizes web automation for users of all technical backgrounds while creating sustainable economic models for community-driven development.

@@ -1,10 +1,10 @@
 {
   "manifest_version": 3,
-  "name": "ChatGPT Buddy",
-  "version": "1.0",
-  "description": "A browser extension to programmatically interact with ChatGPT tabs.",
+  "name": "ChatGPT-Buddy",
+  "version": "2.0.0",
+  "description": "AI-powered web automation extension built on Web-Buddy framework for ChatGPT and language model integration",
   "background": {
-    "service_worker": "build/background.js"
+    "service_worker": "build/chatgpt-background.js"
   },
   "content_scripts": [
     {
@@ -14,7 +14,7 @@
   ],
   "action": {
     "default_popup": "src/popup.html",
-    "default_title": "Web-Buddy Extension"
+    "default_title": "ChatGPT-Buddy: AI Automation"
   },
   "permissions": [
     "activeTab",

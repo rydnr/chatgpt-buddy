@@ -1,0 +1,538 @@
+#+TITLE: Migration Guides: From Monorepo to Multi-Repository Architecture
+#+AUTHOR: Development Team  
+#+DATE: 2025-01-04
+#+STARTUP: showall
+
+* Overview
+
+This document provides comprehensive migration guides for users, developers, and organizations transitioning from the monorepo ChatGPT-buddy architecture to the new multi-repository TypeScript-EDA ecosystem.
+
+* Migration Timeline
+
+** Current State (v1.x - Monorepo)
+- Single repository with all components
+- Direct imports between modules
+- Shared build and test configuration
+- Manual dependency management
+
+** Target State (v2.x - Multi-Repo)
+- Separate repositories for each major component
+- NPM package dependencies
+- Independent versioning and releases
+- Automated cross-package testing
+
+** Transition Period (3-6 months)
+- Both architectures supported
+- Migration tools and guides available
+- Backward compatibility maintained
+- Community support for migration
+
+* User Migration Guide
+
+** For End Users (Browser Extension Users)
+
+*** Current Usage
+Users currently install ChatGPT-buddy as a single browser extension.
+
+*** Migration Steps
+1. **No Action Required**: Existing installations continue working
+2. **Optional Upgrade**: Install v2.0 for enhanced features
+3. **Gradual Migration**: New features only available in v2.0+
+
+*** What Changes
+- **Extension Capabilities**: Enhanced AI automation features
+- **Configuration**: New configuration options for multi-model support
+- **Performance**: Improved performance with modular architecture
+
+*** What Stays The Same
+- **UI/UX**: Familiar interface and interaction patterns
+- **Existing Patterns**: All learned automation patterns preserved
+- **Browser Support**: Same browser compatibility
+
+** For API Users (Client SDK Users)
+
+*** Current Usage
+#+BEGIN_SRC typescript
+// v1.x monorepo imports
+import { ChatGPTBuddyClient } from 'chatgpt-buddy/client';
+
+const client = new ChatGPTBuddyClient({
+  serverUrl: 'http://localhost:3000'
+});
+#+END_SRC
+
+*** Migration Steps
+1. **Update Package Dependencies**:
+   #+BEGIN_SRC bash
+   # Remove old package
+   npm uninstall chatgpt-buddy
+   
+   # Install new packages  
+   npm install @chatgpt-buddy/client
+   #+END_SRC
+
+2. **Update Import Statements**:
+   #+BEGIN_SRC typescript
+   // v2.x multi-repo imports
+   import { createChatGPTBuddyClient } from '@chatgpt-buddy/client';
+   
+   const client = await createChatGPTBuddyClient({
+     serverUrl: 'http://localhost:3003',
+     defaultModel: 'gpt-4'
+   });
+   #+END_SRC
+
+3. **Update Configuration**:
+   #+BEGIN_SRC typescript
+   // v2.x enhanced configuration
+   const config = {
+     serverUrl: 'http://localhost:3003',
+     defaultModel: 'gpt-4',
+     enableWebSocket: true,
+     timeout: 30000,
+     apiKey: process.env.CHATGPT_BUDDY_API_KEY
+   };
+   #+END_SRC
+
+*** Migration Automation
+#+BEGIN_SRC bash
+# Automated migration script
+npx @chatgpt-buddy/migrate-v1-to-v2 ./src
+#+END_SRC
+
+* Developer Migration Guide
+
+** For Extension Developers
+
+*** Current Development Setup
+#+BEGIN_SRC bash
+git clone https://github.com/rydnr/chatgpt-buddy
+cd chatgpt-buddy
+npm install
+npm run build:extension
+#+END_SRC
+
+*** New Development Setup
+#+BEGIN_SRC bash
+# Option 1: Use existing monorepo during transition
+git clone https://github.com/rydnr/chatgpt-buddy
+cd chatgpt-buddy
+npm run install:all
+
+# Option 2: Use individual repositories (future)
+git clone https://github.com/rydnr/web-buddy-browser-extension
+cd web-buddy-browser-extension
+npm install
+#+END_SRC
+
+*** Architecture Changes
+
+**** Before: Direct Module Imports
+#+BEGIN_SRC typescript
+// v1.x: Direct imports within monorepo
+import { TrainingSession } from '../training/domain/entities/training-session';
+import { BackgroundScript } from '../background/background-script';
+#+END_SRC
+
+**** After: Package-Based Imports
+#+BEGIN_SRC typescript
+// v2.x: Import from published packages
+import { TrainingSession } from '@web-buddy/browser-extension';
+import { BackgroundApplication } from '@web-buddy/browser-extension';
+import { ChatGPTBackgroundApplication } from '@chatgpt-buddy/extension';
+#+END_SRC
+
+*** Custom Extension Development
+
+**** Creating New Domain-Specific Extensions
+#+BEGIN_SRC typescript
+// Example: GitHub-buddy extension
+import { BackgroundApplication } from '@web-buddy/browser-extension';
+import { Enable } from '@typescript-eda/application';
+import { GitHubIntegrationAdapter } from './adapters/github-integration';
+
+@Enable(GitHubIntegrationAdapter)
+export class GitHubBuddyApplication extends BackgroundApplication {
+  public readonly metadata = new Map([
+    ['name', 'GitHub-Buddy Background Application'],
+    ['capabilities', ['github-automation', 'pr-workflows', 'issue-tracking']]
+  ]);
+
+  // GitHub-specific automation logic
+}
+#+END_SRC
+
+** For Server Developers
+
+*** Dependency Management Changes
+
+**** Before: Internal Modules
+#+BEGIN_SRC json
+{
+  "dependencies": {
+    "@typescript-eda/domain": "file:../typescript-eda",
+    "@typescript-eda/infrastructure": "file:../typescript-eda",
+    "@typescript-eda/application": "file:../typescript-eda"
+  }
+}
+#+END_SRC
+
+**** After: Published Packages
+#+BEGIN_SRC json
+{
+  "dependencies": {
+    "@typescript-eda/domain": "^1.0.0",
+    "@typescript-eda/infrastructure": "^1.0.0", 
+    "@typescript-eda/application": "^1.0.0",
+    "@web-buddy/nodejs-server": "^1.0.0"
+  }
+}
+#+END_SRC
+
+*** Application Architecture
+
+**** Enhanced Server Applications
+#+BEGIN_SRC typescript
+// v2.x: Extended server with Web-Buddy foundation
+import { ServerApplication, ServerStartRequestedEvent } from '@web-buddy/nodejs-server';
+import { ChatGPTAutomationApplication } from '@chatgpt-buddy/server';
+
+async function startServer() {
+  const serverApp = new ServerApplication();
+  const chatGPTApp = new ChatGPTAutomationApplication();
+  
+  const startEvent = new ServerStartRequestedEvent(3003, config);
+  await serverApp.accept(startEvent);
+  await chatGPTApp.start();
+}
+#+END_SRC
+
+* Testing Migration
+
+** Test Structure Changes
+
+*** Before: Monorepo Testing
+#+BEGIN_SRC bash
+# v1.x: Single test command for everything
+npm test
+#+END_SRC
+
+*** After: Package-Specific Testing
+#+BEGIN_SRC bash
+# v2.x: Test individual packages
+npm run test:unit          # Unit tests within packages
+npm run test:integration   # Cross-package integration tests
+npm run test:contract     # API contract validation
+npm run test:e2e          # End-to-end ecosystem tests
+#+END_SRC
+
+** Contract Testing
+
+New contract testing ensures compatibility between packages:
+
+#+BEGIN_SRC typescript
+// Example: Contract test for Web-Buddy → ChatGPT-buddy
+describe('ChatGPT-buddy ↔ Web-Buddy Contract', () => {
+  it('should handle Web-Buddy events correctly', async () => {
+    const webBuddyEvent = new AutomationRequestedEvent({
+      type: 'chatgpt_interaction',
+      payload: { prompt: 'test' }
+    });
+    
+    const chatGPTApp = new ChatGPTBackgroundApplication();
+    const result = await chatGPTApp.accept(webBuddyEvent);
+    
+    expect(result).toMatchContract(ChatGPTResponseSchema);
+  });
+});
+#+END_SRC
+
+* Configuration Migration
+
+** Environment Variables
+
+*** Updated Environment Configuration
+#+BEGIN_SRC bash
+# v2.x environment variables
+CHATGPT_BUDDY_VERSION=2.0.0
+WEB_BUDDY_SERVER_URL=http://localhost:3003
+TYPESCRIPT_EDA_LOG_LEVEL=info
+
+# AI Configuration
+OPENAI_API_KEY=your_openai_key
+ANTHROPIC_API_KEY=your_anthropic_key
+DEFAULT_AI_MODEL=gpt-4
+
+# Feature Flags
+ENABLE_PATTERN_RECOGNITION=true
+ENABLE_TRAINING_MODE=true
+ENABLE_CONTRACT_DISCOVERY=false  # Phase 17 feature
+#+END_SRC
+
+** Configuration File Migration
+
+*** Before: Single Configuration
+#+BEGIN_SRC json
+{
+  "chatgptBuddy": {
+    "serverPort": 3000,
+    "enableTraining": true,
+    "aiProvider": "openai"
+  }
+}
+#+END_SRC
+
+*** After: Layered Configuration
+#+BEGIN_SRC json
+{
+  "typescript-eda": {
+    "logLevel": "info",
+    "eventBusConfig": { "maxRetries": 3 }
+  },
+  "web-buddy": {
+    "server": { "port": 3003, "enableWebSocket": true },
+    "extension": { "enableTraining": true, "patternStorage": "indexeddb" }
+  },
+  "chatgpt-buddy": {
+    "aiProviders": {
+      "openai": { "defaultModel": "gpt-4", "apiKey": "env:OPENAI_API_KEY" },
+      "anthropic": { "defaultModel": "claude-3-sonnet", "apiKey": "env:ANTHROPIC_API_KEY" }
+    },
+    "features": {
+      "patternRecognition": true,
+      "multiModelSupport": true,
+      "intelligentRouting": true
+    }
+  }
+}
+#+END_SRC
+
+* CI/CD Migration
+
+** Build Pipeline Changes
+
+*** Before: Single Pipeline
+#+BEGIN_SRC yaml
+# v1.x: Monorepo CI/CD
+name: ChatGPT-Buddy CI
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install dependencies
+        run: npm install
+      - name: Run tests
+        run: npm test
+      - name: Build
+        run: npm run build
+#+END_SRC
+
+*** After: Multi-Package Pipeline
+#+BEGIN_SRC yaml
+# v2.x: Multi-package CI/CD with dependency awareness
+name: Ecosystem CI
+on: [push, pull_request]
+jobs:
+  test-foundation:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Test TypeScript-EDA packages
+        run: |
+          npm run test:typescript-eda-domain
+          npm run test:typescript-eda-infrastructure  
+          npm run test:typescript-eda-application
+          
+  test-framework:
+    needs: test-foundation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Test Web-Buddy packages
+        run: |
+          npm run test:web-buddy-server
+          npm run test:web-buddy-extension
+          
+  test-implementation:
+    needs: test-framework
+    runs-on: ubuntu-latest
+    steps:
+      - name: Test ChatGPT-buddy packages
+        run: |
+          npm run test:chatgpt-buddy-server
+          npm run test:chatgpt-buddy-extension
+          npm run test:chatgpt-buddy-client
+          
+  integration-tests:
+    needs: [test-foundation, test-framework, test-implementation]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run cross-package integration tests
+        run: npm run test:integration:all
+#+END_SRC
+
+* Performance Migration
+
+** Bundle Size Optimization
+
+*** Before: Monolithic Bundle
+- Single large bundle (~2MB)
+- All features loaded regardless of usage
+- Limited tree shaking
+
+*** After: Modular Packages
+- Individual packages (~15KB - 200KB each)
+- Load only needed functionality
+- Optimal tree shaking and dead code elimination
+
+** Runtime Performance
+
+*** Memory Usage Optimization
+#+BEGIN_SRC typescript
+// v2.x: Lazy loading of packages
+const client = await import('@chatgpt-buddy/client');
+const webBuddy = await import('@web-buddy/browser-extension');
+
+// Only load AI features when needed
+if (needsAIFeatures) {
+  const aiModule = await import('@chatgpt-buddy/ai-integration');
+}
+#+END_SRC
+
+* Troubleshooting Common Migration Issues
+
+** Package Resolution Problems
+
+*** Issue: Module Not Found
+#+BEGIN_SRC
+Error: Cannot resolve module '@chatgpt-buddy/client'
+#+END_SRC
+
+*** Solution:
+#+BEGIN_SRC bash
+# Ensure packages are installed
+npm install @chatgpt-buddy/client
+
+# Clear node_modules and reinstall
+rm -rf node_modules package-lock.json
+npm install
+
+# Check package registry
+npm config get registry
+#+END_SRC
+
+** Version Compatibility Issues
+
+*** Issue: Package Version Conflicts
+#+BEGIN_SRC
+Error: Peer dependency @typescript-eda/domain@^1.0.0 not satisfied
+#+END_SRC
+
+*** Solution:
+#+BEGIN_SRC bash
+# Check version matrix
+npm ls @typescript-eda/domain
+
+# Update to compatible versions
+npm update @typescript-eda/domain @typescript-eda/infrastructure @typescript-eda/application
+
+# Use exact versions if needed
+npm install @typescript-eda/domain@1.0.0 --save-exact
+#+END_SRC
+
+** Configuration Migration Issues
+
+*** Issue: Missing Configuration Properties
+#+BEGIN_SRC
+Error: Property 'serverUrl' is required but missing
+#+END_SRC
+
+*** Solution:
+#+BEGIN_SRC typescript
+// Use migration helper
+import { migrateV1Config } from '@chatgpt-buddy/migrate';
+
+const v1Config = { /* old config */ };
+const v2Config = migrateV1Config(v1Config);
+#+END_SRC
+
+* Rollback Strategy
+
+** Emergency Rollback to v1.x
+
+If critical issues arise during migration:
+
+#+BEGIN_SRC bash
+# 1. Rollback packages
+npm uninstall @chatgpt-buddy/client @chatgpt-buddy/server @chatgpt-buddy/extension
+npm install chatgpt-buddy@1.x
+
+# 2. Restore configuration
+cp config.v1.json config.json
+
+# 3. Rollback code changes
+git checkout v1-backup-branch
+
+# 4. Test functionality
+npm test
+#+END_SRC
+
+** Gradual Migration Strategy
+
+For organizations requiring zero-downtime migration:
+
+1. **Parallel Deployment**: Run both versions simultaneously
+2. **Feature Flags**: Gradually enable v2.x features
+3. **A/B Testing**: Split traffic between versions
+4. **Data Migration**: Sync data between versions
+5. **Complete Cutover**: Switch to v2.x when confident
+
+* Support During Migration
+
+** Migration Support Channels
+
+- **GitHub Discussions**: =chatgpt-buddy/discussions/migration=
+- **Discord Server**: =#migration-support= channel
+- **Email Support**: =migration@chatgpt-buddy.org=
+- **Community Wiki**: =wiki.chatgpt-buddy.org/migration=
+
+** Professional Services
+
+- **Migration Consulting**: Expert guidance for complex migrations
+- **Custom Tooling**: Bespoke migration tools for large organizations
+- **Training Services**: Team training on new architecture
+- **Priority Support**: SLA-backed support during migration period
+
+* Migration Timeline and Milestones
+
+** Phase 1: Preparation (Month 1)
+- [ ] Audit current usage and dependencies
+- [ ] Set up development environment for v2.x
+- [ ] Create migration plan and timeline
+- [ ] Backup current configuration and data
+
+** Phase 2: Development Migration (Month 2)
+- [ ] Update development dependencies
+- [ ] Migrate custom code to new APIs
+- [ ] Update build and test pipelines
+- [ ] Validate functionality in development
+
+** Phase 3: Testing and Validation (Month 3)
+- [ ] Run comprehensive test suite
+- [ ] Perform integration testing
+- [ ] Conduct user acceptance testing
+- [ ] Performance benchmarking
+
+** Phase 4: Production Migration (Month 4)
+- [ ] Deploy to staging environment
+- [ ] Gradual production rollout
+- [ ] Monitor performance and errors
+- [ ] Complete cutover to v2.x
+
+** Phase 5: Optimization (Month 5-6)
+- [ ] Optimize configuration for new architecture
+- [ ] Adopt new features and capabilities
+- [ ] Train team on advanced patterns
+- [ ] Contribute back to ecosystem
+
+This migration guide ensures a smooth transition from the monorepo architecture to the new multi-repository ecosystem, maximizing benefits while minimizing disruption to existing users and workflows.

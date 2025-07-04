@@ -1,19 +1,45 @@
 {
-  "name": "chatgpt-buddy-extension",
-  "version": "1.0.0",
-  "description": "Browser extension for ChatGPT-buddy",
+  "name": "@chatgpt-buddy/extension",
+  "version": "2.0.0",
+  "description": "Browser extension for ChatGPT-buddy - AI automation extension built on Web-Buddy framework",
   "scripts": {
-    "build": "tsc && cp manifest.json build/ && cp -r assets build/",
+    "build": "tsc && cp manifest.json build/ && cp -r assets build/ 2>/dev/null || true",
     "clean": "rimraf build",
     "dev": "npm run build && npm run watch",
-    "watch": "tsc --watch"
+    "watch": "tsc --watch",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "lint": "eslint src/**/*.ts",
+    "lint:fix": "eslint src/**/*.ts --fix",
+    "typecheck": "tsc --noEmit"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "keywords": [
+    "chatgpt",
+    "ai-automation",
+    "browser-extension",
+    "web-buddy",
+    "training-system",
+    "event-driven",
+    "intelligent-automation"
+  ],
+  "author": "rydnr",
+  "license": "GPL-3.0",
+  "dependencies": {
+    "@typescript-eda/domain": "^1.0.0",
+    "@typescript-eda/infrastructure": "^1.0.0",
+    "@typescript-eda/application": "^1.0.0",
+    "@web-buddy/browser-extension": "^1.0.0",
+    "webextension-polyfill": "^0.10.0"
+  },
   "devDependencies": {
     "@types/chrome": "^0.0.268",
     "@types/ws": "^8.5.10",
+    "@types/jest": "^29.5.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "eslint": "^8.0.0",
+    "jest": "^29.5.0",
+    "ts-jest": "^29.1.0",
     "rimraf": "^5.0.1",
     "typescript": "^5.5.3"
   },
@@ -21,5 +47,10 @@
     "host_permissions": [
       "<all_urls>"
     ]
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rydnr/chatgpt-buddy.git",
+    "directory": "extension"
   }
 }

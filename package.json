@@ -1,19 +1,33 @@
 {
   "name": "chatgpt-buddy",
   "version": "2.0.0",
-  "description": "Event-driven ChatGPT automation tool with browser extension and client SDKs",
+  "description": "AI-powered web automation tool built on Web-Buddy framework for ChatGPT and language model integration",
   "scripts": {
-    "build": "pnpm --filter='./packages/*' build",
+    "build": "npm run build:server && npm run build:extension && npm run build:client",
+    "build:server": "cd server && npm run build",
+    "build:extension": "cd extension && npm run build",
+    "build:client": "cd client && npm run build",
     "test": "jest",
-    "test:unit": "pnpm --filter='./packages/*' test",
+    "test:unit": "jest tests/unit",
     "test:integration": "jest tests/integration",
     "test:e2e": "npx playwright test",
     "test:e2e:server": "node scripts/start-e2e-server.js",
-    "dev:server": "pnpm --filter='@chatgpt-buddy/server' dev",
-    "lint": "pnpm --filter='./packages/*' lint",
-    "typecheck": "pnpm --filter='./packages/*' typecheck",
-    "extension:build": "cd extension && npm run build",
-    "extension:install": "cd extension && npm install"
+    "dev": "npm run dev:server",
+    "dev:server": "cd server && npm run dev",
+    "start": "npm run start:server",
+    "start:server": "cd server && npm start",
+    "lint": "npm run lint:server && npm run lint:extension && npm run lint:client",
+    "lint:server": "cd server && npm run lint",
+    "lint:extension": "cd extension && npm run lint",
+    "lint:client": "cd client && npm run lint",
+    "typecheck": "npm run typecheck:server && npm run typecheck:extension && npm run typecheck:client",
+    "typecheck:server": "cd server && npm run typecheck",
+    "typecheck:extension": "cd extension && npm run typecheck",
+    "typecheck:client": "cd client && npm run typecheck",
+    "install:all": "npm install && npm run install:server && npm run install:extension && npm run install:client",
+    "install:server": "cd server && npm install",
+    "install:extension": "cd extension && npm install",
+    "install:client": "cd client && npm install"
   },
   "repository": {
     "type": "git",
@@ -21,10 +35,13 @@
   },
   "keywords": [
     "chatgpt",
-    "automation",
+    "ai-automation",
     "browser-extension",
     "typescript",
-    "event-driven"
+    "event-driven",
+    "web-buddy",
+    "language-models",
+    "intelligent-automation"
   ],
   "author": "rydnr",
   "license": "GPL-3.0",
@@ -32,6 +49,13 @@
     "url": "https://github.com/rydnr/chatgpt-buddy/issues"
   },
   "homepage": "https://github.com/rydnr/chatgpt-buddy#readme",
+  "dependencies": {
+    "@typescript-eda/domain": "^1.0.0",
+    "@typescript-eda/infrastructure": "^1.0.0",
+    "@typescript-eda/application": "^1.0.0",
+    "@web-buddy/nodejs-server": "^1.0.0",
+    "@web-buddy/browser-extension": "^1.0.0"
+  },
   "devDependencies": {
     "@jest/globals": "^30.0.3",
     "@playwright/test": "^1.53.1",
@@ -47,9 +71,8 @@
     "typescript": "^5.0.0",
     "ws": "^8.18.3"
   },
-  "workspaces": [
-    "packages/*",
-    "typescript-eda",
-    "web-buddy"
-  ]
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  }
 }

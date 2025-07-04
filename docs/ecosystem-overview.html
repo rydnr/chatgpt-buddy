@@ -1,0 +1,550 @@
+---
+title: "TypeScript-EDA & Web-Buddy Ecosystem Overview"
+
+author: "Development Team"
+date: "2025-01-04"
+layout: 
+
+---
+
+<h1 id="executive-summary">Executive Summary</h1>
+<p>The TypeScript-EDA and Web-Buddy ecosystem represents a revolutionary
+approach to web automation, combining event-driven architecture with
+intelligent pattern learning. This document provides a comprehensive
+overview of the multi-repository architecture and the relationships
+between all components.</p>
+<h1 id="architecture-overview">Architecture Overview</h1>
+<h2 id="three-layer-ecosystem-structure">Three-Layer Ecosystem
+Structure</h2>
+<p>The ecosystem is organized into three main layers:</p>
+<ol>
+<li><strong><strong>Foundation Layer</strong></strong>: TypeScript-EDA
+framework providing event-driven patterns</li>
+<li><strong><strong>Framework Layer</strong></strong>: Web-Buddy
+automation framework built on TypeScript-EDA</li>
+<li><strong><strong>Implementation Layer</strong></strong>: Specialized
+tools like ChatGPT-buddy built on Web-Buddy</li>
+</ol>
+<pre><code>┌─────────────────────────────────────────────────────────────┐
+│                   Implementation Layer                      │
+├─────────────────────────────────────────────────────────────┤
+│  📱 ChatGPT-Buddy     │  🐙 GitHub-Buddy   │  📧 Gmail-Buddy │
+│  AI Automation       │  Git Workflows     │  Email Mgmt     │
+├─────────────────────────────────────────────────────────────┤
+│                     Framework Layer                         │
+├─────────────────────────────────────────────────────────────┤
+│  🌐 Web-Buddy Server  │  🧩 Web-Buddy Extension             │
+│  Event Coordination  │  Training System                     │
+├─────────────────────────────────────────────────────────────┤
+│                    Foundation Layer                         │
+├─────────────────────────────────────────────────────────────┤
+│  🏗️ EDA-Domain        │  🔧 EDA-Infrastructure              │
+│  Events &amp; Entities   │  Adapters &amp; Ports                   │
+│                      │  🎯 EDA-Application                  │
+│                      │  Orchestration                       │
+└─────────────────────────────────────────────────────────────┘
+</code></pre>
+<h1 id="repository-structure">Repository Structure</h1>
+<h2 id="foundation-repositories">Foundation Repositories</h2>
+<h3 id="typescript-edadomain">@typescript-eda/domain</h3>
+<ul>
+<li><strong><strong>Purpose</strong></strong>: Core domain patterns for
+event-driven architecture</li>
+<li><strong><strong>Key Components</strong></strong>: Events, Entities,
+Value Objects, Repositories</li>
+<li><strong><strong>Dependencies</strong></strong>: None
+(foundation)</li>
+<li><strong><strong>Repository</strong></strong>: <code
+class="verbatim">https://github.com/rydnr/typescript-eda-domain</code></li>
+</ul>
+<h3
+id="typescript-edainfrastructure">@typescript-eda/infrastructure</h3>
+<ul>
+<li><strong><strong>Purpose</strong></strong>: Infrastructure adapters
+and port implementations</li>
+<li><strong><strong>Key Components</strong></strong>: Adapters,
+Decorators, Port patterns</li>
+<li><strong><strong>Dependencies</strong></strong>: <code
+class="verbatim">@typescript-eda/domain</code></li>
+<li><strong><strong>Repository</strong></strong>: <code
+class="verbatim">https://github.com/rydnr/typescript-eda-infrastructure</code></li>
+</ul>
+<h3 id="typescript-edaapplication">@typescript-eda/application</h3>
+<ul>
+<li><strong><strong>Purpose</strong></strong>: Application orchestration
+with @Enable decorators</li>
+<li><strong><strong>Key Components</strong></strong>: Application class,
+@Enable decorator, Primary ports</li>
+<li><strong><strong>Dependencies</strong></strong>: <code
+class="verbatim">@typescript-eda/domain</code>, <code
+class="verbatim">@typescript-eda/infrastructure</code></li>
+<li><strong><strong>Repository</strong></strong>: <code
+class="verbatim">https://github.com/rydnr/typescript-eda-application</code></li>
+</ul>
+<h2 id="framework-repositories">Framework Repositories</h2>
+<h3 id="web-buddynodejs-server">@web-buddy/nodejs-server</h3>
+<ul>
+<li><strong><strong>Purpose</strong></strong>: Event-driven server for
+coordinating browser extension automation</li>
+<li><strong><strong>Key Components</strong></strong>: HTTP server,
+WebSocket coordination, Extension management</li>
+<li><strong><strong>Dependencies</strong></strong>: All <code
+class="verbatim">@typescript-eda/*</code> packages</li>
+<li><strong><strong>Repository</strong></strong>: <code
+class="verbatim">https://github.com/rydnr/web-buddy-nodejs-server</code></li>
+</ul>
+<h3 id="web-buddybrowser-extension">@web-buddy/browser-extension</h3>
+<ul>
+<li><strong><strong>Purpose</strong></strong>: Browser extension
+framework with intelligent training system</li>
+<li><strong><strong>Key Components</strong></strong>: Background
+application, Training UI, Pattern learning</li>
+<li><strong><strong>Dependencies</strong></strong>: All <code
+class="verbatim">@typescript-eda/*</code> packages</li>
+<li><strong><strong>Repository</strong></strong>: <code
+class="verbatim">https://github.com/rydnr/web-buddy-browser-extension</code></li>
+</ul>
+<h2 id="implementation-repositories">Implementation Repositories</h2>
+<h3 id="chatgpt-buddyserver">@chatgpt-buddy/server</h3>
+<ul>
+<li><strong><strong>Purpose</strong></strong>: AI-enhanced automation
+server for ChatGPT and language models</li>
+<li><strong><strong>Key Components</strong></strong>: OpenAI
+integration, Anthropic API, Pattern recognition</li>
+<li><strong><strong>Dependencies</strong></strong>: <code
+class="verbatim">@web-buddy/nodejs-server</code>, All <code
+class="verbatim">@typescript-eda/*</code> packages</li>
+<li><strong><strong>Repository</strong></strong>: <code
+class="verbatim">https://github.com/rydnr/chatgpt-buddy</code> (server
+component)</li>
+</ul>
+<h3 id="chatgpt-buddyextension">@chatgpt-buddy/extension</h3>
+<ul>
+<li><strong><strong>Purpose</strong></strong>: AI automation browser
+extension built on Web-Buddy framework</li>
+<li><strong><strong>Key Components</strong></strong>: ChatGPT-specific
+automation, AI pattern learning</li>
+<li><strong><strong>Dependencies</strong></strong>: <code
+class="verbatim">@web-buddy/browser-extension</code>, All <code
+class="verbatim">@typescript-eda/*</code> packages</li>
+<li><strong><strong>Repository</strong></strong>: <code
+class="verbatim">https://github.com/rydnr/chatgpt-buddy</code>
+(extension component)</li>
+</ul>
+<h3 id="chatgpt-buddyclient">@chatgpt-buddy/client</h3>
+<ul>
+<li><strong><strong>Purpose</strong></strong>: TypeScript/Python SDKs
+for ChatGPT automation</li>
+<li><strong><strong>Key Components</strong></strong>: Event-driven
+client, Multi-model support, Type safety</li>
+<li><strong><strong>Dependencies</strong></strong>: All <code
+class="verbatim">@typescript-eda/*</code> packages</li>
+<li><strong><strong>Repository</strong></strong>: <code
+class="verbatim">https://github.com/rydnr/chatgpt-buddy</code> (client
+component)</li>
+</ul>
+<h1 id="dependency-flow">Dependency Flow</h1>
+<h2 id="package-dependencies">Package Dependencies</h2>
+<pre><code>┌─────────────────────────────────────────────────────────────┐
+│                    Dependency Graph                         │
+└─────────────────────────────────────────────────────────────┘
+
+@typescript-eda/domain
+    ↑
+    ├─ @typescript-eda/infrastructure
+    ├─ @typescript-eda/application
+    ↑
+    ├─ @web-buddy/nodejs-server
+    ├─ @web-buddy/browser-extension
+    ↑
+    ├─ @chatgpt-buddy/server
+    ├─ @chatgpt-buddy/extension  
+    ├─ @chatgpt-buddy/client
+    ├─ @github-buddy/* (future)
+    └─ @gmail-buddy/* (future)
+</code></pre>
+<h2 id="version-compatibility-matrix">Version Compatibility Matrix</h2>
+<table>
+<thead>
+<tr class="header">
+<th>Package</th>
+<th>TypeScript-EDA</th>
+<th>Web-Buddy</th>
+<th>ChatGPT-Buddy</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Domain</td>
+<td>1.0.0</td>
+<td>-</td>
+<td>-</td>
+</tr>
+<tr class="even">
+<td>Infrastructure</td>
+<td>1.0.0</td>
+<td>-</td>
+<td>-</td>
+</tr>
+<tr class="odd">
+<td>Application</td>
+<td>1.0.0</td>
+<td>-</td>
+<td>-</td>
+</tr>
+<tr class="even">
+<td>Web-Buddy Server</td>
+<td>1.0.0</td>
+<td>1.0.0</td>
+<td>-</td>
+</tr>
+<tr class="odd">
+<td>Web-Buddy Extension</td>
+<td>1.0.0</td>
+<td>1.0.0</td>
+<td>-</td>
+</tr>
+<tr class="even">
+<td>ChatGPT Server</td>
+<td>1.0.0</td>
+<td>1.0.0</td>
+<td>2.0.0</td>
+</tr>
+<tr class="odd">
+<td>ChatGPT Extension</td>
+<td>1.0.0</td>
+<td>1.0.0</td>
+<td>2.0.0</td>
+</tr>
+<tr class="even">
+<td>ChatGPT Client</td>
+<td>1.0.0</td>
+<td>-</td>
+<td>2.0.0</td>
+</tr>
+</tbody>
+</table>
+<h1 id="development-workflow">Development Workflow</h1>
+<h2 id="repository-development-order">Repository Development Order</h2>
+<ol>
+<li><strong><strong>Foundation First</strong></strong>: Develop and
+stabilize TypeScript-EDA packages</li>
+<li><strong><strong>Framework Second</strong></strong>: Build Web-Buddy
+framework on stable foundation</li>
+<li><strong><strong>Implementation Third</strong></strong>: Create
+specialized implementations (ChatGPT-buddy, etc.)</li>
+</ol>
+<h2 id="cross-repository-changes">Cross-Repository Changes</h2>
+<p>When making changes that affect multiple repositories:</p>
+<ol>
+<li><strong><strong>Start with Domain</strong></strong>: Make changes to
+<code class="verbatim">@typescript-eda/domain</code> first</li>
+<li><strong><strong>Update Infrastructure</strong></strong>: Adapt <code
+class="verbatim">@typescript-eda/infrastructure</code> to domain
+changes</li>
+<li><strong><strong>Update Application</strong></strong>: Modify <code
+class="verbatim">@typescript-eda/application</code> for orchestration
+changes</li>
+<li><strong><strong>Update Frameworks</strong></strong>: Adapt Web-Buddy
+packages to foundation changes</li>
+<li><strong><strong>Update Implementations</strong></strong>: Finally
+update ChatGPT-buddy and other tools</li>
+</ol>
+<h2 id="testing-strategy">Testing Strategy</h2>
+<ul>
+<li><strong><strong>Unit Tests</strong></strong>: Each repository has
+comprehensive unit tests</li>
+<li><strong><strong>Integration Tests</strong></strong>: Test
+cross-package integration scenarios</li>
+<li><strong><strong>Contract Tests</strong></strong>: Ensure API
+contracts between packages remain stable</li>
+<li><strong><strong>E2E Tests</strong></strong>: Full ecosystem testing
+in ChatGPT-buddy and implementations</li>
+</ul>
+<h1 id="usage-patterns">Usage Patterns</h1>
+<h2 id="for-framework-developers">For Framework Developers</h2>
+<p>Building new automation frameworks (GitHub-buddy, Gmail-buddy,
+etc.):</p>
+<pre class="typescript"><code>// 1. Use Web-Buddy as foundation
+import { BackgroundApplication } from &#39;@web-buddy/browser-extension&#39;;
+import { ServerApplication } from &#39;@web-buddy/nodejs-server&#39;;
+
+// 2. Extend with domain-specific functionality
+@Enable(GitHubIntegrationAdapter)
+export class GitHubBuddyApplication extends BackgroundApplication {
+  // Domain-specific automation logic
+}
+</code></pre>
+<h2 id="for-application-developers">For Application Developers</h2>
+<p>Using existing tools like ChatGPT-buddy:</p>
+<pre class="typescript"><code>import { createChatGPTBuddyClient } from &#39;@chatgpt-buddy/client&#39;;
+
+const client = await createChatGPTBuddyClient({
+  serverUrl: &#39;http://localhost:3003&#39;,
+  defaultModel: &#39;gpt-4&#39;
+});
+
+const response = await client.chat({
+  prompt: &#39;Explain TypeScript decorators&#39;,
+  model: &#39;gpt-4&#39;
+});
+</code></pre>
+<h2 id="for-infrastructure-developers">For Infrastructure
+Developers</h2>
+<p>Creating new adapters and ports:</p>
+<pre class="typescript"><code>import { AdapterFor, Port } from &#39;@typescript-eda/infrastructure&#39;;
+
+export abstract class NotificationPort extends Port {
+  abstract sendNotification(message: string): Promise&lt;void&gt;;
+}
+
+@AdapterFor(NotificationPort)
+export class EmailNotificationAdapter extends NotificationPort {
+  async sendNotification(message: string): Promise&lt;void&gt; {
+    // Email implementation
+  }
+}
+</code></pre>
+<h1 id="migration-paths">Migration Paths</h1>
+<h2 id="from-monorepo-to-multi-repo">From Monorepo to Multi-Repo</h2>
+<p>Current users of the monorepo version can migrate gradually:</p>
+<ol>
+<li><strong><strong>Phase 1</strong></strong>: Update imports to use new
+package names</li>
+<li><strong><strong>Phase 2</strong></strong>: Install packages from NPM
+instead of local builds</li>
+<li><strong><strong>Phase 3</strong></strong>: Migrate custom code to
+use new APIs</li>
+<li><strong><strong>Phase 4</strong></strong>: Adopt new patterns
+(contract-based automation, plugins)</li>
+</ol>
+<h2 id="backward-compatibility">Backward Compatibility</h2>
+<ul>
+<li><strong><strong>Event Names</strong></strong>: All existing event
+names remain compatible</li>
+<li><strong><strong>API Surface</strong></strong>: Core APIs maintain
+backward compatibility</li>
+<li><strong><strong>Configuration</strong></strong>: Existing
+configuration files continue to work</li>
+<li><strong><strong>Extensions</strong></strong>: Existing browser
+extensions can be gradually updated</li>
+</ul>
+<h1 id="performance-characteristics">Performance Characteristics</h1>
+<h2 id="package-sizes">Package Sizes</h2>
+<table>
+<thead>
+<tr class="header">
+<th>Package</th>
+<th>Bundle Size</th>
+<th>Dependencies</th>
+<th>Load Time</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>@typescript-eda/domain</td>
+<td>~15KB</td>
+<td>0</td>
+<td>&lt;10ms</td>
+</tr>
+<tr class="even">
+<td>@typescript-eda/infrastructure</td>
+<td>~25KB</td>
+<td>1</td>
+<td>&lt;15ms</td>
+</tr>
+<tr class="odd">
+<td>@typescript-eda/application</td>
+<td>~20KB</td>
+<td>2</td>
+<td>&lt;12ms</td>
+</tr>
+<tr class="even">
+<td>@web-buddy/nodejs-server</td>
+<td>~150KB</td>
+<td>3 + extras</td>
+<td>&lt;100ms</td>
+</tr>
+<tr class="odd">
+<td>@web-buddy/browser-extension</td>
+<td>~200KB</td>
+<td>3 + browser APIs</td>
+<td>&lt;200ms</td>
+</tr>
+<tr class="even">
+<td>@chatgpt-buddy/client</td>
+<td>~80KB</td>
+<td>3 + HTTP client</td>
+<td>&lt;50ms</td>
+</tr>
+</tbody>
+</table>
+<h2 id="runtime-performance">Runtime Performance</h2>
+<ul>
+<li><strong><strong>Event Processing</strong></strong>: &lt;1ms per
+event in typical scenarios</li>
+<li><strong><strong>Memory Usage</strong></strong>: ~50MB for full
+ChatGPT-buddy installation</li>
+<li><strong><strong>Network Overhead</strong></strong>: &lt;10KB for
+typical automation requests</li>
+<li><strong><strong>Storage Impact</strong></strong>: &lt;5MB for
+learned patterns and configuration</li>
+</ul>
+<h1 id="documentation-structure">Documentation Structure</h1>
+<h2 id="per-repository-documentation">Per-Repository Documentation</h2>
+<p>Each repository contains:</p>
+<ul>
+<li><strong><strong>README.md</strong></strong>: Quick start and basic
+usage</li>
+<li><strong><strong>docs/story.org</strong></strong>: Narrative
+explanation of purpose and design</li>
+<li><strong><strong>docs/getting<sub>started</sub>.org</strong></strong>:
+Step-by-step tutorial</li>
+<li><strong><strong>docs/journal.org</strong></strong>: Development
+notes and decisions</li>
+<li><strong><strong>docs/specs/</strong></strong>: Technical
+specifications and examples</li>
+</ul>
+<h2 id="cross-repository-documentation">Cross-Repository
+Documentation</h2>
+<ul>
+<li><strong><strong>This Document</strong></strong>: Ecosystem overview
+and relationships</li>
+<li><strong><strong>Migration Guides</strong></strong>: Moving between
+versions and architectures</li>
+<li><strong><strong>Integration Examples</strong></strong>: How to
+combine multiple packages</li>
+<li><strong><strong>Best Practices</strong></strong>: Recommended
+patterns and approaches</li>
+</ul>
+<h1 id="community-and-ecosystem">Community and Ecosystem</h1>
+<h2 id="npm-organizations">NPM Organizations</h2>
+<ul>
+<li><strong><strong>@typescript-eda</strong></strong>: Foundation
+packages for event-driven architecture</li>
+<li><strong><strong>@web-buddy</strong></strong>: Web automation
+framework packages</li>
+<li><strong><strong>@chatgpt-buddy</strong></strong>: AI automation
+implementation packages</li>
+</ul>
+<h2 id="future-ecosystem-expansion">Future Ecosystem Expansion</h2>
+<p>Planned additional implementations:</p>
+<ul>
+<li><strong><strong>@github-buddy</strong></strong>: Git workflow
+automation</li>
+<li><strong><strong>@gmail-buddy</strong></strong>: Email management
+automation</li>
+<li><strong><strong>@docs-buddy</strong></strong>: Documentation
+workflow automation</li>
+<li><strong><strong>@testing-buddy</strong></strong>: Automated testing
+workflow tools</li>
+</ul>
+<h2 id="plugin-architecture-phase-17">Plugin Architecture (Phase
+17)</h2>
+<p>Future plugin system will enable:</p>
+<ul>
+<li><strong><strong>Contract-Based Integration</strong></strong>: Web
+apps declare automation capabilities</li>
+<li><strong><strong>Plugin Marketplace</strong></strong>:
+Community-driven automation extensions</li>
+<li><strong><strong>Auto-Generated SDKs</strong></strong>: Type-safe
+clients from web app contracts</li>
+<li><strong><strong>Zero-Fragility Automation</strong></strong>: No more
+broken selectors</li>
+</ul>
+<h1 id="getting-started">Getting Started</h1>
+<h2 id="for-new-users">For New Users</h2>
+<ol>
+<li><p><strong><strong>Choose Your Use Case</strong></strong>:</p>
+<ul>
+<li>AI automation: Start with <code
+class="verbatim">@chatgpt-buddy/*</code></li>
+<li>Custom web automation: Start with <code
+class="verbatim">@web-buddy/*</code></li>
+<li>Event-driven architecture: Start with <code
+class="verbatim">@typescript-eda/*</code></li>
+</ul></li>
+<li><p><strong><strong>Install Dependencies</strong></strong>:</p>
+<pre class="bash"><code>npm install @chatgpt-buddy/client  # For AI automation
+npm install @web-buddy/browser-extension  # For custom automation
+npm install @typescript-eda/domain  # For EDA patterns
+</code></pre></li>
+<li><p><strong><strong>Follow Getting Started
+Guides</strong></strong>:</p>
+<ul>
+<li><a href="./chatgpt-buddy/getting-started.org">ChatGPT-Buddy Getting
+Started</a></li>
+<li><a href="./web-buddy/getting-started.org">Web-Buddy Getting
+Started</a></li>
+<li><a href="./typescript-eda/getting-started.org">TypeScript-EDA
+Getting Started</a></li>
+</ul></li>
+</ol>
+<h2 id="for-contributors">For Contributors</h2>
+<ol>
+<li><p><strong><strong>Development Setup</strong></strong>:</p>
+<pre class="bash"><code>git clone https://github.com/rydnr/chatgpt-buddy
+cd chatgpt-buddy
+npm run install:all
+npm run build
+npm test
+</code></pre></li>
+<li><p><strong><strong>Choose Contribution Area</strong></strong>:</p>
+<ul>
+<li><strong><strong>Foundation</strong></strong>: Improve TypeScript-EDA
+patterns</li>
+<li><strong><strong>Framework</strong></strong>: Enhance Web-Buddy
+capabilities</li>
+<li><strong><strong>Implementation</strong></strong>: Extend
+ChatGPT-buddy features</li>
+<li><strong><strong>Documentation</strong></strong>: Improve guides and
+examples</li>
+</ul></li>
+<li><p><strong><strong>Follow Development
+Workflow</strong></strong>:</p>
+<ul>
+<li>Create feature branch</li>
+<li>Implement changes with tests</li>
+<li>Update documentation</li>
+<li>Submit pull request</li>
+</ul></li>
+</ol>
+<h1 id="support-and-resources">Support and Resources</h1>
+<h2 id="documentation-links">Documentation Links</h2>
+<ul>
+<li><strong><strong>TypeScript-EDA</strong></strong>: <a
+href="./typescript-eda/">Foundation Documentation</a></li>
+<li><strong><strong>Web-Buddy</strong></strong>: <a
+href="./web-buddy/">Framework Documentation</a></li>
+<li><strong><strong>ChatGPT-Buddy</strong></strong>: <a
+href="./chatgpt-buddy/">Implementation Documentation</a></li>
+</ul>
+<h2 id="community-resources">Community Resources</h2>
+<ul>
+<li><strong><strong>GitHub Discussions</strong></strong>: Questions and
+community support</li>
+<li><strong><strong>Issue Tracking</strong></strong>: Bug reports and
+feature requests</li>
+<li><strong><strong>Discord Server</strong></strong>: Real-time
+community chat</li>
+<li><strong><strong>Stack Overflow</strong></strong>: <code
+class="verbatim">typescript-eda</code> and <code
+class="verbatim">web-buddy</code> tags</li>
+</ul>
+<h2 id="commercial-support">Commercial Support</h2>
+<ul>
+<li><strong><strong>Enterprise Consulting</strong></strong>: Custom
+implementation services</li>
+<li><strong><strong>Training Services</strong></strong>: Team training
+on EDA patterns</li>
+<li><strong><strong>Priority Support</strong></strong>: SLA-backed
+support for production deployments</li>
+<li><strong><strong>Custom Development</strong></strong>: Bespoke
+automation solutions</li>
+</ul>
+<p>This ecosystem represents a new paradigm in web automation, combining
+the robustness of event-driven architecture with the intelligence of
+AI-powered pattern learning. Whether you're building simple automation
+scripts or complex enterprise workflows, the TypeScript-EDA and
+Web-Buddy ecosystem provides the foundation for reliable, maintainable,
+and extensible solutions.</p>

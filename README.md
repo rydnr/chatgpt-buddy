@@ -1,53 +1,444 @@
-# Web-Buddy Framework
+# ChatGPT-Buddy
 
-> Generic web automation with event-driven architecture and layered client APIs
+> AI-powered web automation tool built on Web-Buddy framework for ChatGPT and language model integration
+
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-blue.svg)](https://www.typescriptlang.org/)
+[![Node.js](https://img.shields.io/badge/Node.js-18+-green.svg)](https://nodejs.org/)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+
+## Overview
+
+ChatGPT-Buddy is a specialized implementation of the Web-Buddy framework that enables intelligent automation through ChatGPT and other language models. It provides a complete AI automation platform with browser extension integration, intelligent pattern recognition, and multi-model support.
 
 ## Architecture Overview
 
-Web-Buddy is a generic web automation framework that transforms single-purpose tools into extensible, maintainable automation platforms. It demonstrates a three-layer architecture:
+ChatGPT-Buddy is built on the Web-Buddy framework ecosystem, leveraging event-driven architecture and TypeScript-EDA patterns:
 
 ```ascii
-┌─────────────────────────────────────────────────┐
-│                API LAYER                        │ ← Developer-friendly methods
-│         GoogleBuddyClient.enterSearchTerm()    │   chatGPTClient.selectProject()
-├─────────────────────────────────────────────────┤
-│               DOMAIN LAYER                      │ ← Site-specific messages & handlers
-│      {'ENTER_SEARCH_TERM': ...}                │   {'SELECT_PROJECT': ...}
-├─────────────────────────────────────────────────┤
-│               CORE LAYER                        │ ← Generic messaging infrastructure
-│         WebBuddyClient.sendMessage()           │   WebBuddyServer, WebBuddyExtension
-└─────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────┐
+│                   ChatGPT-Buddy                         │
+├─────────────────────────────────────────────────────────┤
+│  🤖 AI Integration    │  🧠 Pattern Recognition         │
+│  • OpenAI API        │  • Workflow Analysis             │
+│  • Anthropic API     │  • Automation Insights           │
+│  • Multi-model       │  • Learning Engine               │
+├─────────────────────────────────────────────────────────┤
+│                   Web-Buddy Framework                   │
+├─────────────────────────────────────────────────────────┤
+│  🌐 Server Framework  │  🧩 Browser Extension           │
+│  • Event Coordination│  • Training System               │
+│  • WebSocket Server  │  • Pattern Execution             │
+│  • REST API Gateway  │  • Cross-Site Adaptation         │
+├─────────────────────────────────────────────────────────┤
+│                  TypeScript-EDA Foundation             │
+├─────────────────────────────────────────────────────────┤
+│  🏗️ Domain Layer      │  🔧 Infrastructure Layer        │
+│  • Events & Entities │  • Adapters & Ports              │
+│  🎯 Application Layer │  • Event Bus & Decorators       │
+└─────────────────────────────────────────────────────────┘
 ```
 
-### Key Benefits
+### Key Features
 
-- **Reusable Core**: Generic message-passing infrastructure works with any website
-- **Domain-Specific Logic**: Site-specific automation without core changes
-- **Developer Experience**: Choice between generic API and convenient wrappers
-- **Test-Driven**: ATDD with Playwright for browser automation specification
-- **Type-Safe**: Full TypeScript support with strong typing
+- 🤖 **Multi-Model AI Integration**: Support for GPT-4, Claude, and custom models
+- 🎯 **Intelligent Automation**: AI-enhanced web automation with pattern recognition
+- 🧠 **Learning Engine**: Learns from user interactions to improve automation
+- 🔄 **Cross-Site Adaptation**: Patterns work across different websites
+- 📊 **Performance Analytics**: Comprehensive metrics and optimization insights
+- 🛡️ **Privacy-First**: Local processing with user-controlled data sharing
 
 ## Quick Start
 
-### 1. Install Core Framework
+### Installation
 
 ```bash
-npm install @web-buddy/core
+# Clone the repository
+git clone https://github.com/rydnr/chatgpt-buddy.git
+cd chatgpt-buddy
+
+# Install all dependencies
+npm run install:all
 ```
 
-### 2. Install Domain Implementation
+### Environment Setup
+
+Create a `.env` file in the server directory:
 
 ```bash
-npm install @google-buddy/client  # For Google search automation
-# or
-npm install @chatgpt-buddy/client # For ChatGPT automation
+# AI API Keys
+OPENAI_API_KEY=your_openai_api_key
+ANTHROPIC_API_KEY=your_anthropic_api_key
+
+# Server Configuration
+PORT=3003
+NODE_ENV=development
+LOG_LEVEL=info
+
+# Security
+ENABLE_AUTH=false
+CORS_ORIGINS=http://localhost:3000
+
+# Features
+ENABLE_PATTERN_RECOGNITION=true
+ENABLE_AI_INSIGHTS=true
 ```
 
-### 3. Use the Convenient API
+### Start the Server
+
+```bash
+# Development mode
+npm run dev
+
+# Production mode
+npm run build
+npm start
+```
+
+### Install Browser Extension
+
+1. Build the extension:
+   ```bash
+   npm run build:extension
+   ```
+
+2. Load in Chrome:
+   - Open `chrome://extensions/`
+   - Enable "Developer mode"
+   - Click "Load unpacked"
+   - Select the `extension/build` directory
+
+## AI Integration Examples
+
+### Basic ChatGPT Automation
 
 ```typescript
-import { createWebBuddyClient } from '@web-buddy/core';
-import { GoogleBuddyClient } from '@google-buddy/client';
+import { ChatGPTBuddyClient } from '@chatgpt-buddy/client';
+
+const client = new ChatGPTBuddyClient({
+  serverUrl: 'http://localhost:3003',
+  openaiApiKey: process.env.OPENAI_API_KEY
+});
+
+// Simple AI interaction
+const response = await client.chat({
+  prompt: "Explain quantum computing in simple terms",
+  model: "gpt-4",
+  context: {
+    userLevel: "beginner",
+    preferredStyle: "conversational"
+  }
+});
+
+console.log(response.content);
+```
+
+### Intelligent Web Automation
+
+```typescript
+// AI-enhanced automation with pattern learning
+const automationResult = await client.automateWithAI({
+  task: "Research and summarize information about renewable energy",
+  instructions: [
+    "Search for recent renewable energy articles",
+    "Extract key statistics and trends", 
+    "Generate a comprehensive summary"
+  ],
+  options: {
+    enableLearning: true,
+    crossSiteAdaptation: true,
+    aiInsights: true
+  }
+});
+```
+
+### Pattern Recognition and Learning
+
+```typescript
+// Enable training mode for pattern learning
+await client.extension.enableTrainingMode({
+  sessionType: 'ai_enhanced',
+  learningLevel: 'advanced',
+  patternTypes: ['research_workflow', 'data_extraction']
+});
+
+// The extension will learn from user interactions
+// and suggest automation improvements
+```
+
+## Advanced Features
+
+### Multi-Model AI Support
+
+```typescript
+// Intelligent model selection based on task
+const client = new ChatGPTBuddyClient({
+  modelStrategy: 'intelligent_selection',
+  availableModels: [
+    { name: 'gpt-4', capabilities: ['reasoning', 'code'], cost: 'high' },
+    { name: 'gpt-3.5-turbo', capabilities: ['general'], cost: 'low' },
+    { name: 'claude-3-opus', capabilities: ['analysis'], cost: 'medium' }
+  ]
+});
+
+// AI automatically selects the best model for each task
+const response = await client.smartChat({
+  prompt: "Write a Python script to analyze CSV data",
+  requirements: {
+    accuracy: 'high',
+    speed: 'medium', 
+    cost: 'optimize'
+  }
+});
+```
+
+### AI-Powered Workflow Optimization
+
+```typescript
+// Analyze and optimize automation workflows
+const optimization = await client.optimizeWorkflow({
+  workflowId: 'research_automation',
+  criteria: ['speed', 'accuracy', 'cost'],
+  aiAnalysis: true
+});
+
+console.log('Optimization suggestions:', optimization.suggestions);
+console.log('Expected improvement:', optimization.expectedImprovement);
+```
+
+### Intelligent Error Recovery
+
+```typescript
+// AI-enhanced error recovery
+await client.setErrorRecovery({
+  enableAIRecovery: true,
+  strategies: [
+    'alternative_selectors',
+    'semantic_analysis',
+    'ai_problem_solving',
+    'user_guidance'
+  ],
+  maxRetries: 3,
+  learningEnabled: true
+});
+```
+
+## Browser Extension Integration
+
+### Training Mode
+
+The ChatGPT-Buddy extension learns from user demonstrations:
+
+1. **Activate Training**: Click the ChatGPT-Buddy icon and select "Start Training"
+2. **Demonstrate Workflow**: Perform your automation task normally
+3. **AI Analysis**: The extension analyzes your actions with AI insights
+4. **Pattern Generation**: Creates intelligent automation patterns
+5. **Cross-Site Testing**: Validates patterns across similar websites
+
+### AI-Enhanced Features
+
+- **Semantic Element Detection**: AI identifies elements by purpose, not just selectors
+- **Context-Aware Actions**: Understands the intent behind user actions
+- **Intelligent Adaptation**: Automatically adapts to website changes
+- **Natural Language Commands**: Control automation with conversational commands
+
+## API Reference
+
+### ChatGPT Integration
+
+```typescript
+interface ChatGPTRequest {
+  prompt: string;
+  model?: 'gpt-4' | 'gpt-4-turbo' | 'gpt-3.5-turbo';
+  context?: ConversationContext;
+  options?: {
+    maxTokens?: number;
+    temperature?: number;
+    enableStreaming?: boolean;
+  };
+}
+
+interface ChatGPTResponse {
+  content: string;
+  usage: TokenUsage;
+  modelUsed: string;
+  responseTime: number;
+  confidence?: number;
+  suggestions?: string[];
+}
+```
+
+### Automation with AI
+
+```typescript
+interface AIAutomationRequest {
+  task: string;
+  instructions?: string[];
+  context?: PageContext;
+  options?: {
+    enableLearning?: boolean;
+    aiInsights?: boolean;
+    crossSiteAdaptation?: boolean;
+    errorRecovery?: boolean;
+  };
+}
+
+interface AIAutomationResponse {
+  success: boolean;
+  results: AutomationResult[];
+  aiInsights: AIInsight[];
+  learnedPatterns: AutomationPattern[];
+  performance: PerformanceMetrics;
+}
+```
+
+## Development
+
+### Project Structure
+
+```
+chatgpt-buddy/
+├── server/              # AI automation server
+│   ├── src/
+│   │   ├── applications/    # ChatGPT-specific applications
+│   │   ├── adapters/        # AI service integrations
+│   │   ├── events/          # ChatGPT domain events
+│   │   └── utils/           # Shared utilities
+├── extension/           # Browser extension
+│   └── src/             # Extension source code
+├── client/              # Client SDKs
+│   ├── typescript/      # TypeScript SDK
+│   └── python/          # Python SDK
+└── docs/                # Documentation
+```
+
+### Building and Testing
+
+```bash
+# Build all components
+npm run build
+
+# Run tests
+npm test
+
+# Run E2E tests
+npm run test:e2e
+
+# Lint and type check
+npm run lint
+npm run typecheck
+```
+
+### Contributing
+
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/ai-enhancement`
+3. Make your changes with tests
+4. Run the test suite: `npm test`
+5. Submit a pull request
+
+## Configuration
+
+### Server Configuration
+
+The server can be configured via environment variables or a configuration file:
+
+```typescript
+export interface ChatGPTBuddyConfig {
+  ai: {
+    openaiApiKey: string;
+    anthropicApiKey?: string;
+    defaultModel: string;
+    enableModelSwitching: boolean;
+    costOptimization: boolean;
+  };
+  automation: {
+    enablePatternLearning: boolean;
+    crossSiteAdaptation: boolean;
+    intelligentErrorRecovery: boolean;
+    performanceOptimization: boolean;
+  };
+  privacy: {
+    localProcessing: boolean;
+    dataRetentionDays: number;
+    anonymizeData: boolean;
+    userControlledSharing: boolean;
+  };
+}
+```
+
+## Performance and Monitoring
+
+### AI Performance Metrics
+
+- **Response Time**: Average AI model response times
+- **Cost Optimization**: Token usage and cost tracking
+- **Model Performance**: Accuracy and user satisfaction scores
+- **Pattern Success Rate**: Automation pattern execution success rates
+
+### Monitoring Dashboard
+
+Access the monitoring dashboard at `http://localhost:3003/dashboard` to view:
+
+- Real-time AI interaction metrics
+- Automation pattern performance
+- Cost optimization insights
+- User satisfaction analytics
+
+## Examples and Use Cases
+
+### Research Automation
+
+```typescript
+// Automated research with AI summarization
+const research = await client.researchTopic({
+  topic: "latest developments in quantum computing",
+  sources: ["academic", "news", "industry"],
+  aiSummary: {
+    style: "technical",
+    length: "comprehensive",
+    includeStats: true
+  }
+});
+```
+
+### Content Generation
+
+```typescript
+// AI-powered content creation with web research
+const content = await client.generateContent({
+  type: "blog_post",
+  topic: "The future of web automation",
+  research: {
+    enableWebSearch: true,
+    factChecking: true,
+    sourceVerification: true
+  },
+  style: {
+    tone: "professional",
+    audience: "developers",
+    length: "2000-3000 words"
+  }
+});
+```
+
+### Data Analysis Automation
+
+```typescript
+// Automated data extraction and AI analysis
+const analysis = await client.analyzeWebData({
+  sources: ["https://example.com/data"],
+  extractionRules: {
+    tables: true,
+    charts: true,
+    statistics: true
+  },
+  aiAnalysis: {
+    generateInsights: true,
+    identifyTrends: true,
+    predictOutcomes: true
+  }
+});
+```
 
 // Setup
 const webClient = createWebBuddyClient({ 

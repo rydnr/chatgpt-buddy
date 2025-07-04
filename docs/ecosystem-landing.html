@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TypeScript-EDA & Web-Buddy Ecosystem</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .hero {
+            text-align: center;
+            padding: 60px 0;
+            color: white;
+        }
+
+        .hero h1 {
+            font-size: 3rem;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .hero p {
+            font-size: 1.2rem;
+            margin-bottom: 30px;
+            opacity: 0.9;
+        }
+
+        .ecosystem-overview {
+            background: white;
+            border-radius: 15px;
+            padding: 40px;
+            margin: 40px 0;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+
+        .architecture-diagram {
+            text-align: center;
+            margin: 40px 0;
+        }
+
+        .layer {
+            margin: 20px 0;
+            padding: 20px;
+            border-radius: 10px;
+            position: relative;
+        }
+
+        .implementation-layer {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+        }
+
+        .framework-layer {
+            background: linear-gradient(135deg, #f093fb, #f5576c);
+            color: white;
+        }
+
+        .foundation-layer {
+            background: linear-gradient(135deg, #4facfe, #00f2fe);
+            color: white;
+        }
+
+        .layer h3 {
+            font-size: 1.5rem;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        .packages {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .package-card {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 20px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: transform 0.3s ease;
+        }
+
+        .package-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .package-card h4 {
+            font-size: 1.2rem;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+        }
+
+        .package-card .emoji {
+            font-size: 1.5rem;
+            margin-right: 10px;
+        }
+
+        .package-card p {
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+
+        .dependency-flow {
+            margin: 40px 0;
+            text-align: center;
+        }
+
+        .dependency-flow h3 {
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        .flow-diagram {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 30px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            line-height: 1.8;
+            text-align: left;
+            overflow-x: auto;
+        }
+
+        .navigation-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            margin: 40px 0;
+        }
+
+        .nav-section {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+        }
+
+        .nav-section h3 {
+            color: #667eea;
+            margin-bottom: 20px;
+            font-size: 1.4rem;
+        }
+
+        .nav-links {
+            list-style: none;
+        }
+
+        .nav-links li {
+            margin: 10px 0;
+        }
+
+        .nav-links a {
+            color: #333;
+            text-decoration: none;
+            padding: 10px 15px;
+            border-radius: 5px;
+            display: block;
+            transition: background-color 0.3s ease;
+        }
+
+        .nav-links a:hover {
+            background-color: #f0f0f0;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin: 40px 0;
+        }
+
+        .stat-card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .stat-number {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .stat-label {
+            font-size: 0.9rem;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .footer {
+            text-align: center;
+            padding: 40px 0;
+            color: white;
+            opacity: 0.8;
+        }
+
+        @media (max-width: 768px) {
+            .hero h1 {
+                font-size: 2rem;
+            }
+            
+            .ecosystem-overview {
+                padding: 20px;
+            }
+            
+            .packages {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="hero">
+            <h1>TypeScript-EDA & Web-Buddy Ecosystem</h1>
+            <p>Revolutionary approach to web automation combining event-driven architecture with intelligent pattern learning</p>
+        </div>
+
+        <div class="ecosystem-overview">
+            <h2 style="text-align: center; margin-bottom: 30px; color: #333;">Three-Layer Architecture</h2>
+            
+            <div class="architecture-diagram">
+                <div class="layer implementation-layer">
+                    <h3>🚀 Implementation Layer</h3>
+                    <p>Specialized automation tools built on Web-Buddy framework</p>
+                    <div class="packages">
+                        <div class="package-card">
+                            <h4><span class="emoji">🤖</span>ChatGPT-Buddy</h4>
+                            <p>AI-powered automation for ChatGPT and language models</p>
+                        </div>
+                        <div class="package-card">
+                            <h4><span class="emoji">🐙</span>GitHub-Buddy</h4>
+                            <p>Git workflow automation (future)</p>
+                        </div>
+                        <div class="package-card">
+                            <h4><span class="emoji">📧</span>Gmail-Buddy</h4>
+                            <p>Email management automation (future)</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="layer framework-layer">
+                    <h3>🌐 Framework Layer</h3>
+                    <p>Reusable web automation framework with training system</p>
+                    <div class="packages">
+                        <div class="package-card">
+                            <h4><span class="emoji">🖥️</span>Web-Buddy Server</h4>
+                            <p>Event coordination and WebSocket management</p>
+                        </div>
+                        <div class="package-card">
+                            <h4><span class="emoji">🧩</span>Web-Buddy Extension</h4>
+                            <p>Browser extension with intelligent training system</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="layer foundation-layer">
+                    <h3>🏗️ Foundation Layer</h3>
+                    <p>Event-driven architecture patterns and building blocks</p>
+                    <div class="packages">
+                        <div class="package-card">
+                            <h4><span class="emoji">🎯</span>EDA-Domain</h4>
+                            <p>Core domain patterns: Events, Entities, Value Objects</p>
+                        </div>
+                        <div class="package-card">
+                            <h4><span class="emoji">🔧</span>EDA-Infrastructure</h4>
+                            <p>Adapters, Ports, and infrastructure patterns</p>
+                        </div>
+                        <div class="package-card">
+                            <h4><span class="emoji">🎭</span>EDA-Application</h4>
+                            <p>Application orchestration with @Enable decorators</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="dependency-flow">
+                <h3>Dependency Flow</h3>
+                <div class="flow-diagram">
+@typescript-eda/domain
+    ↑
+    ├─ @typescript-eda/infrastructure
+    ├─ @typescript-eda/application
+    ↑
+    ├─ @web-buddy/nodejs-server
+    ├─ @web-buddy/browser-extension
+    ↑
+    ├─ @chatgpt-buddy/server
+    ├─ @chatgpt-buddy/extension
+    ├─ @chatgpt-buddy/client
+    ├─ @github-buddy/* (future)
+    └─ @gmail-buddy/* (future)
+                </div>
+            </div>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-number">6+</div>
+                <div class="stat-label">Repositories</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">3</div>
+                <div class="stat-label">Architecture Layers</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">8</div>
+                <div class="stat-label">NPM Packages</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">100%</div>
+                <div class="stat-label">TypeScript</div>
+            </div>
+        </div>
+
+        <div class="navigation-grid">
+            <div class="nav-section">
+                <h3>🏗️ Foundation (TypeScript-EDA)</h3>
+                <ul class="nav-links">
+                    <li><a href="./typescript-eda/index.html">Overview</a></li>
+                    <li><a href="./typescript-eda/getting-started.html">Getting Started</a></li>
+                    <li><a href="./typescript-eda/story.html">Project Story</a></li>
+                    <li><a href="https://github.com/rydnr/typescript-eda-domain">Domain Repository</a></li>
+                    <li><a href="https://github.com/rydnr/typescript-eda-infrastructure">Infrastructure Repository</a></li>
+                    <li><a href="https://github.com/rydnr/typescript-eda-application">Application Repository</a></li>
+                </ul>
+            </div>
+
+            <div class="nav-section">
+                <h3>🌐 Framework (Web-Buddy)</h3>
+                <ul class="nav-links">
+                    <li><a href="./web-buddy/index.html">Overview</a></li>
+                    <li><a href="./web-buddy/getting-started.html">Getting Started</a></li>
+                    <li><a href="./web-buddy/story.html">Project Story</a></li>
+                    <li><a href="https://github.com/rydnr/web-buddy-nodejs-server">Server Repository</a></li>
+                    <li><a href="https://github.com/rydnr/web-buddy-browser-extension">Extension Repository</a></li>
+                </ul>
+            </div>
+
+            <div class="nav-section">
+                <h3>🤖 Implementation (ChatGPT-Buddy)</h3>
+                <ul class="nav-links">
+                    <li><a href="./chatgpt-buddy/index.html">Overview</a></li>
+                    <li><a href="./chatgpt-buddy/getting-started.html">Getting Started</a></li>
+                    <li><a href="./chatgpt-buddy/story.html">Project Story</a></li>
+                    <li><a href="./chatgpt-buddy/atdd-guide.html">ATDD Guide</a></li>
+                    <li><a href="./chatgpt-buddy/research.html">Research</a></li>
+                    <li><a href="https://github.com/rydnr/chatgpt-buddy">Repository</a></li>
+                </ul>
+            </div>
+
+            <div class="nav-section">
+                <h3>📚 Documentation</h3>
+                <ul class="nav-links">
+                    <li><a href="./ecosystem-overview.html">Ecosystem Overview</a></li>
+                    <li><a href="./migration-guides.html">Migration Guides</a></li>
+                    <li><a href="./GETTING_STARTED.md">Quick Start</a></li>
+                    <li><a href="./GOOGLE_IMAGES_GETTING_STARTED.md">Google Images Guide</a></li>
+                    <li><a href="https://github.com/rydnr/chatgpt-buddy/tree/main/specs">Technical Specs</a></li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="ecosystem-overview">
+            <h2 style="text-align: center; margin-bottom: 30px; color: #333;">Key Innovations</h2>
+            
+            <div class="packages">
+                <div class="package-card" style="background: linear-gradient(135deg, #667eea, #764ba2); color: white;">
+                    <h4><span class="emoji">🎯</span>Event-Driven Architecture</h4>
+                    <p>Pure event-driven communication between all components with strong typing</p>
+                </div>
+                <div class="package-card" style="background: linear-gradient(135deg, #f093fb, #f5576c); color: white;">
+                    <h4><span class="emoji">🧠</span>Intelligent Pattern Learning</h4>
+                    <p>AI-powered automation that learns from user interactions and improves over time</p>
+                </div>
+                <div class="package-card" style="background: linear-gradient(135deg, #4facfe, #00f2fe); color: white;">
+                    <h4><span class="emoji">🔌</span>Hexagonal Architecture</h4>
+                    <p>Clean separation of domain, application, and infrastructure layers</p>
+                </div>
+                <div class="package-card" style="background: linear-gradient(135deg, #43e97b, #38f9d7); color: white;">
+                    <h4><span class="emoji">🚀</span>Multi-Repository Design</h4>
+                    <p>Modular packages enabling reusable automation frameworks</p>
+                </div>
+                <div class="package-card" style="background: linear-gradient(135deg, #fa709a, #fee140); color: white;">
+                    <h4><span class="emoji">🤝</span>Contract-Based Automation</h4>
+                    <p>Revolutionary approach where web apps declare their automation capabilities</p>
+                </div>
+                <div class="package-card" style="background: linear-gradient(135deg, #a8edea, #fed6e3); color: white;">
+                    <h4><span class="emoji">🎨</span>Plugin Architecture</h4>
+                    <p>Extensible framework for domain-specific automation tools</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>© 2025 TypeScript-EDA & Web-Buddy Ecosystem | <a href="https://github.com/rydnr" style="color: white;">GitHub</a></p>
+        </div>
+    </div>
+</body>
+</html>

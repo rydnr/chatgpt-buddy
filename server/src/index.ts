@@ -1,135 +1,150 @@
-import express, { Request, Response, NextFunction } from 'express';
-import http from 'http';
-import WebSocket from 'ws';
-import { AgentMessage, ActionResponse } from '../../shared/types';
-import logger from './logger';
+/**
+ * @fileoverview ChatGPT-Buddy Server - AI automation server built on Web-Buddy framework
+ * @description Specialized server for ChatGPT and language model integration automation
+ * @author rydnr
+ */
 
-// --- Configuration ---
-// In a production environment, use environment variables
-const PORT = process.env.PORT || 3000;
-const CLIENT_SECRET = process.env.CLIENT_SECRET || 'your-super-secret-client-key';
-const EXTENSION_SECRET = process.env.EXTENSION_SECRET || 'your-super-secret-extension-key';
+import 'reflect-metadata';
+import dotenv from 'dotenv';
+import { ServerApplication, ServerStartRequestedEvent, ServerStopRequestedEvent } from '@web-buddy/nodejs-server';
+import { ChatGPTAutomationApplication } from './applications/chatgpt-automation-application';
+import { logger } from './utils/logger';
 
-// --- Interfaces ---
-interface DispatchPayload {
-  target: {
-    extensionId: string;
-    tabId: number;
-  };
-  message: AgentMessage;
+// Load environment configuration
+dotenv.config();
+
+/**
+ * ChatGPT-Buddy Server entry point
+ * Combines Web-Buddy coordination with AI language model integration
+ */
+async function startChatGPTBuddyServer() {
+  const port = parseInt(process.env.PORT || '3003');
+  const environment = process.env.NODE_ENV || 'development';
+
+  console.log('🤖 Starting ChatGPT-Buddy Server...');
+  console.log(`📋 Environment: ${environment}`);
+  console.log(`🔌 Port: ${port}`);
+
+  try {
+    // Initialize the Web-Buddy server foundation
+    const serverApp = new ServerApplication();
+    
+    // Initialize ChatGPT-specific automation application
+    const chatGPTApp = new ChatGPTAutomationApplication();
+
+    // Configure server with ChatGPT-specific settings
+    const serverConfig = {
+      port,
+      host: process.env.HOST || '0.0.0.0',
+      environment: environment as 'development' | 'staging' | 'production',
+      
+      logging: {
+        level: (process.env.LOG_LEVEL || 'info') as 'debug' | 'info' | 'warn' | 'error',
+        format: 'json' as const,
+        destinations: ['console'],
+        enableRequestLogging: true,
+        enableErrorTracking: true
+      },
+      
+      security: {
+        enableHTTPS: process.env.ENABLE_HTTPS === 'true',
+        corsOrigins: process.env.CORS_ORIGINS?.split(',') || ['http://localhost:3000'],
+        rateLimiting: {
+          enabled: true,
+          windowMs: 15 * 60 * 1000, // 15 minutes
+          maxRequests: 100,
+          skipSuccessfulRequests: false
+        },
+        authentication: {
+          enabled: process.env.ENABLE_AUTH === 'true',
+          method: 'apikey' as const,
+          tokenExpiration: 3600
+        },
+        headers: {
+          enableHelmet: true,
+          contentSecurityPolicy: true,
+          xssProtection: true,
+          frameOptions: true
+        }
+      },
+      
+      performance: {
+        enableCompression: true,
+        enableCaching: true,
+        maxRequestSize: '10mb',
+        requestTimeout: 30000,
+        keepAliveTimeout: 5000
+      },
+      
+      features: {
+        enableWebSocket: true,
+        enableFileUploads: false,
+        enableExtensionManagement: true,
+        enablePatternSharing: true,
+        enableAnalytics: true
+      }
+    };
+
+    // Start the server applications
+    const startEvent = new ServerStartRequestedEvent(port, serverConfig);
+    
+    // Start Web-Buddy server foundation using accept method
+    await serverApp.accept(startEvent);
+    
+    // Start ChatGPT automation application
+    await chatGPTApp.start();
+
+    console.log('✅ ChatGPT-Buddy Server started successfully!');
+    console.log(`🌐 HTTP API: http://localhost:${port}`);
+    console.log(`🔌 WebSocket: ws://localhost:${port + 1}/ws`);
+    console.log(`🤖 ChatGPT automation: Enabled`);
+    console.log(`📊 Analytics: ${serverConfig.features.enableAnalytics ? 'Enabled' : 'Disabled'}`);
+    console.log(`🔐 Authentication: ${serverConfig.security.authentication.enabled ? 'Enabled' : 'Disabled'}`);
+
+    // Handle graceful shutdown
+    process.on('SIGINT', async () => {
+      console.log('\n🛑 Received SIGINT, shutting down gracefully...');
+      
+      try {
+        await chatGPTApp.shutdown();
+        const stopEvent = new ServerStopRequestedEvent('SIGINT', true);
+        await serverApp.accept(stopEvent);
+        console.log('✅ ChatGPT-Buddy Server stopped successfully');
+        process.exit(0);
+      } catch (error) {
+        console.error('❌ Error during shutdown:', error);
+        process.exit(1);
+      }
+    });
+
+    process.on('SIGTERM', async () => {
+      console.log('\n🛑 Received SIGTERM, shutting down gracefully...');
+      
+      try {
+        await chatGPTApp.shutdown();
+        const stopEvent = new ServerStopRequestedEvent('SIGTERM', true);
+        await serverApp.accept(stopEvent);
+        console.log('✅ ChatGPT-Buddy Server stopped successfully');
+        process.exit(0);
+      } catch (error) {
+        console.error('❌ Error during shutdown:', error);
+        process.exit(1);
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Failed to start ChatGPT-Buddy Server:', error);
+    logger.error('Server startup failed', { error: error.message, stack: error.stack });
+    process.exit(1);
+  }
 }
 
-// --- Express App Setup ---
-const app = express();
-app.use(express.json());
-
-// --- WebSocket Server Setup ---
-const server = http.createServer(app);
-const wss = new WebSocket.Server({ server });
-
-const extensionConnections = new Map<string, WebSocket>();
-
-// --- Middleware for API Authentication ---
-const clientAuthMiddleware = (req: Request, res: Response, next: NextFunction) => {
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    logger.warn('Authentication failed: Missing or invalid Authorization header');
-    return res.status(401).json({ error: 'Unauthorized: Missing API key' });
-  }
-
-  const token = authHeader.split(' ')[1];
-  if (token !== CLIENT_SECRET) {
-    logger.warn('Authentication failed: Invalid API key');
-    return res.status(403).json({ error: 'Forbidden: Invalid API key' });
-  }
-
-  next();
-};
-
-// --- WebSocket Connection Handling ---
-wss.on('connection', (ws: WebSocket, req) => {
-  logger.info('A new WebSocket client is attempting to connect.');
-
-  const timeout = setTimeout(() => {
-    logger.warn('WebSocket connection timed out due to missing authentication.');
-    ws.close();
-  }, 10000); // 10-second timeout for authentication
-
-  ws.on('message', (message: string) => {
-    try {
-      const parsedMessage = JSON.parse(message);
-
-      // 1. Handle Registration & Authentication
-      if (parsedMessage.type === 'REGISTER' && parsedMessage.extensionId && parsedMessage.secret) {
-        if (parsedMessage.secret !== EXTENSION_SECRET) {
-          logger.warn('WebSocket authentication failed: Invalid extension secret.', { extensionId: parsedMessage.extensionId });
-          ws.close();
-          return;
-        }
-        
-        clearTimeout(timeout); // Authentication successful, clear the timeout
-        extensionConnections.set(parsedMessage.extensionId, ws);
-        logger.info('Extension registered successfully.', { extensionId: parsedMessage.extensionId });
-        return;
-      }
-
-      // 2. Handle Responses from Authenticated Extensions
-      const extensionId = Array.from(extensionConnections.keys()).find(key => extensionConnections.get(key) === ws);
-      if (!extensionId) {
-        logger.warn('Received message from an unauthenticated/unregistered WebSocket client.');
-        ws.close(); // Close connection if message received before authentication
-        return;
-      }
-
-      const response: ActionResponse = parsedMessage;
-      logger.info('Received response from extension.', { extensionId, correlationId: response.correlationId });
-      // In a real app, you'd correlate this back to the original client request
-      // and potentially use a message queue or another mechanism to notify the client.
-
-    } catch (error) {
-      logger.error('Error processing WebSocket message.', error);
-    }
+// Start the server if this file is executed directly
+if (require.main === module) {
+  startChatGPTBuddyServer().catch((error) => {
+    console.error('❌ Unhandled error during server startup:', error);
+    process.exit(1);
   });
+}
 
-  ws.on('close', () => {
-    // Find and remove the disconnected extension from the map
-    for (const [extId, connection] of extensionConnections.entries()) {
-      if (connection === ws) {
-        extensionConnections.delete(extId);
-        logger.info('Extension disconnected and unregistered.', { extensionId: extId });
-        break;
-      }
-    }
-  });
-
-  ws.on('error', (error: Error) => {
-    logger.error('WebSocket error.', error);
-  });
-});
-
-// --- API Routes ---
-app.post('/api/dispatch', clientAuthMiddleware, (req: Request, res: Response) => {
-  const { target, message }: DispatchPayload = req.body;
-
-  if (!target || !target.extensionId || !target.tabId || !message) {
-    logger.warn('Invalid dispatch payload received.', { body: req.body });
-    return res.status(400).json({ error: 'Invalid dispatch payload' });
-  }
-
-  const extensionWs = extensionConnections.get(target.extensionId);
-
-  if (extensionWs && extensionWs.readyState === WebSocket.OPEN) {
-    logger.info('Dispatching message to extension.', { target, correlationId: message.correlationId });
-    extensionWs.send(JSON.stringify({ tabId: target.tabId, message }));
-    res.status(200).json({ status: 'Message dispatched successfully' });
-  } else {
-    logger.warn('Dispatch failed: Target extension not connected or not found.', { target });
-    res.status(404).json({ error: 'Target extension not connected or found' });
-  }
-});
-
-// --- Server Startup ---
-server.listen(PORT, () => {
-  logger.info(`Server listening on port ${PORT}`);
-  logger.info('Awaiting client requests and extension connections...');
-});
+export { startChatGPTBuddyServer };
