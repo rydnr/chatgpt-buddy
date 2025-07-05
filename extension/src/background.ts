@@ -406,6 +406,129 @@ class HeartbeatAckHandler extends MessageHandler {
   }
 }
 
+class ContractExecutionRequestedHandler extends MessageHandler {
+  async handle(message: any): Promise<void> {
+    try {
+      console.log('📋 Handling contract execution request:', message);
+      
+      // Get active tab
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      
+      if (!tab.id) {
+        throw new Error('No active tab found');
+      }
+      
+      // Forward to content script with contract execution type
+      const contractMessage = {
+        ...message,
+        type: 'contractExecutionRequested'
+      };
+      
+      chrome.tabs.sendMessage(tab.id, contractMessage, (response) => {
+        if (chrome.runtime.lastError) {
+          console.error('❌ Error sending contract execution to content script:', chrome.runtime.lastError.message);
+          this.sendErrorResponse(
+            message.correlationId,
+            chrome.runtime.lastError.message || 'Content script not reachable for contract execution'
+          );
+        } else {
+          console.log('✅ Received contract execution response from content script:', response);
+          this.sendResponse(response, message.correlationId);
+        }
+      });
+      
+    } catch (error) {
+      console.error('❌ Error handling contract execution request:', error);
+      this.sendErrorResponse(
+        message.correlationId,
+        error instanceof Error ? error.message : 'Unknown contract execution error'
+      );
+    }
+  }
+}
+
+class ContractDiscoveryRequestedHandler extends MessageHandler {
+  async handle(message: any): Promise<void> {
+    try {
+      console.log('🔍 Handling contract discovery request:', message);
+      
+      // Get active tab
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      
+      if (!tab.id) {
+        throw new Error('No active tab found');
+      }
+      
+      // Forward to content script with contract discovery type
+      const discoveryMessage = {
+        ...message,
+        type: 'contractDiscoveryRequested'
+      };
+      
+      chrome.tabs.sendMessage(tab.id, discoveryMessage, (response) => {
+        if (chrome.runtime.lastError) {
+          console.error('❌ Error sending contract discovery to content script:', chrome.runtime.lastError.message);
+          this.sendErrorResponse(
+            message.correlationId,
+            chrome.runtime.lastError.message || 'Content script not reachable for contract discovery'
+          );
+        } else {
+          console.log('✅ Received contract discovery response from content script:', response);
+          this.sendResponse(response, message.correlationId);
+        }
+      });
+      
+    } catch (error) {
+      console.error('❌ Error handling contract discovery request:', error);
+      this.sendErrorResponse(
+        message.correlationId,
+        error instanceof Error ? error.message : 'Unknown contract discovery error'
+      );
+    }
+  }
+}
+
+class ContractAvailabilityCheckHandler extends MessageHandler {
+  async handle(message: any): Promise<void> {
+    try {
+      console.log('🔍 Handling contract availability check:', message);
+      
+      // Get active tab
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      
+      if (!tab.id) {
+        throw new Error('No active tab found');
+      }
+      
+      // Forward to content script with availability check type
+      const availabilityMessage = {
+        ...message,
+        type: 'contractAvailabilityCheck'
+      };
+      
+      chrome.tabs.sendMessage(tab.id, availabilityMessage, (response) => {
+        if (chrome.runtime.lastError) {
+          console.error('❌ Error sending contract availability check to content script:', chrome.runtime.lastError.message);
+          this.sendErrorResponse(
+            message.correlationId,
+            chrome.runtime.lastError.message || 'Content script not reachable for availability check'
+          );
+        } else {
+          console.log('✅ Received contract availability response from content script:', response);
+          this.sendResponse(response, message.correlationId);
+        }
+      });
+      
+    } catch (error) {
+      console.error('❌ Error handling contract availability check:', error);
+      this.sendErrorResponse(
+        message.correlationId,
+        error instanceof Error ? error.message : 'Unknown contract availability error'
+      );
+    }
+  }
+}
+
 class MessageDispatcher {
   private handlers: Map<string, MessageHandler> = new Map();
 
@@ -421,11 +544,21 @@ class MessageDispatcher {
     this.handlers.set('RegistrationAck', new RegistrationAckHandler());
     this.handlers.set('HeartbeatAck', new HeartbeatAckHandler());
     
+    // Contract-based handlers
+    this.handlers.set('ContractExecutionRequested', new ContractExecutionRequestedHandler());
+    this.handlers.set('ContractDiscoveryRequested', new ContractDiscoveryRequestedHandler());
+    this.handlers.set('ContractAvailabilityCheck', new ContractAvailabilityCheckHandler());
+    
     // Keep legacy names for backward compatibility
     this.handlers.set('automationRequested', new AutomationRequestedHandler());
     this.handlers.set('ping', new PingHandler());
     this.handlers.set('registrationAck', new RegistrationAckHandler());
     this.handlers.set('heartbeatAck', new HeartbeatAckHandler());
+    
+    // Contract-based handlers (snake_case for API compatibility)
+    this.handlers.set('contractExecutionRequested', new ContractExecutionRequestedHandler());
+    this.handlers.set('contractDiscoveryRequested', new ContractDiscoveryRequestedHandler());
+    this.handlers.set('contractAvailabilityCheck', new ContractAvailabilityCheckHandler());
   }
 
   async dispatch(message: any): Promise<void> {

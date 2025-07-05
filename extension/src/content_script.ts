@@ -2,6 +2,8 @@
 // Handles automation commands from the background script
 
 import { webBuddyStorage, AutomationPattern, UserInteraction } from './storage';
+import { contractDiscovery } from './contracts/contract-discovery-adapter';
+import { contractExecution } from './contracts/contract-execution-service';
 
 // Store test data for E2E testing
 (window as any).extensionTestData = {
@@ -15,6 +17,16 @@ const sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 
 const currentDomain = window.location.hostname;
 const currentUrl = window.location.href;
 
+// Initialize contract discovery system
+(async () => {
+  try {
+    await contractDiscovery.initialize();
+    console.log('🔍 Contract discovery system initialized');
+  } catch (error) {
+    console.error('❌ Failed to initialize contract discovery:', error);
+  }
+})();
+
 chrome.runtime.onMessage.addListener(async (message: any, sender, sendResponse) => {
   console.log('📨 Content script received message:', message);
   
@@ -27,6 +39,12 @@ chrome.runtime.onMessage.addListener(async (message: any, sender, sendResponse) 
     // Handle different event types
     if (message.type === 'automationRequested') {
       response = await handleAutomationRequest(message);
+    } else if (message.type === 'contractExecutionRequested') {
+      response = await handleContractExecution(message);
+    } else if (message.type === 'contractDiscoveryRequested') {
+      response = await handleContractDiscovery(message);
+    } else if (message.type === 'contractAvailabilityCheck') {
+      response = await handleContractAvailabilityCheck(message);
     } else if (message.type === 'ping') {
       response = handlePingMessage(message);
     } else if (message.type === 'storageRequest') {
@@ -123,14 +141,42 @@ function generateContextHash(): string {
   return btoa(JSON.stringify(context)).slice(0, 16);
 }
 
-// Enhanced automation handler with pattern matching
+// Enhanced automation handler with contract-based execution and pattern matching
 async function handleAutomationRequest(message: any): Promise<any> {
   const { payload, correlationId } = message;
   const { action, parameters } = payload;
   
   console.log(`🎯 Executing automation: ${action}`, parameters);
   
-  // Check for existing patterns for this action
+  // Step 1: Try contract-based execution first
+  try {
+    const contractResult = await contractExecution.executeWithContract({
+      action,
+      parameters,
+      domain: currentDomain
+    });
+    
+    if (contractResult.success) {
+      console.log('✅ Contract-based execution successful');
+      return {
+        correlationId,
+        status: 'success',
+        data: {
+          ...contractResult.data,
+          executionMethod: 'contract',
+          contractId: contractResult.contractId,
+          capabilityName: contractResult.capabilityName
+        },
+        timestamp: contractResult.timestamp
+      };
+    } else {
+      console.log('⚠️ Contract-based execution failed, falling back to patterns');
+    }
+  } catch (contractError) {
+    console.log('⚠️ Contract execution error, falling back to patterns:', contractError);
+  }
+  
+  // Step 2: Check for existing patterns for this action (fallback)
   const existingPatterns = await webBuddyStorage.getAutomationPatterns({
     domain: currentDomain,
     action: action,
@@ -155,7 +201,7 @@ async function handleAutomationRequest(message: any): Promise<any> {
     }
   }
   
-  // Fall back to standard action handling
+  // Step 3: Fall back to standard action handling
   return handleStandardAction(action, parameters, correlationId);
 }
 
@@ -431,6 +477,104 @@ async function handleLegacyAction(message: any): Promise<any> {
     data: `Legacy action ${action} executed successfully (placeholder)`,
     timestamp: new Date().toISOString()
   };
+}
+
+// Contract-based message handlers
+async function handleContractExecution(message: any): Promise<any> {
+  const { payload, correlationId } = message;
+  const { action, parameters, preferredContract, timeout } = payload;
+  
+  console.log(`📋 Executing contract-based action: ${action}`);
+  
+  try {
+    const result = await contractExecution.executeWithContract({
+      action,
+      parameters,
+      preferredContract,
+      timeout,
+      domain: currentDomain
+    });
+    
+    return {
+      correlationId,
+      status: result.success ? 'success' : 'error',
+      data: result.data,
+      error: result.error,
+      executionTime: result.executionTime,
+      contractId: result.contractId,
+      capabilityName: result.capabilityName,
+      timestamp: result.timestamp
+    };
+  } catch (error: any) {
+    return {
+      correlationId,
+      status: 'error',
+      error: error.message,
+      timestamp: new Date().toISOString()
+    };
+  }
+}
+
+async function handleContractDiscovery(message: any): Promise<any> {
+  const { correlationId } = message;
+  
+  console.log('🔍 Performing contract discovery');
+  
+  try {
+    const contracts = await contractDiscovery.discoverContracts();
+    const availability = await contractExecution.checkContractAvailability();
+    const actions = contractExecution.getAvailableActions();
+    
+    return {
+      correlationId,
+      status: 'success',
+      data: {
+        contracts: contracts,
+        availability: availability,
+        availableActions: actions,
+        url: currentUrl,
+        domain: currentDomain
+      },
+      timestamp: new Date().toISOString()
+    };
+  } catch (error: any) {
+    return {
+      correlationId,
+      status: 'error',
+      error: error.message,
+      timestamp: new Date().toISOString()
+    };
+  }
+}
+
+async function handleContractAvailabilityCheck(message: any): Promise<any> {
+  const { correlationId } = message;
+  
+  console.log('🔍 Checking contract availability');
+  
+  try {
+    const availability = await contractExecution.checkContractAvailability();
+    const recommendations = contractExecution.getContractRecommendations();
+    
+    return {
+      correlationId,
+      status: 'success',
+      data: {
+        availability: availability,
+        recommendations: recommendations,
+        url: currentUrl,
+        domain: currentDomain
+      },
+      timestamp: new Date().toISOString()
+    };
+  } catch (error: any) {
+    return {
+      correlationId,
+      status: 'error',
+      error: error.message,
+      timestamp: new Date().toISOString()
+    };
+  }
 }
 
 // Notify background script that content script is ready
