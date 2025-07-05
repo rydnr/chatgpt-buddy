@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web-Buddy Contract Demo - E-commerce Store</title>
+    
+    <!-- Contract metadata for discovery -->
+    <meta name="web-buddy-contract" content='{"version":"1.0.0","domain":"demo-store.example.com","title":"E-commerce Demo Contract","description":"Automation contract for the demo e-commerce store"}'>
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: #f8f9fa;
+        }
+        
+        .header {
+            background: #2c3e50;
+            color: white;
+            padding: 1rem 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+        
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .logo {
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+        
+        .user-menu {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .login-btn, .cart-btn {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            text-decoration: none;
+            transition: background-color 0.3s;
+        }
+        
+        .login-btn:hover, .cart-btn:hover {
+            background: #2980b9;
+        }
+        
+        .search-section {
+            background: white;
+            padding: 2rem 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        
+        .search-form {
+            display: flex;
+            max-width: 600px;
+            margin: 0 auto;
+            gap: 10px;
+        }
+        
+        .search-input {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        
+        .search-btn {
+            background: #e74c3c;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+        
+        .search-btn:hover {
+            background: #c0392b;
+        }
+        
+        .main-content {
+            margin: 2rem 0;
+        }
+        
+        .products-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            margin-bottom: 2rem;
+        }
+        
+        .product-card {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            padding: 20px;
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+        
+        .product-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+        }
+        
+        .product-image {
+            width: 100%;
+            height: 200px;
+            background: linear-gradient(45deg, #f0f0f0, #e0e0e0);
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 15px;
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .product-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #2c3e50;
+        }
+        
+        .product-price {
+            font-size: 1.25rem;
+            font-weight: bold;
+            color: #e74c3c;
+            margin-bottom: 15px;
+        }
+        
+        .add-to-cart-btn {
+            width: 100%;
+            background: #27ae60;
+            color: white;
+            border: none;
+            padding: 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+        
+        .add-to-cart-btn:hover {
+            background: #229954;
+        }
+        
+        .form-section {
+            background: white;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            margin-bottom: 2rem;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #555;
+        }
+        
+        .form-input, .form-select {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        
+        .form-input:focus, .form-select:focus {
+            border-color: #3498db;
+            outline: none;
+        }
+        
+        .submit-btn {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+        
+        .submit-btn:hover {
+            background: #2980b9;
+        }
+        
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #27ae60;
+            color: white;
+            padding: 15px 20px;
+            border-radius: 4px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            transform: translateX(400px);
+            transition: transform 0.3s;
+            z-index: 1000;
+        }
+        
+        .notification.show {
+            transform: translateX(0);
+        }
+        
+        .contract-info {
+            background: #e8f4f8;
+            border: 2px solid #3498db;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 2rem;
+        }
+        
+        .contract-info h3 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+        
+        .capabilities-list {
+            list-style: none;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            margin-top: 15px;
+        }
+        
+        .capability-item {
+            background: white;
+            padding: 8px 12px;
+            border-radius: 4px;
+            border-left: 4px solid #3498db;
+            font-size: 14px;
+        }
+        
+        .highlighted {
+            outline: 3px solid #ff6b6b !important;
+            outline-offset: 2px;
+            background-color: rgba(255, 107, 107, 0.1) !important;
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <div class="logo" data-testid="logo">DemoStore</div>
+                <div class="user-menu">
+                    <a href="#login" class="login-btn" 
+                       data-testid="login-button"
+                       aria-label="Login to your account"
+                       role="button">Login</a>
+                    <a href="#cart" class="cart-btn" 
+                       data-testid="cart-button"
+                       aria-label="View shopping cart"
+                       role="button">Cart (0)</a>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Search Section -->
+    <section class="search-section">
+        <div class="container">
+            <form class="search-form" data-testid="search-form" role="search">
+                <input type="text" 
+                       class="search-input"
+                       data-testid="search-input"
+                       aria-label="Search for products"
+                       placeholder="Search for products..." 
+                       name="query">
+                <button type="submit" 
+                        class="search-btn"
+                        data-testid="search-button"
+                        aria-label="Search products">Search</button>
+            </form>
+        </div>
+    </section>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="container">
+            <!-- Contract Information -->
+            <div class="contract-info">
+                <h3>🔗 Web-Buddy Contract Enabled</h3>
+                <p>This page declares automation contracts that can be discovered and used by Web-Buddy extensions for zero-fragility automation.</p>
+                <div>
+                    <strong>Available Capabilities:</strong>
+                    <ul class="capabilities-list">
+                        <li class="capability-item">🔍 Search Products</li>
+                        <li class="capability-item">🛒 Add to Cart</li>
+                        <li class="capability-item">👤 User Login</li>
+                        <li class="capability-item">📝 Fill Forms</li>
+                        <li class="capability-item">🧭 Navigation</li>
+                        <li class="capability-item">📊 Query Data</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Products Grid -->
+            <div class="products-grid">
+                <div class="product-card" data-testid="product-laptop" data-product-id="1">
+                    <div class="product-image">Laptop Image</div>
+                    <h3 class="product-title">Gaming Laptop</h3>
+                    <div class="product-price">$1,299.99</div>
+                    <button class="add-to-cart-btn" 
+                            data-testid="add-to-cart-laptop"
+                            aria-label="Add Gaming Laptop to cart">Add to Cart</button>
+                </div>
+
+                <div class="product-card" data-testid="product-smartphone" data-product-id="2">
+                    <div class="product-image">Smartphone Image</div>
+                    <h3 class="product-title">Smartphone Pro</h3>
+                    <div class="product-price">$899.99</div>
+                    <button class="add-to-cart-btn" 
+                            data-testid="add-to-cart-smartphone"
+                            aria-label="Add Smartphone Pro to cart">Add to Cart</button>
+                </div>
+
+                <div class="product-card" data-testid="product-headphones" data-product-id="3">
+                    <div class="product-image">Headphones Image</div>
+                    <h3 class="product-title">Wireless Headphones</h3>
+                    <div class="product-price">$199.99</div>
+                    <button class="add-to-cart-btn" 
+                            data-testid="add-to-cart-headphones"
+                            aria-label="Add Wireless Headphones to cart">Add to Cart</button>
+                </div>
+            </div>
+
+            <!-- User Registration Form -->
+            <section class="form-section">
+                <h2>Create Account</h2>
+                <form data-testid="registration-form" role="form" aria-label="User registration form">
+                    <div class="form-group">
+                        <label class="form-label" for="username">Username:</label>
+                        <input type="text" 
+                               id="username" 
+                               name="username"
+                               class="form-input"
+                               data-testid="username-input"
+                               aria-label="Enter your username"
+                               placeholder="Enter username" 
+                               required>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="email">Email:</label>
+                        <input type="email" 
+                               id="email" 
+                               name="email"
+                               class="form-input"
+                               data-testid="email-input"
+                               aria-label="Enter your email address"
+                               placeholder="Enter email" 
+                               required>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="password">Password:</label>
+                        <input type="password" 
+                               id="password" 
+                               name="password"
+                               class="form-input"
+                               data-testid="password-input"
+                               aria-label="Enter your password"
+                               placeholder="Enter password" 
+                               required>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="country">Country:</label>
+                        <select id="country" 
+                                name="country"
+                                class="form-select"
+                                data-testid="country-select"
+                                aria-label="Select your country">
+                            <option value="">Select Country</option>
+                            <option value="us">United States</option>
+                            <option value="ca">Canada</option>
+                            <option value="uk">United Kingdom</option>
+                            <option value="de">Germany</option>
+                            <option value="fr">France</option>
+                        </select>
+                    </div>
+
+                    <button type="submit" 
+                            class="submit-btn"
+                            data-testid="register-button"
+                            aria-label="Create your account">Create Account</button>
+                </form>
+            </section>
+        </div>
+    </main>
+
+    <!-- Notification -->
+    <div id="notification" class="notification"></div>
+
+    <!-- Contract Declaration Script -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "WebBuddyContract",
+        "version": "1.0.0",
+        "domain": "demo-store.example.com",
+        "title": "E-commerce Demo Store Contract",
+        "description": "Comprehensive automation contract for the demo e-commerce store",
+        "capabilities": {
+            "searchProducts": {
+                "type": "form",
+                "description": "Search for products in the store",
+                "selector": "[data-testid='search-input']",
+                "parameters": [
+                    {
+                        "name": "query",
+                        "type": "string",
+                        "description": "Search query",
+                        "required": true
+                    }
+                ]
+            },
+            "addToCart": {
+                "type": "action",
+                "description": "Add a product to shopping cart",
+                "selector": ".add-to-cart-btn",
+                "parameters": [
+                    {
+                        "name": "productId",
+                        "type": "string",
+                        "description": "Product identifier",
+                        "required": false
+                    }
+                ]
+            },
+            "login": {
+                "type": "navigation",
+                "description": "Navigate to login page",
+                "selector": "[data-testid='login-button']"
+            },
+            "fillRegistrationForm": {
+                "type": "form",
+                "description": "Fill user registration form",
+                "selector": "[data-testid='registration-form']",
+                "parameters": [
+                    {
+                        "name": "username",
+                        "type": "string",
+                        "description": "Username",
+                        "required": true
+                    },
+                    {
+                        "name": "email",
+                        "type": "string",
+                        "description": "Email address",
+                        "required": true
+                    },
+                    {
+                        "name": "password",
+                        "type": "string",
+                        "description": "Password",
+                        "required": true
+                    },
+                    {
+                        "name": "country",
+                        "type": "string",
+                        "description": "Country selection",
+                        "required": false
+                    }
+                ]
+            },
+            "getProductInfo": {
+                "type": "query",
+                "description": "Get product information",
+                "selector": ".product-card",
+                "returnType": {
+                    "type": "object",
+                    "description": "Product details including title, price, and ID"
+                }
+            },
+            "getCartCount": {
+                "type": "query",
+                "description": "Get current cart item count",
+                "selector": "[data-testid='cart-button']",
+                "returnType": {
+                    "type": "string",
+                    "description": "Cart count text"
+                }
+            }
+        },
+        "context": {
+            "urlPatterns": ["*://demo-store.example.com/*", "*://localhost:*/*"],
+            "accessibility": {
+                "ariaCompliant": true,
+                "keyboardNavigation": true
+            }
+        }
+    }
+    </script>
+
+    <!-- Demo JavaScript -->
+    <script>
+        // Mock contract library for demo purposes
+        const WebBuddyContracts = {
+            quickRegister: function(options) {
+                console.log('📋 Contract registered:', options);
+                return { valid: true, errors: [], warnings: [] };
+            },
+            
+            contractRegistry: {
+                getAll: () => [{
+                    domain: 'demo-store.example.com',
+                    title: 'E-commerce Demo Store Contract',
+                    capabilities: {
+                        searchProducts: 'Search for products',
+                        addToCart: 'Add products to cart',
+                        login: 'User login',
+                        fillRegistrationForm: 'Fill registration form',
+                        getProductInfo: 'Get product information',
+                        getCartCount: 'Get cart count'
+                    }
+                }],
+                
+                discoverContracts: async () => {
+                    console.log('🔍 Discovering contracts...');
+                    return [];
+                }
+            }
+        };
+
+        // Register contract using the quick registration method
+        WebBuddyContracts.quickRegister({
+            domain: 'demo-store.example.com',
+            title: 'E-commerce Demo Store Contract',
+            description: 'Interactive demo contract for testing Web-Buddy automation',
+            capabilities: [
+                {
+                    name: 'searchProducts',
+                    type: 'form',
+                    description: 'Search for products in the store',
+                    selector: '[data-testid="search-input"]'
+                },
+                {
+                    name: 'addToCart',
+                    type: 'action',
+                    description: 'Add a product to shopping cart',
+                    selector: '.add-to-cart-btn'
+                },
+                {
+                    name: 'login',
+                    type: 'navigation',
+                    description: 'Navigate to login page',
+                    selector: '[data-testid="login-button"]'
+                },
+                {
+                    name: 'fillRegistrationForm',
+                    type: 'form',
+                    description: 'Fill user registration form',
+                    selector: '[data-testid="registration-form"]'
+                },
+                {
+                    name: 'getProductInfo',
+                    type: 'query',
+                    description: 'Get product information',
+                    selector: '.product-card'
+                },
+                {
+                    name: 'getCartCount',
+                    type: 'query',
+                    description: 'Get current cart item count',
+                    selector: '[data-testid="cart-button"]'
+                }
+            ]
+        });
+
+        // Demo functionality
+        let cartCount = 0;
+        
+        function showNotification(message) {
+            const notification = document.getElementById('notification');
+            notification.textContent = message;
+            notification.classList.add('show');
+            
+            setTimeout(() => {
+                notification.classList.remove('show');
+            }, 3000);
+        }
+        
+        function updateCartCount() {
+            const cartBtn = document.querySelector('[data-testid="cart-button"]');
+            cartBtn.textContent = `Cart (${cartCount})`;
+        }
+
+        // Event listeners
+        document.addEventListener('DOMContentLoaded', function() {
+            // Search form
+            document.querySelector('[data-testid="search-form"]').addEventListener('submit', function(e) {
+                e.preventDefault();
+                const query = document.querySelector('[data-testid="search-input"]').value;
+                if (query) {
+                    showNotification(`Searching for: "${query}"`);
+                    console.log('🔍 Search executed:', query);
+                }
+            });
+
+            // Add to cart buttons
+            document.querySelectorAll('.add-to-cart-btn').forEach(button => {
+                button.addEventListener('click', function() {
+                    cartCount++;
+                    updateCartCount();
+                    const productCard = this.closest('.product-card');
+                    const productTitle = productCard.querySelector('.product-title').textContent;
+                    showNotification(`Added "${productTitle}" to cart!`);
+                    console.log('🛒 Product added to cart:', productTitle);
+                });
+            });
+
+            // Registration form
+            document.querySelector('[data-testid="registration-form"]').addEventListener('submit', function(e) {
+                e.preventDefault();
+                const formData = new FormData(this);
+                const userData = Object.fromEntries(formData);
+                showNotification(`Account created for ${userData.username}!`);
+                console.log('👤 User registered:', userData);
+            });
+
+            // Login button
+            document.querySelector('[data-testid="login-button"]').addEventListener('click', function(e) {
+                e.preventDefault();
+                showNotification('Redirecting to login page...');
+                console.log('👤 Login navigation triggered');
+            });
+
+            console.log('✅ E-commerce demo page loaded with Web-Buddy contracts');
+        });
+
+        // Expose test functions for automation
+        window.demoActions = {
+            highlightElement: function(selector) {
+                const element = document.querySelector(selector);
+                if (element) {
+                    element.classList.add('highlighted');
+                    setTimeout(() => {
+                        element.classList.remove('highlighted');
+                    }, 3000);
+                    return true;
+                }
+                return false;
+            },
+            
+            fillForm: function(formData) {
+                for (const [field, value] of Object.entries(formData)) {
+                    const input = document.querySelector(`[name="${field}"]`);
+                    if (input) {
+                        input.value = value;
+                        input.dispatchEvent(new Event('input', { bubbles: true }));
+                    }
+                }
+            },
+            
+            getContractInfo: function() {
+                return {
+                    domain: 'demo-store.example.com',
+                    title: 'E-commerce Demo Store Contract',
+                    capabilities: 6,
+                    url: window.location.href
+                };
+            }
+        };
+
+        // Listen for Web-Buddy contract events
+        window.addEventListener('web-buddy:contracts-discovered', function(event) {
+            console.log('🎯 Contracts discovered by Web-Buddy:', event.detail);
+        });
+
+        window.addEventListener('web-buddy:contract-registered', function(event) {
+            console.log('📋 Contract registered in Web-Buddy:', event.detail);
+        });
+    </script>
+</body>
+</html>

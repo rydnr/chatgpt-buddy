@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web-Buddy Contract Library - Basic Usage</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, textarea, button {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }
+        .highlight {
+            outline: 3px solid #ff6b6b;
+            outline-offset: 2px;
+            background-color: rgba(255, 107, 107, 0.1);
+        }
+        .contract-info {
+            background: #e7f3ff;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Web-Buddy Contract Library Demo</h1>
+    
+    <div class="contract-info">
+        <h3>Contract Registration Status</h3>
+        <div id="contract-status">Initializing...</div>
+    </div>
+
+    <!-- Sample form for automation -->
+    <form id="sample-form" role="form" aria-label="Sample contact form">
+        <h2>Contact Form</h2>
+        
+        <div class="form-group">
+            <label for="name">Name:</label>
+            <input type="text" 
+                   id="name" 
+                   name="name" 
+                   data-testid="name-input"
+                   aria-label="Your full name"
+                   placeholder="Enter your full name">
+        </div>
+
+        <div class="form-group">
+            <label for="email">Email:</label>
+            <input type="email" 
+                   id="email" 
+                   name="email" 
+                   data-testid="email-input"
+                   aria-label="Your email address"
+                   placeholder="Enter your email">
+        </div>
+
+        <div class="form-group">
+            <label for="message">Message:</label>
+            <textarea id="message" 
+                     name="message" 
+                     data-testid="message-input"
+                     aria-label="Your message"
+                     placeholder="Enter your message"
+                     rows="4"></textarea>
+        </div>
+
+        <button type="submit" 
+                id="submit-btn" 
+                data-testid="submit-button"
+                aria-label="Submit contact form">
+            Submit Form
+        </button>
+    </form>
+
+    <!-- Navigation links -->
+    <nav aria-label="Page navigation">
+        <h3>Navigation</h3>
+        <a href="#about" 
+           data-testid="about-link"
+           aria-label="Go to about section">About</a> |
+        <a href="#services" 
+           data-testid="services-link"
+           aria-label="Go to services section">Services</a> |
+        <a href="#contact" 
+           data-testid="contact-link"
+           aria-label="Go to contact section">Contact</a>
+    </nav>
+
+    <!-- Results display -->
+    <div id="results" class="result" style="display: none;">
+        <h3>Form Results</h3>
+        <div id="result-content"></div>
+    </div>
+
+    <!-- Test buttons -->
+    <div style="margin-top: 30px;">
+        <h3>Contract Testing</h3>
+        <button onclick="testContractDiscovery()">Test Contract Discovery</button>
+        <button onclick="testElementHighlight()">Highlight Form Elements</button>
+        <button onclick="testAutomation()">Test Automation</button>
+        <button onclick="testARIAIntegration()">Test ARIA Integration</button>
+    </div>
+
+    <!-- Include the contract library -->
+    <script type="module">
+        // Simulate loading the library (in real usage, this would be from NPM or CDN)
+        
+        // Mock contract library functionality for demo
+        window.WebBuddyContracts = {
+            quickRegister: function(options) {
+                console.log('✅ Contract registered:', options);
+                return { valid: true, errors: [], warnings: [] };
+            },
+            
+            contractRegistry: {
+                getAll: () => [
+                    {
+                        domain: 'demo.example.com',
+                        title: 'Contact Form Contract',
+                        capabilities: {
+                            fillName: 'Fill name field',
+                            fillEmail: 'Fill email field',
+                            fillMessage: 'Fill message field',
+                            submitForm: 'Submit the form'
+                        }
+                    }
+                ],
+                
+                discoverContracts: async () => {
+                    console.log('🔍 Discovering contracts...');
+                    return [];
+                }
+            },
+            
+            SelectorUtils: {
+                highlightElement: function(element, duration = 2000) {
+                    element.classList.add('highlight');
+                    setTimeout(() => {
+                        element.classList.remove('highlight');
+                    }, duration);
+                },
+                
+                generateRobustSelector: function(element) {
+                    const testId = element.getAttribute('data-testid');
+                    const id = element.id;
+                    const ariaLabel = element.getAttribute('aria-label');
+                    
+                    return {
+                        primary: testId ? `[data-testid="${testId}"]` : `#${id}`,
+                        fallback: [
+                            ariaLabel ? `[aria-label="${ariaLabel}"]` : null,
+                            element.tagName.toLowerCase()
+                        ].filter(Boolean)
+                    };
+                }
+            },
+            
+            AriaIntegration: {
+                findAriaElements: () => {
+                    return document.querySelectorAll('[role], [aria-label], [data-testid]');
+                },
+                
+                getAccessibilityInfo: (element) => {
+                    return {
+                        role: element.getAttribute('role'),
+                        name: element.getAttribute('aria-label') || element.textContent?.trim(),
+                        testId: element.getAttribute('data-testid')
+                    };
+                }
+            }
+        };
+
+        // Register the demo contract
+        const contractResult = WebBuddyContracts.quickRegister({
+            domain: 'demo.example.com',
+            title: 'Contact Form Demo Contract',
+            description: 'Automation contract for the contact form demo',
+            capabilities: [
+                {
+                    name: 'fillName',
+                    type: 'form',
+                    description: 'Fill the name input field',
+                    selector: '[data-testid="name-input"]'
+                },
+                {
+                    name: 'fillEmail',
+                    type: 'form',
+                    description: 'Fill the email input field',
+                    selector: '[data-testid="email-input"]'
+                },
+                {
+                    name: 'fillMessage',
+                    type: 'form',
+                    description: 'Fill the message textarea',
+                    selector: '[data-testid="message-input"]'
+                },
+                {
+                    name: 'submitForm',
+                    type: 'action',
+                    description: 'Submit the contact form',
+                    selector: '[data-testid="submit-button"]'
+                },
+                {
+                    name: 'navigateToAbout',
+                    type: 'navigation',
+                    description: 'Navigate to about section',
+                    selector: '[data-testid="about-link"]'
+                }
+            ]
+        });
+
+        // Update status
+        document.getElementById('contract-status').innerHTML = `
+            <strong>✅ Contract Registered Successfully</strong><br>
+            Domain: demo.example.com<br>
+            Capabilities: 5 registered<br>
+            Validation: ${contractResult.valid ? 'Passed' : 'Failed'}
+        `;
+
+        // Global test functions
+        window.testContractDiscovery = async function() {
+            console.log('Testing contract discovery...');
+            const contracts = WebBuddyContracts.contractRegistry.getAll();
+            alert(`Found ${contracts.length} contract(s):\n${contracts.map(c => c.title).join('\n')}`);
+        };
+
+        window.testElementHighlight = function() {
+            console.log('Highlighting form elements...');
+            const elements = document.querySelectorAll('[data-testid]');
+            elements.forEach((el, index) => {
+                setTimeout(() => {
+                    WebBuddyContracts.SelectorUtils.highlightElement(el, 1500);
+                    console.log(`Highlighted: ${el.getAttribute('data-testid')}`);
+                }, index * 300);
+            });
+        };
+
+        window.testAutomation = function() {
+            console.log('Testing automation sequence...');
+            
+            // Simulate automated form filling
+            const nameField = document.querySelector('[data-testid="name-input"]');
+            const emailField = document.querySelector('[data-testid="email-input"]');
+            const messageField = document.querySelector('[data-testid="message-input"]');
+            
+            // Fill fields with animation
+            setTimeout(() => {
+                WebBuddyContracts.SelectorUtils.highlightElement(nameField);
+                nameField.value = 'Test User';
+                nameField.dispatchEvent(new Event('input', { bubbles: true }));
+            }, 500);
+            
+            setTimeout(() => {
+                WebBuddyContracts.SelectorUtils.highlightElement(emailField);
+                emailField.value = 'test@example.com';
+                emailField.dispatchEvent(new Event('input', { bubbles: true }));
+            }, 1000);
+            
+            setTimeout(() => {
+                WebBuddyContracts.SelectorUtils.highlightElement(messageField);
+                messageField.value = 'This message was filled automatically using Web-Buddy contracts!';
+                messageField.dispatchEvent(new Event('input', { bubbles: true }));
+            }, 1500);
+            
+            alert('Automation sequence completed! Check the form fields.');
+        };
+
+        window.testARIAIntegration = function() {
+            console.log('Testing ARIA integration...');
+            const ariaElements = WebBuddyContracts.AriaIntegration.findAriaElements();
+            
+            const results = Array.from(ariaElements).map(el => {
+                const info = WebBuddyContracts.AriaIntegration.getAccessibilityInfo(el);
+                return `${el.tagName}: ${info.name || 'Unnamed'} (${info.role || 'no role'})`;
+            });
+            
+            alert(`Found ${ariaElements.length} ARIA elements:\n${results.join('\n')}`);
+        };
+
+        // Form submission handler
+        document.getElementById('sample-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            const results = Object.fromEntries(formData);
+            
+            document.getElementById('result-content').innerHTML = `
+                <strong>Form Submitted via Contract:</strong><br>
+                Name: ${results.name}<br>
+                Email: ${results.email}<br>
+                Message: ${results.message}
+            `;
+            
+            document.getElementById('results').style.display = 'block';
+            
+            console.log('Form submitted with contract-based automation support');
+        });
+
+        console.log('✅ Web-Buddy Contract Library Demo initialized');
+    </script>
+</body>
+</html>

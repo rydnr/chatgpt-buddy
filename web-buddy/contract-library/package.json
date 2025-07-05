@@ -1,0 +1,48 @@
+{
+  "name": "@web-buddy/contract-declaration",
+  "version": "1.0.0",
+  "description": "JavaScript library for web applications to declare automation contracts",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "jest",
+    "lint": "eslint src/**/*.ts",
+    "clean": "rm -rf dist",
+    "prepublishOnly": "npm run clean && npm run build",
+    "dev": "tsc --watch"
+  },
+  "keywords": [
+    "web-automation",
+    "contract-based",
+    "declarative",
+    "browser-extension",
+    "testing",
+    "zero-fragility"
+  ],
+  "author": "Web-Buddy Team",
+  "license": "GPL-3.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rydnr/web-buddy-contract-declaration.git"
+  },
+  "bugs": {
+    "url": "https://github.com/rydnr/web-buddy-contract-declaration/issues"
+  },
+  "homepage": "https://github.com/rydnr/web-buddy-contract-declaration#readme",
+  "devDependencies": {
+    "@types/jest": "^29.5.0",
+    "@types/node": "^18.15.0",
+    "@typescript-eslint/eslint-plugin": "^5.57.0",
+    "@typescript-eslint/parser": "^5.57.0",
+    "eslint": "^8.37.0",
+    "jest": "^29.5.0",
+    "ts-jest": "^29.1.0",
+    "typescript": "^5.0.0"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ]
+}
