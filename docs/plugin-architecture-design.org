@@ -1,0 +1,514 @@
+#+TITLE: Web-Buddy Plugin Architecture Design
+#+AUTHOR: Web-Buddy Team
+#+DATE: 2025-07-04
+#+DESCRIPTION: Plugin architecture for domain-specific automation extensions
+
+* Overview
+
+The Web-Buddy Plugin Architecture enables domain-specific automation extensions that leverage the contract discovery system for zero-fragility automation. This architecture allows specialized plugins like ChatGPT-buddy, GitHub-buddy, and others to provide tailored automation experiences while maintaining compatibility with the core Web-Buddy framework.
+
+* Plugin Architecture Goals
+
+** 1. Domain Specialization
+- Enable plugins to provide domain-specific automation capabilities
+- Support specialized UI elements and workflows for different web applications
+- Allow custom contract definitions and automation patterns
+
+** 2. Contract Integration
+- Leverage the Web-Buddy contract discovery system
+- Enable plugins to register domain-specific contracts
+- Support contract-based automation with plugin-specific enhancements
+
+** 3. Extensibility
+- Plugin hot-loading and runtime registration
+- Modular architecture with clear plugin boundaries
+- Support for plugin dependencies and versioning
+
+** 4. Compatibility
+- Backward compatibility with existing Web-Buddy automation patterns
+- Seamless integration with the core browser extension framework
+- Cross-plugin communication and data sharing
+
+* Plugin Architecture Components
+
+** 1. Plugin Registry System
+
+#+BEGIN_SRC typescript
+interface PluginRegistry {
+  // Plugin lifecycle management
+  register(plugin: WebBuddyPlugin): Promise<void>;
+  unregister(pluginId: string): Promise<void>;
+  getPlugin(pluginId: string): WebBuddyPlugin | null;
+  
+  // Plugin discovery
+  discoverPlugins(): Promise<WebBuddyPlugin[]>;
+  getPluginsByDomain(domain: string): WebBuddyPlugin[];
+  
+  // Plugin communication
+  broadcastEvent(event: PluginEvent): Promise<void>;
+  sendMessageToPlugin(pluginId: string, message: any): Promise<any>;
+}
+#+END_SRC
+
+** 2. Plugin Interface Definition
+
+#+BEGIN_SRC typescript
+interface WebBuddyPlugin {
+  // Plugin metadata
+  id: string;
+  name: string;
+  version: string;
+  description: string;
+  author: string;
+  
+  // Domain specification
+  supportedDomains: string[];
+  contractDefinitions: WebBuddyContract[];
+  
+  // Plugin lifecycle hooks
+  initialize(context: PluginContext): Promise<void>;
+  activate(): Promise<void>;
+  deactivate(): Promise<void>;
+  destroy(): Promise<void>;
+  
+  // Contract and automation
+  getContracts(): WebBuddyContract[];
+  executeCapability(capability: string, params: any): Promise<any>;
+  
+  // UI integration
+  getUIComponents(): PluginUIComponent[];
+  getMenuItems(): PluginMenuItem[];
+  
+  // Event handling
+  onEvent(event: PluginEvent): Promise<void>;
+}
+#+END_SRC
+
+** 3. Plugin Context System
+
+#+BEGIN_SRC typescript
+interface PluginContext {
+  // Core services
+  contractRegistry: ContractRegistry;
+  executionService: ContractExecutionService;
+  storageService: PluginStorageService;
+  
+  // Browser integration
+  tabManager: TabManager;
+  extensionAPI: ExtensionAPI;
+  
+  // Plugin communication
+  messaging: PluginMessaging;
+  eventBus: PluginEventBus;
+  
+  // Configuration
+  config: PluginConfiguration;
+  logger: PluginLogger;
+}
+#+END_SRC
+
+* Domain-Specific Plugin Examples
+
+** 1. ChatGPT-Buddy Plugin
+
+#+BEGIN_SRC typescript
+class ChatGPTBuddyPlugin implements WebBuddyPlugin {
+  id = 'chatgpt-buddy';
+  name = 'ChatGPT Automation Buddy';
+  version = '2.0.0';
+  description = 'Specialized automation for OpenAI ChatGPT interface';
+  supportedDomains = ['chat.openai.com', 'chatgpt.com'];
+  
+  contractDefinitions = [
+    {
+      version: '1.0.0',
+      domain: 'chat.openai.com',
+      title: 'ChatGPT Interface Contract',
+      capabilities: {
+        sendMessage: {
+          type: 'form',
+          description: 'Send a message to ChatGPT',
+          selector: '[data-testid="send-button"]',
+          parameters: [
+            { name: 'message', type: 'string', required: true }
+          ]
+        },
+        getResponse: {
+          type: 'query',
+          description: 'Get the latest ChatGPT response',
+          selector: '[data-message-author-role="assistant"]:last-child'
+        },
+        startNewConversation: {
+          type: 'action',
+          description: 'Start a new conversation',
+          selector: '[data-testid="new-chat-button"]'
+        }
+      }
+    }
+  ];
+  
+  async executeCapability(capability: string, params: any): Promise<any> {
+    switch (capability) {
+      case 'sendMessage':
+        return this.sendChatMessage(params.message);
+      case 'getResponse':
+        return this.getChatResponse();
+      case 'startNewConversation':
+        return this.startNewChat();
+      default:
+        throw new Error(`Unknown capability: ${capability}`);
+    }
+  }
+  
+  private async sendChatMessage(message: string): Promise<any> {
+    // ChatGPT-specific message sending logic
+    const textarea = document.querySelector('#prompt-textarea');
+    const sendButton = document.querySelector('[data-testid="send-button"]');
+    
+    if (textarea && sendButton) {
+      textarea.value = message;
+      textarea.dispatchEvent(new Event('input', { bubbles: true }));
+      sendButton.click();
+      return { success: true, message: 'Message sent to ChatGPT' };
+    }
+    
+    throw new Error('ChatGPT interface not found');
+  }
+}
+#+END_SRC
+
+** 2. GitHub-Buddy Plugin
+
+#+BEGIN_SRC typescript
+class GitHubBuddyPlugin implements WebBuddyPlugin {
+  id = 'github-buddy';
+  name = 'GitHub Automation Buddy';
+  version = '1.0.0';
+  description = 'Specialized automation for GitHub interface';
+  supportedDomains = ['github.com', '*.github.com'];
+  
+  contractDefinitions = [
+    {
+      version: '1.0.0',
+      domain: 'github.com',
+      title: 'GitHub Interface Contract',
+      capabilities: {
+        createIssue: {
+          type: 'form',
+          description: 'Create a new GitHub issue',
+          selector: '[data-testid="issue-form"]',
+          parameters: [
+            { name: 'title', type: 'string', required: true },
+            { name: 'body', type: 'string', required: false }
+          ]
+        },
+        searchRepositories: {
+          type: 'form',
+          description: 'Search for repositories',
+          selector: '[data-testid="search-input"]',
+          parameters: [
+            { name: 'query', type: 'string', required: true }
+          ]
+        },
+        createPullRequest: {
+          type: 'form',
+          description: 'Create a pull request',
+          selector: '[data-testid="pr-form"]'
+        }
+      }
+    }
+  ];
+}
+#+END_SRC
+
+* Plugin Discovery and Loading
+
+** 1. Plugin Discovery Mechanisms
+
+#+BEGIN_SRC typescript
+interface PluginDiscovery {
+  // Static discovery from manifest
+  discoverFromManifest(): Promise<PluginManifest[]>;
+  
+  // Dynamic discovery from URLs
+  discoverFromURL(url: string): Promise<WebBuddyPlugin[]>;
+  
+  // Registry-based discovery
+  discoverFromRegistry(): Promise<PluginMetadata[]>;
+  
+  // Local file system discovery
+  discoverFromFiles(): Promise<PluginBundle[]>;
+}
+
+interface PluginManifest {
+  plugins: Array<{
+    id: string;
+    name: string;
+    version: string;
+    scriptUrl: string;
+    domains: string[];
+    dependencies?: string[];
+  }>;
+}
+#+END_SRC
+
+** 2. Plugin Loading Strategy
+
+#+BEGIN_SRC typescript
+class PluginLoader {
+  async loadPlugin(manifest: PluginManifest): Promise<WebBuddyPlugin> {
+    // 1. Validate plugin compatibility
+    await this.validateCompatibility(manifest);
+    
+    // 2. Load plugin dependencies
+    await this.loadDependencies(manifest.dependencies);
+    
+    // 3. Load plugin script
+    const pluginModule = await this.loadScript(manifest.scriptUrl);
+    
+    // 4. Instantiate plugin
+    const plugin = new pluginModule.default();
+    
+    // 5. Initialize plugin context
+    await plugin.initialize(this.createPluginContext());
+    
+    return plugin;
+  }
+  
+  private async validateCompatibility(manifest: PluginManifest): Promise<void> {
+    // Check Web-Buddy version compatibility
+    // Validate required permissions
+    // Check domain access requirements
+  }
+}
+#+END_SRC
+
+* Plugin Communication and Events
+
+** 1. Plugin Event System
+
+#+BEGIN_SRC typescript
+interface PluginEvent {
+  type: string;
+  source: string;
+  target?: string;
+  data: any;
+  timestamp: string;
+}
+
+interface PluginEventBus {
+  emit(event: PluginEvent): Promise<void>;
+  on(eventType: string, handler: PluginEventHandler): void;
+  off(eventType: string, handler: PluginEventHandler): void;
+  
+  // Cross-plugin communication
+  broadcast(event: PluginEvent): Promise<void>;
+  sendToPlugin(pluginId: string, event: PluginEvent): Promise<any>;
+}
+
+// Standard plugin events
+const PluginEvents = {
+  PLUGIN_LOADED: 'plugin:loaded',
+  PLUGIN_ACTIVATED: 'plugin:activated',
+  PLUGIN_DEACTIVATED: 'plugin:deactivated',
+  CONTRACT_DISCOVERED: 'contract:discovered',
+  AUTOMATION_EXECUTED: 'automation:executed',
+  UI_INTERACTION: 'ui:interaction',
+  ERROR_OCCURRED: 'error:occurred'
+};
+#+END_SRC
+
+** 2. Inter-Plugin Messaging
+
+#+BEGIN_SRC typescript
+interface PluginMessaging {
+  // Direct messaging between plugins
+  sendMessage(fromPlugin: string, toPlugin: string, message: any): Promise<any>;
+  
+  // Publish-subscribe pattern
+  publish(topic: string, data: any): Promise<void>;
+  subscribe(topic: string, handler: MessageHandler): void;
+  
+  // Request-response pattern
+  request(pluginId: string, request: any): Promise<any>;
+  respond(requestId: string, response: any): Promise<void>;
+}
+#+END_SRC
+
+* Plugin UI Integration
+
+** 1. Plugin UI Components
+
+#+BEGIN_SRC typescript
+interface PluginUIComponent {
+  id: string;
+  type: 'panel' | 'toolbar' | 'modal' | 'sidebar' | 'popup';
+  name: string;
+  render(): HTMLElement;
+  
+  // Lifecycle hooks
+  onMount(): void;
+  onUnmount(): void;
+  onUpdate(props: any): void;
+}
+
+interface PluginMenuItem {
+  id: string;
+  label: string;
+  icon?: string;
+  shortcut?: string;
+  action: () => Promise<void>;
+  submenu?: PluginMenuItem[];
+}
+#+END_SRC
+
+** 2. UI Integration Points
+
+#+BEGIN_SRC typescript
+interface PluginUIManager {
+  // Register UI components
+  registerComponent(component: PluginUIComponent): void;
+  registerMenuItem(item: PluginMenuItem): void;
+  
+  // UI lifecycle
+  mountComponent(componentId: string, container: HTMLElement): void;
+  unmountComponent(componentId: string): void;
+  
+  // UI state management
+  getUIState(pluginId: string): any;
+  setUIState(pluginId: string, state: any): void;
+}
+#+END_SRC
+
+* Plugin Storage and Configuration
+
+** 1. Plugin Storage System
+
+#+BEGIN_SRC typescript
+interface PluginStorageService {
+  // Plugin-scoped storage
+  set(key: string, value: any): Promise<void>;
+  get(key: string): Promise<any>;
+  remove(key: string): Promise<void>;
+  clear(): Promise<void>;
+  
+  // Cross-plugin shared storage
+  setShared(namespace: string, key: string, value: any): Promise<void>;
+  getShared(namespace: string, key: string): Promise<any>;
+  
+  // Configuration storage
+  getConfig(): Promise<PluginConfiguration>;
+  setConfig(config: PluginConfiguration): Promise<void>;
+}
+
+interface PluginConfiguration {
+  enabled: boolean;
+  settings: Record<string, any>;
+  domains: string[];
+  permissions: string[];
+}
+#+END_SRC
+
+* Plugin Security and Sandboxing
+
+** 1. Plugin Security Model
+
+#+BEGIN_SRC typescript
+interface PluginSecurity {
+  // Permission system
+  requestPermission(permission: string): Promise<boolean>;
+  hasPermission(permission: string): boolean;
+  
+  // Capability restrictions
+  canAccessDomain(domain: string): boolean;
+  canExecuteScript(): boolean;
+  canAccessStorage(): boolean;
+  
+  // Sandboxing
+  createSandbox(): PluginSandbox;
+  executeSandboxed(code: string): Promise<any>;
+}
+
+interface PluginSandbox {
+  execute(code: string): Promise<any>;
+  addAPI(name: string, api: any): void;
+  removeAPI(name: string): void;
+}
+#+END_SRC
+
+* Plugin Marketplace and Distribution
+
+** 1. Plugin Registry Service
+
+#+BEGIN_SRC typescript
+interface PluginMarketplace {
+  // Plugin discovery
+  search(query: string): Promise<PluginMetadata[]>;
+  getByCategory(category: string): Promise<PluginMetadata[]>;
+  getPopular(): Promise<PluginMetadata[]>;
+  
+  // Plugin management
+  install(pluginId: string): Promise<void>;
+  uninstall(pluginId: string): Promise<void>;
+  update(pluginId: string): Promise<void>;
+  
+  // Plugin information
+  getPluginInfo(pluginId: string): Promise<PluginInfo>;
+  getVersionHistory(pluginId: string): Promise<PluginVersion[]>;
+  getReviews(pluginId: string): Promise<PluginReview[]>;
+}
+#+END_SRC
+
+* Implementation Strategy
+
+** Phase 1: Core Plugin Infrastructure
+1. Implement basic plugin registry and loading system
+2. Create plugin interface and context system
+3. Add plugin discovery mechanisms
+4. Build plugin communication framework
+
+** Phase 2: Domain-Specific Plugins
+1. Refactor ChatGPT-buddy as a plugin
+2. Create GitHub-buddy plugin
+3. Develop generic web app plugin template
+4. Build plugin development tools
+
+** Phase 3: Advanced Features
+1. Implement plugin marketplace
+2. Add plugin security and sandboxing
+3. Create plugin analytics and monitoring
+4. Build plugin collaboration features
+
+** Phase 4: Ecosystem Integration
+1. Integrate with existing Web-Buddy features
+2. Add contract-based plugin discovery
+3. Implement cross-plugin data sharing
+4. Create plugin developer documentation
+
+* Benefits of Plugin Architecture
+
+** 1. Domain Specialization
+- Tailored automation experiences for specific web applications
+- Domain-specific contract definitions and capabilities
+- Specialized UI components and workflows
+
+** 2. Extensibility
+- Third-party plugin development
+- Community-driven automation extensions
+- Modular and composable architecture
+
+** 3. Maintainability
+- Clear separation of concerns
+- Independent plugin development and deployment
+- Reduced complexity in core Web-Buddy framework
+
+** 4. Performance
+- Load only required plugins for current domains
+- Plugin lazy loading and hot swapping
+- Optimized resource usage
+
+* Conclusion
+
+The Web-Buddy Plugin Architecture enables a powerful ecosystem of domain-specific automation extensions while maintaining compatibility with the core contract discovery system. This architecture supports specialized plugins like ChatGPT-buddy and GitHub-buddy, providing tailored automation experiences while preserving the zero-fragility benefits of contract-based automation.
+
+The plugin system's modular design ensures extensibility, maintainability, and performance while enabling community-driven development of automation extensions for any web application domain.
