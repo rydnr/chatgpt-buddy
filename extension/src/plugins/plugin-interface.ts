@@ -3,6 +3,8 @@
  * @description Defines the plugin architecture interfaces, types, and contracts
  */
 
+/// <reference path="./chrome-types.d.ts" />
+
 /**
  * Plugin metadata and identification
  */
@@ -228,6 +230,9 @@ export interface PluginMessaging {
   
   // Broadcast messaging
   broadcast(message: any): Promise<void>;
+  
+  // Statistics and monitoring
+  getStatistics(): any;
 }
 
 /**
@@ -246,6 +251,9 @@ export interface PluginEventBus {
   // Event history and replay
   getHistory(pluginId?: string): PluginEvent[];
   replay(fromTimestamp?: string): Promise<void>;
+  
+  // Statistics and monitoring
+  getStatistics(): any;
 }
 
 /**
@@ -269,18 +277,29 @@ export interface PluginLogger {
 }
 
 /**
+ * Basic tab interface
+ */
+export interface WebBuddyTab {
+  id?: number;
+  url?: string;
+  title?: string;
+  active?: boolean;
+  windowId?: number;
+}
+
+/**
  * Tab manager service interface
  */
 export interface TabManager {
-  getCurrentTab(): Promise<chrome.tabs.Tab | null>;
-  getAllTabs(): Promise<chrome.tabs.Tab[]>;
+  getCurrentTab(): Promise<WebBuddyTab | null>;
+  getAllTabs(): Promise<WebBuddyTab[]>;
   switchToTab(tabId: number): Promise<void>;
-  findTabByTitle(title: string): Promise<chrome.tabs.Tab | null>;
-  findTabByUrl(url: string): Promise<chrome.tabs.Tab | null>;
+  findTabByTitle(title: string): Promise<WebBuddyTab | null>;
+  findTabByUrl(url: string): Promise<WebBuddyTab | null>;
   
   // Tab events
-  onTabCreated(callback: (tab: chrome.tabs.Tab) => void): void;
-  onTabUpdated(callback: (tabId: number, changeInfo: any, tab: chrome.tabs.Tab) => void): void;
+  onTabCreated(callback: (tab: WebBuddyTab) => void): void;
+  onTabUpdated(callback: (tabId: number, changeInfo: any, tab: WebBuddyTab) => void): void;
   onTabRemoved(callback: (tabId: number, removeInfo: any) => void): void;
   onTabActivated(callback: (activeInfo: { tabId: number; windowId: number }) => void): void;
 }
@@ -290,16 +309,16 @@ export interface TabManager {
  */
 export interface ExtensionAPI {
   // Chrome APIs wrapper
-  runtime: typeof chrome.runtime;
-  tabs: typeof chrome.tabs;
-  storage: typeof chrome.storage;
-  permissions: typeof chrome.permissions;
+  runtime: any;
+  tabs: any;
+  storage: any;
+  permissions: any;
   
   // Custom extension utilities
   sendMessage(message: any): Promise<any>;
   broadcastMessage(message: any): Promise<void>;
-  executeScript(tabId: number, details: chrome.tabs.InjectDetails): Promise<any[]>;
-  insertCSS(tabId: number, details: chrome.tabs.InjectDetails): Promise<void>;
+  executeScript(tabId: number, details: any): Promise<any[]>;
+  insertCSS(tabId: number, details: any): Promise<void>;
 }
 
 /**
