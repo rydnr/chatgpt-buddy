@@ -1715,6 +1715,36 @@ The script will:
 5. Set up workspace at =~/github/rydnr/semantest-workspace=
 6. Clean up temporary branches
 7. Provide instructions to make original directory git-less
+
+** Organization Structure Updates
+*** Dual Organization Approach
+After user feedback, the monorepo separation now uses two GitHub organizations:
+- =typescript-eda= organization for the EDA framework:
+  - =typescript-eda/domain= - Core domain primitives
+  - =typescript-eda/infrastructure= - Infrastructure adapters
+  - =typescript-eda/application= - Application layer orchestration
+- =semantest= organization for browser automation:
+  - =semantest/browser= - Core browser framework
+  - =semantest/nodejs.server= - Node.js server
+  - =semantest/google.com= - Google automation
+  - =semantest/chatgpt.com= - ChatGPT automation
+  - =semantest/extension.chrome= - Chrome extension
+  - =semantest/typescript.client= - TypeScript SDK
+  - =semantest/docs= - Documentation
+  - =semantest/deploy= - Deployment configs
+
+*** DNS Naming Convention Correction
+Fixed client repository naming to follow DNS convention:
+- Changed from =client.typescript= to =typescript.client=
+- Rule: Top-level virtual host is either component name or domain name
+- Full DNS would be =typescript.client.semantest.com=
+
+*** Script Updates Completed
+1. Updated =scripts/separate-monorepo.sh= to handle dual organizations
+2. Modified extraction function to accept organization parameter
+3. Updated all guide files with correct organization structure
+4. Fixed shebang lines to use =/usr/bin/env bash= per CLAUDE.md
+5. Corrected client naming convention throughout all scripts
 - Enterprise adoption of certified developers
 
 Phase 8 transforms Semantest from a technical project into a professional discipline, establishing industry standards for semantic web automation expertise and creating sustainable growth through education and certification.
