@@ -1,3 +1,4 @@
+"use strict";
 /*
                         Web-Buddy Core
 
@@ -16,14 +17,16 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
-import { v4 as uuidv4 } from 'uuid';
-import { AutomationRequestedEvent, AutomationEventFactory } from './events/automation';
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.WebBuddyClient = void 0;
+const uuid_1 = require("uuid");
+const automation_1 = require("./events/automation");
 /**
  * Generic Web-Buddy client that provides low-level event-driven API
  * This is the core layer that domain-specific clients build upon
  * Now supports the learning automation system with event-based communication
  */
-export class WebBuddyClient {
+class WebBuddyClient {
     config;
     timeout;
     retryAttempts;
@@ -84,7 +87,7 @@ export class WebBuddyClient {
      * This triggers the learning loop if no implementation exists
      */
     async requestAutomation(action, parameters, options) {
-        const event = new AutomationRequestedEvent({
+        const event = new automation_1.AutomationRequestedEvent({
             action,
             parameters,
             context: options?.context,
@@ -96,7 +99,7 @@ export class WebBuddyClient {
      * Convenience method: Request search automation
      */
     async requestSearch(query, website, options) {
-        const event = AutomationEventFactory.createSearchRequest(query, website, options?.context);
+        const event = automation_1.AutomationEventFactory.createSearchRequest(query, website, options?.context);
         return this.sendEvent(event, {
             tabId: options?.tabId,
             timeout: options?.timeout
@@ -106,7 +109,7 @@ export class WebBuddyClient {
      * Convenience method: Request login automation
      */
     async requestLogin(credentials, website, options) {
-        const event = AutomationEventFactory.createLoginRequest(credentials, website, options?.context);
+        const event = automation_1.AutomationEventFactory.createLoginRequest(credentials, website, options?.context);
         return this.sendEvent(event, {
             tabId: options?.tabId,
             timeout: options?.timeout
@@ -128,7 +131,7 @@ export class WebBuddyClient {
             payload: messageData[eventType] || messageData,
             correlationId: options?.correlationId || this.generateCorrelationId(),
             timestamp: new Date(),
-            eventId: `legacy-${Date.now()}-${uuidv4().substr(0, 8)}`,
+            eventId: `legacy-${Date.now()}-${(0, uuid_1.v4)().substr(0, 8)}`,
             tabId: options?.tabId
         };
     }
@@ -209,7 +212,17 @@ export class WebBuddyClient {
      * Generates a unique correlation ID for message tracking
      */
     generateCorrelationId() {
-        return `web-buddy-${Date.now()}-${uuidv4().substr(0, 8)}`;
+        return `web-buddy-${Date.now()}-${(0, uuid_1.v4)().substr(0, 8)}`;
+    }
+    /**
+     * Get current connection status and transport information
+     */
+    async getTransportInfo() {
+        return {
+            type: 'http',
+            status: 'connected',
+            averageLatency: 0
+        };
     }
     /**
      * Makes HTTP request with timeout support
@@ -250,4 +263,5 @@ export class WebBuddyClient {
         throw new Error(`Operation failed after ${this.retryAttempts} attempts: ${lastError.message}`);
     }
 }
+exports.WebBuddyClient = WebBuddyClient;
 //# sourceMappingURL=client.js.map

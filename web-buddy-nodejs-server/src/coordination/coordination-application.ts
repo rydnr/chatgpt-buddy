@@ -4,8 +4,7 @@
  * @author Web-Buddy Team
  */
 
-import { Application, Enable } from '@typescript-eda/application';
-import { listen } from '@typescript-eda/domain';
+import { Application, Enable, listen } from '../stubs/typescript-eda-stubs';
 import {
   ExtensionConnectedEvent,
   ExtensionDisconnectedEvent,
@@ -38,9 +37,9 @@ export class CoordinationApplication extends Application {
   public readonly metadata = new Map([
     ['name', 'Web-Buddy Coordination Engine'],
     ['version', '1.0.0'],
-    ['capabilities', ['extension-routing', 'session-management', 'load-balancing']],
-    ['maxConcurrentSessions', 100],
-    ['heartbeatInterval', 30000] // 30 seconds
+    ['capabilities', 'extension-routing,session-management,load-balancing'],
+    ['maxConcurrentSessions', '100'],
+    ['heartbeatInterval', '30000'] // 30 seconds
   ]);
 
   private activeExtensions = new Map<string, ExtensionInfo>();

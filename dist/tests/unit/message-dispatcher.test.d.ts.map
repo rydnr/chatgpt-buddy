@@ -1,0 +1,1 @@
+{"version":3,"file":"message-dispatcher.test.d.ts","sourceRoot":"","sources":["../../../tests/unit/message-dispatcher.test.ts"],"names":[],"mappings":"AA4BA,OAAO,CAAC,MAAM,CAAC;IACb,IAAI,EAAE,EAAE,GAAG,CAAC;IACZ,IAAI,WAAW,EAAE,MAAM,CAAC;IACxB,IAAI,gBAAgB,EAAE,GAAG,CAAC;IAC1B,IAAI,YAAY,EAAE,GAAG,CAAC;IACtB,UAAU,UAAU,CAAC;QACnB,IAAI,iBAAiB,EAAE,GAAG,CAAC;KAC5B;CACF"}

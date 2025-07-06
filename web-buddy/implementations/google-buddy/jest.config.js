@@ -7,7 +7,9 @@ module.exports = {
     '**/?(*.)+(spec|test).ts'
   ],
   transform: {
-    '^.+\.ts$': 'ts-jest'
+    '^.+\.ts$': ['ts-jest', {
+      useESM: true
+    }]
   },
   collectCoverageFrom: [
     'src/**/*.ts',
@@ -22,12 +24,7 @@ module.exports = {
     'html'
   ],
   moduleNameMapper: {
-    '^@web-buddy/core$': '<rootDir>/../../packages/web-buddy-core/src/index.ts'
+    '^@web-buddy/core$': '<rootDir>/../../packages/core/src'
   },
-  extensionsToTreatAsEsm: ['.ts'],
-  globals: {
-    'ts-jest': {
-      useESM: true
-    }
-  }
+  extensionsToTreatAsEsm: ['.ts']
 };

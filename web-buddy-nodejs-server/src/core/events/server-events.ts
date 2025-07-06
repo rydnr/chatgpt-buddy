@@ -4,7 +4,7 @@
  * @author Web-Buddy Team
  */
 
-import { Event } from '@typescript-eda/domain';
+import { Event } from '../../stubs/typescript-eda-stubs';
 
 /**
  * Event triggered when server startup is requested

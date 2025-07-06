@@ -3,8 +3,9 @@
   "version": "2.0.0",
   "description": "Browser extension for ChatGPT-buddy - AI automation extension built on Web-Buddy framework",
   "scripts": {
-    "build": "tsc && cp manifest.json build/ && cp -r assets build/ 2>/dev/null || true",
-    "clean": "rimraf build",
+    "build": "tsc && npm run copy-assets",
+    "copy-assets": "cp manifest.json build/ && cp -r assets build/ && cp src/*.html build/ 2>/dev/null || true",
+    "clean": "rimraf build && mkdir -p build",
     "dev": "npm run build && npm run watch",
     "watch": "tsc --watch",
     "test": "jest",
@@ -25,10 +26,6 @@
   "author": "rydnr",
   "license": "GPL-3.0",
   "dependencies": {
-    "@typescript-eda/domain": "^1.0.0",
-    "@typescript-eda/infrastructure": "^1.0.0",
-    "@typescript-eda/application": "^1.0.0",
-    "@web-buddy/browser-extension": "^1.0.0",
     "webextension-polyfill": "^0.10.0"
   },
   "devDependencies": {

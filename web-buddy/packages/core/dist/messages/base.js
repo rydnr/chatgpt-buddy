@@ -1,3 +1,4 @@
+"use strict";
 /*
                         Web-Buddy Core
 
@@ -16,12 +17,16 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
-import { v4 as uuidv4 } from 'uuid';
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.BaseMessage = void 0;
+exports.createSuccessResponse = createSuccessResponse;
+exports.createErrorResponse = createErrorResponse;
+const uuid_1 = require("uuid");
 /**
  * Abstract base class for all Web-Buddy messages
  * Implements common functionality and ensures consistent structure
  */
-export class BaseMessage {
+class BaseMessage {
     payload;
     website;
     tabId;
@@ -37,7 +42,7 @@ export class BaseMessage {
      * Generates a unique correlation ID for message tracking
      */
     generateCorrelationId() {
-        return `web-buddy-${Date.now()}-${uuidv4().substr(0, 8)}`;
+        return `web-buddy-${Date.now()}-${(0, uuid_1.v4)().substr(0, 8)}`;
     }
     /**
      * Serializes the message to JSON format for network transmission
@@ -60,10 +65,11 @@ export class BaseMessage {
         throw new Error('fromJSON must be implemented by concrete message classes');
     }
 }
+exports.BaseMessage = BaseMessage;
 /**
  * Creates a standardized success response
  */
-export function createSuccessResponse(data, correlationId) {
+function createSuccessResponse(data, correlationId) {
     return {
         success: true,
         data,
@@ -74,7 +80,7 @@ export function createSuccessResponse(data, correlationId) {
 /**
  * Creates a standardized error response
  */
-export function createErrorResponse(error, correlationId) {
+function createErrorResponse(error, correlationId) {
     return {
         success: false,
         error,

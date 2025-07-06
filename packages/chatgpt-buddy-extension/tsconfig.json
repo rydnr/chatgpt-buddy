@@ -1,10 +1,10 @@
 {
+  "extends": "../../tsconfig.json",
   "compilerOptions": {
     "target": "ES2022",
     "module": "ES2022",
     "lib": ["es2022", "dom"],
     "outDir": "./dist",
-    "rootDir": "./src",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
@@ -15,9 +15,18 @@
     "declarationMap": true,
     "sourceMap": true,
     "moduleResolution": "node",
-    "allowSyntheticDefaultImports": true
+    "allowSyntheticDefaultImports": true,
+    "composite": true,
+    "baseUrl": "../../",
+    "paths": {
+      "@chatgpt-buddy/core": ["packages/chatgpt-buddy-core/src"],
+      "@chatgpt-buddy/*": ["packages/chatgpt-buddy-*/src"]
+    }
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist", "tests"],
-  "types": ["chrome"]
+  "types": ["chrome"],
+  "references": [
+    { "path": "../chatgpt-buddy-core" }
+  ]
 }

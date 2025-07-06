@@ -12,9 +12,14 @@
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
+    "composite": true,
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
-    "lib": ["ES2022", "DOM", "DOM.Iterable"]
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "baseUrl": "../../",
+    "paths": {
+      "@web-buddy/core": ["packages/core/src"]
+    }
   },
   "include": [
     "src/**/*"
@@ -27,7 +32,7 @@
   ],
   "references": [
     {
-      "path": "../../packages/web-buddy-core"
+      "path": "../../packages/core"
     }
   ]
 }

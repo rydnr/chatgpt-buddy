@@ -18,8 +18,9 @@
     "paths": {
       "@web-buddy/core": ["./packages/core/src"],
       "@web-buddy/testing": ["./packages/testing/src"],
-      "@web-buddy/google-buddy": ["./packages/google-buddy/src"],
-      "@web-buddy/wikipedia-buddy": ["./packages/wikipedia-buddy/src"]
+      "@google-buddy/client": ["./implementations/google-buddy/src"],
+      "@chatgpt-buddy/client": ["./implementations/chatgpt-buddy/src"],
+      "@wikipedia-buddy/client": ["./implementations/wikipedia-buddy/src"]
     }
   },
   "include": [
@@ -36,8 +37,10 @@
   ],
   "references": [
     { "path": "./packages/core" },
+    { "path": "./packages/server" },
     { "path": "./packages/testing" },
-    { "path": "./packages/google-buddy" },
-    { "path": "./packages/wikipedia-buddy" }
+    { "path": "./implementations/google-buddy" },
+    { "path": "./implementations/chatgpt-buddy" },
+    { "path": "./implementations/wikipedia-buddy" }
   ]
 }

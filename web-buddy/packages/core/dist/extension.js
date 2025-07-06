@@ -1,3 +1,4 @@
+"use strict";
 /*
                         Web-Buddy Core
 
@@ -16,16 +17,18 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.ContentScriptIntegration = exports.WebBuddyExtension = void 0;
 /// <reference types="chrome" />
-import { createSuccessResponse, createErrorResponse } from './events/base';
-import { UserGuidanceRequestedEvent, UserGuidanceProvidedEvent, AutomationImplementedEvent } from './events/automation';
-import { AutomationManager } from './learning/automation-manager';
+const base_1 = require("./events/base");
+const automation_1 = require("./events/automation");
+const automation_manager_1 = require("./learning/automation-manager");
 /**
  * Generic Web-Buddy extension that handles browser-side automation
  * Now includes learning capabilities and user guidance workflows
  * Domain-specific extensions register their handlers with this class
  */
-export class WebBuddyExtension {
+class WebBuddyExtension {
     config;
     handlers = new Map();
     learningUI;
@@ -56,7 +59,7 @@ export class WebBuddyExtension {
     initializeLearningSystem() {
         this.learningUI = new BrowserLearningUI();
         this.playwrightRecorder = new BrowserPlaywrightRecorder();
-        this.automationManager = new AutomationManager();
+        this.automationManager = new automation_manager_1.AutomationManager();
         // Register built-in handlers for learning events
         this.registerHandler('userGuidanceRequested', {
             handle: this.handleUserGuidanceRequest.bind(this),
@@ -142,16 +145,16 @@ export class WebBuddyExtension {
             // Find handler for event type
             const handler = this.handlers.get(event.type);
             if (!handler) {
-                response = createErrorResponse(`No handler registered for event type: ${event.type}`, event.correlationId, event.eventId);
+                response = (0, base_1.createErrorResponse)(`No handler registered for event type: ${event.type}`, event.correlationId, event.eventId);
             }
             else {
                 // Execute handler
                 const result = await handler.handle(event);
-                response = createSuccessResponse(result, event.correlationId, event.eventId);
+                response = (0, base_1.createSuccessResponse)(result, event.correlationId, event.eventId);
             }
         }
         catch (error) {
-            response = createErrorResponse(error instanceof Error ? error.message : 'Unknown error', event.correlationId, event.eventId);
+            response = (0, base_1.createErrorResponse)(error instanceof Error ? error.message : 'Unknown error', event.correlationId, event.eventId);
         }
         // Send response back to server
         this.sendResponse(response);
@@ -275,7 +278,7 @@ export class WebBuddyExtension {
         const reviewResult = await this.learningUI.showScriptReview(recordingResult.script);
         if (reviewResult.approved) {
             // Create automation implemented event
-            const implementedEvent = new AutomationImplementedEvent({
+            const implementedEvent = new automation_1.AutomationImplementedEvent({
                 requestEventId: guidanceEvent.payload.requestEventId,
                 action: 'automation', // Would come from original request
                 playwrightScript: recordingResult.script,
@@ -348,7 +351,7 @@ export class WebBuddyExtension {
      */
     async startNewRecording(event) {
         // Create a user guidance event to start the recording workflow
-        const guidanceEvent = new UserGuidanceRequestedEvent({
+        const guidanceEvent = new automation_1.UserGuidanceRequestedEvent({
             requestEventId: event.eventId,
             guidanceType: 'record',
             prompt: `No automation exists for "${event.payload.action}". Would you like to record one?`,
@@ -443,6 +446,7 @@ export class WebBuddyExtension {
         return Array.from(this.handlers.keys());
     }
 }
+exports.WebBuddyExtension = WebBuddyExtension;
 /**
  * Browser-based implementation of learning user interface
  */
@@ -464,7 +468,7 @@ class BrowserLearningUI {
             // Create modal dialog
             const dialog = this.createGuidanceDialog(event, (response) => {
                 this.removeDialog();
-                const userResponse = new UserGuidanceProvidedEvent({
+                const userResponse = new automation_1.UserGuidanceProvidedEvent({
                     requestEventId: event.payload.requestEventId,
                     guidanceRequestId: event.eventId,
                     response,
@@ -947,7 +951,7 @@ class BrowserPlaywrightRecorder {
  * Content script integration helper
  * Facilitates communication between background script and content scripts
  */
-export class ContentScriptIntegration {
+class ContentScriptIntegration {
     extension;
     constructor(extension) {
         this.extension = extension;
@@ -1025,4 +1029,5 @@ export class ContentScriptIntegration {
         });
     }
 }
+exports.ContentScriptIntegration = ContentScriptIntegration;
 //# sourceMappingURL=extension.js.map

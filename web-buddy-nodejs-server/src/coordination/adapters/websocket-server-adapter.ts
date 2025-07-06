@@ -4,7 +4,7 @@
  * @author Web-Buddy Team
  */
 
-import { AdapterFor, Port } from '@typescript-eda/infrastructure';
+import { Adapter, AdapterFor, Port } from '../../stubs/typescript-eda-stubs';
 import * as WebSocket from 'ws';
 import { IncomingMessage } from 'http';
 

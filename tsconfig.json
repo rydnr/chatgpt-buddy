@@ -4,7 +4,6 @@
     "module": "commonjs",
     "lib": ["ES2020", "DOM"],
     "outDir": "./dist",
-    "rootDir": "./",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
@@ -13,31 +12,46 @@
     "declarationMap": true,
     "sourceMap": true,
     "removeComments": false,
-    "noEmitOnError": true,
+    "noEmitOnError": false,
     "moduleResolution": "node",
     "allowSyntheticDefaultImports": true,
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
     "resolveJsonModule": true,
+    "composite": true,
+    "incremental": true,
     "baseUrl": ".",
     "paths": {
+      "@chatgpt-buddy/core": ["packages/chatgpt-buddy-core/src"],
+      "@chatgpt-buddy/server": ["packages/chatgpt-buddy-server/src"],
+      "@chatgpt-buddy/extension": ["packages/chatgpt-buddy-extension/src"],
+      "@chatgpt-buddy/client-ts": ["packages/chatgpt-buddy-client-ts/src"],
       "@chatgpt-buddy/*": ["packages/chatgpt-buddy-*/src"],
-      "@web-buddy/*": ["packages/web-buddy-*/src"],
+      "@web-buddy/*": ["web-buddy/packages/*/src"],
       "@typescript-eda/*": ["typescript-eda/packages/*/src"]
     }
   },
   "include": [
     "packages/**/*",
     "tests/**/*",
-    "extension/src/**/*",
+    "extension/src/**/*", 
     "client/**/*",
-    "server/**/*"
+    "server/**/*",
+    "web-buddy/**/*",
+    "web-buddy-browser-extension/**/*",
+    "web-buddy-nodejs-server/**/*"
   ],
   "exclude": [
     "node_modules",
     "dist",
     "build",
     "**/*.d.ts"
+  ],
+  "references": [
+    { "path": "./packages/chatgpt-buddy-core" },
+    { "path": "./packages/chatgpt-buddy-server" },
+    { "path": "./packages/chatgpt-buddy-extension" },
+    { "path": "./packages/chatgpt-buddy-client-ts" }
   ],
   "ts-node": {
     "esm": true

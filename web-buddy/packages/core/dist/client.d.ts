@@ -102,7 +102,15 @@ export declare class WebBuddyClient {
     /**
      * Generates a unique correlation ID for message tracking
      */
-    private generateCorrelationId;
+    generateCorrelationId(): string;
+    /**
+     * Get current connection status and transport information
+     */
+    getTransportInfo(): Promise<{
+        type: string;
+        status: string;
+        averageLatency?: number;
+    }>;
     /**
      * Makes HTTP request with timeout support
      */

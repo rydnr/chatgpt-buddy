@@ -1,3 +1,4 @@
+"use strict";
 /*
                         Web-Buddy Core
 
@@ -16,6 +17,11 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.VERSION = exports.AutomationManager = exports.createAutomationStorage = exports.IndexedDBAutomationStorage = exports.BaseMessage = exports.AutomationEventFactory = exports.UserGuidanceProvidedEvent = exports.UserGuidanceRequestedEvent = exports.AutomationFailedEvent = exports.AutomationSucceededEvent = exports.AutomationImplementedEvent = exports.AutomationRequestedEvent = exports.EventPriority = exports.createErrorResponse = exports.createSuccessResponse = exports.BaseEvent = exports.ContentScriptIntegration = exports.WebBuddyExtension = exports.WebBuddyClient = void 0;
+exports.createWebBuddyClient = createWebBuddyClient;
+exports.createAutomationClient = createAutomationClient;
+exports.createWebBuddyExtension = createWebBuddyExtension;
 /**
  * Web-Buddy Core - Generic Web Automation Framework
  *
@@ -23,26 +29,42 @@
  * for web automation. Domain-specific implementations build upon this foundation.
  */
 // Core client API
-export { WebBuddyClient } from './client';
-// Core server infrastructure
-export { WebBuddyServer } from './server';
+var client_1 = require("./client");
+Object.defineProperty(exports, "WebBuddyClient", { enumerable: true, get: function () { return client_1.WebBuddyClient; } });
+// Note: Server infrastructure moved to @web-buddy/server package
 // Core extension framework
-export { WebBuddyExtension, ContentScriptIntegration } from './extension';
+var extension_1 = require("./extension");
+Object.defineProperty(exports, "WebBuddyExtension", { enumerable: true, get: function () { return extension_1.WebBuddyExtension; } });
+Object.defineProperty(exports, "ContentScriptIntegration", { enumerable: true, get: function () { return extension_1.ContentScriptIntegration; } });
 // Import classes for factory functions
-import { WebBuddyClient } from './client';
-import { WebBuddyServer } from './server';
-import { WebBuddyExtension } from './extension';
+const client_2 = require("./client");
+const extension_2 = require("./extension");
 // Core event types and utilities (new event-driven architecture)
-export { BaseEvent, createSuccessResponse, createErrorResponse, EventPriority } from './events/base';
+var base_1 = require("./events/base");
+Object.defineProperty(exports, "BaseEvent", { enumerable: true, get: function () { return base_1.BaseEvent; } });
+Object.defineProperty(exports, "createSuccessResponse", { enumerable: true, get: function () { return base_1.createSuccessResponse; } });
+Object.defineProperty(exports, "createErrorResponse", { enumerable: true, get: function () { return base_1.createErrorResponse; } });
+Object.defineProperty(exports, "EventPriority", { enumerable: true, get: function () { return base_1.EventPriority; } });
 // Automation learning events
-export { AutomationRequestedEvent, AutomationImplementedEvent, AutomationSucceededEvent, AutomationFailedEvent, UserGuidanceRequestedEvent, UserGuidanceProvidedEvent, AutomationEventFactory } from './events/automation';
+var automation_1 = require("./events/automation");
+Object.defineProperty(exports, "AutomationRequestedEvent", { enumerable: true, get: function () { return automation_1.AutomationRequestedEvent; } });
+Object.defineProperty(exports, "AutomationImplementedEvent", { enumerable: true, get: function () { return automation_1.AutomationImplementedEvent; } });
+Object.defineProperty(exports, "AutomationSucceededEvent", { enumerable: true, get: function () { return automation_1.AutomationSucceededEvent; } });
+Object.defineProperty(exports, "AutomationFailedEvent", { enumerable: true, get: function () { return automation_1.AutomationFailedEvent; } });
+Object.defineProperty(exports, "UserGuidanceRequestedEvent", { enumerable: true, get: function () { return automation_1.UserGuidanceRequestedEvent; } });
+Object.defineProperty(exports, "UserGuidanceProvidedEvent", { enumerable: true, get: function () { return automation_1.UserGuidanceProvidedEvent; } });
+Object.defineProperty(exports, "AutomationEventFactory", { enumerable: true, get: function () { return automation_1.AutomationEventFactory; } });
 // Legacy message types (deprecated, for backward compatibility)
-export { BaseMessage } from './messages/base';
+var base_2 = require("./messages/base");
+Object.defineProperty(exports, "BaseMessage", { enumerable: true, get: function () { return base_2.BaseMessage; } });
 // Learning and storage system
-export { IndexedDBAutomationStorage, createAutomationStorage } from './storage/automation-storage';
-export { AutomationManager } from './learning/automation-manager';
+var automation_storage_1 = require("./storage/automation-storage");
+Object.defineProperty(exports, "IndexedDBAutomationStorage", { enumerable: true, get: function () { return automation_storage_1.IndexedDBAutomationStorage; } });
+Object.defineProperty(exports, "createAutomationStorage", { enumerable: true, get: function () { return automation_storage_1.createAutomationStorage; } });
+var automation_manager_1 = require("./learning/automation-manager");
+Object.defineProperty(exports, "AutomationManager", { enumerable: true, get: function () { return automation_manager_1.AutomationManager; } });
 // Version information
-export const VERSION = '1.0.0';
+exports.VERSION = '1.0.0';
 /**
  * Factory function to create a configured WebBuddyClient
  * Provides a convenient way to create clients with default configuration
@@ -50,8 +72,8 @@ export const VERSION = '1.0.0';
  * @param config - Client configuration
  * @returns Configured WebBuddyClient instance with learning capabilities
  */
-export function createWebBuddyClient(config) {
-    return new WebBuddyClient({
+function createWebBuddyClient(config) {
+    return new client_2.WebBuddyClient({
         timeout: 30000,
         retryAttempts: 3,
         retryDelay: 1000,
@@ -62,38 +84,16 @@ export function createWebBuddyClient(config) {
  * Factory function to create a learning-enabled automation client
  * Convenient wrapper for automation-focused usage
  */
-export function createAutomationClient(config) {
+function createAutomationClient(config) {
     return createWebBuddyClient({
         ...config,
         learningEnabled: true
     });
 }
 /**
- * Factory function to create a configured WebBuddyServer
- * Provides a convenient way to create servers with default configuration
- *
- * @param config - Server configuration
- * @returns Configured WebBuddyServer instance
+ * Note: Server creation moved to @web-buddy/server package
+ * Use createWebBuddyServer from '@web-buddy/server' instead
  */
-export function createWebBuddyServer(config = {}) {
-    return new WebBuddyServer({
-        port: 3000,
-        host: 'localhost',
-        cors: {
-            enabled: true,
-            origins: ['http://localhost:3000', 'https://*.google.com', 'https://chatgpt.com']
-        },
-        rateLimit: {
-            enabled: true,
-            windowMs: 60000, // 1 minute
-            maxRequests: 100
-        },
-        authentication: {
-            enabled: false
-        },
-        ...config
-    });
-}
 /**
  * Factory function to create a configured WebBuddyExtension
  * Provides a convenient way to create extensions with default configuration
@@ -101,8 +101,8 @@ export function createWebBuddyServer(config = {}) {
  * @param config - Extension configuration
  * @returns Configured WebBuddyExtension instance
  */
-export function createWebBuddyExtension(config) {
-    return new WebBuddyExtension({
+function createWebBuddyExtension(config) {
+    return new extension_2.WebBuddyExtension({
         reconnectInterval: 5000,
         maxReconnectAttempts: 5,
         heartbeatInterval: 30000,

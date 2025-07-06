@@ -1,3 +1,4 @@
+"use strict";
 /*
                         Web-Buddy Core - Event System
 
@@ -16,12 +17,16 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
-import { v4 as uuidv4 } from 'uuid';
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.EventPriority = exports.BaseEvent = void 0;
+exports.createSuccessResponse = createSuccessResponse;
+exports.createErrorResponse = createErrorResponse;
+const uuid_1 = require("uuid");
 /**
  * Abstract base class for all Web-Buddy events
  * Implements common functionality and ensures consistent structure
  */
-export class BaseEvent {
+class BaseEvent {
     payload;
     website;
     tabId;
@@ -39,13 +44,13 @@ export class BaseEvent {
      * Generates a unique correlation ID for event tracking across system boundaries
      */
     generateCorrelationId() {
-        return `web-buddy-${Date.now()}-${uuidv4().substr(0, 8)}`;
+        return `web-buddy-${Date.now()}-${(0, uuid_1.v4)().substr(0, 8)}`;
     }
     /**
      * Generates a unique event ID for this specific event instance
      */
     generateEventId() {
-        return `event-${Date.now()}-${uuidv4().substr(0, 12)}`;
+        return `event-${Date.now()}-${(0, uuid_1.v4)().substr(0, 12)}`;
     }
     /**
      * Serializes the event to JSON format for network transmission
@@ -69,10 +74,11 @@ export class BaseEvent {
         throw new Error('fromJSON must be implemented by concrete event classes');
     }
 }
+exports.BaseEvent = BaseEvent;
 /**
  * Creates a standardized success response
  */
-export function createSuccessResponse(data, correlationId, eventId, resultingEvents) {
+function createSuccessResponse(data, correlationId, eventId, resultingEvents) {
     return {
         success: true,
         data,
@@ -85,7 +91,7 @@ export function createSuccessResponse(data, correlationId, eventId, resultingEve
 /**
  * Creates a standardized error response
  */
-export function createErrorResponse(error, correlationId, eventId) {
+function createErrorResponse(error, correlationId, eventId) {
     return {
         success: false,
         error,
@@ -97,11 +103,11 @@ export function createErrorResponse(error, correlationId, eventId) {
 /**
  * Event priority levels for processing order
  */
-export var EventPriority;
+var EventPriority;
 (function (EventPriority) {
     EventPriority[EventPriority["LOW"] = 0] = "LOW";
     EventPriority[EventPriority["NORMAL"] = 1] = "NORMAL";
     EventPriority[EventPriority["HIGH"] = 2] = "HIGH";
     EventPriority[EventPriority["CRITICAL"] = 3] = "CRITICAL";
-})(EventPriority || (EventPriority = {}));
+})(EventPriority || (exports.EventPriority = EventPriority = {}));
 //# sourceMappingURL=base.js.map

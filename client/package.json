@@ -26,9 +26,6 @@
   "author": "rydnr",
   "license": "GPL-3.0",
   "dependencies": {
-    "@typescript-eda/domain": "^1.0.0",
-    "@typescript-eda/infrastructure": "^1.0.0",
-    "@typescript-eda/application": "^1.0.0",
     "axios": "^1.7.2",
     "ws": "^8.14.2"
   },

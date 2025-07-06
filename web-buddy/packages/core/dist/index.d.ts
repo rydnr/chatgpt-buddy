@@ -5,10 +5,8 @@
  * for web automation. Domain-specific implementations build upon this foundation.
  */
 export { WebBuddyClient, type WebBuddyClientConfig } from './client';
-export { WebBuddyServer, type WebBuddyServerConfig, type ExtensionConnection } from './server';
 export { WebBuddyExtension, type WebBuddyExtensionConfig, ContentScriptIntegration } from './extension';
 import { WebBuddyClient } from './client';
-import { WebBuddyServer, type WebBuddyServerConfig } from './server';
 import { WebBuddyExtension } from './extension';
 export { type WebBuddyEvent, type AutomationEvent, BaseEvent, type EventHandler, type EventResponse, createSuccessResponse, createErrorResponse, EventPriority, type EventMetadata, type MetadataEvent } from './events/base';
 export { AutomationRequestedEvent, AutomationImplementedEvent, AutomationSucceededEvent, AutomationFailedEvent, UserGuidanceRequestedEvent, UserGuidanceProvidedEvent, AutomationEventFactory } from './events/automation';
@@ -39,13 +37,9 @@ export declare function createAutomationClient(config: {
     apiKey?: string;
 }): WebBuddyClient;
 /**
- * Factory function to create a configured WebBuddyServer
- * Provides a convenient way to create servers with default configuration
- *
- * @param config - Server configuration
- * @returns Configured WebBuddyServer instance
+ * Note: Server creation moved to @web-buddy/server package
+ * Use createWebBuddyServer from '@web-buddy/server' instead
  */
-export declare function createWebBuddyServer(config?: WebBuddyServerConfig): WebBuddyServer;
 /**
  * Factory function to create a configured WebBuddyExtension
  * Provides a convenient way to create extensions with default configuration

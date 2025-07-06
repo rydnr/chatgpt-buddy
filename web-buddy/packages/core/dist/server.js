@@ -1,3 +1,4 @@
+"use strict";
 /*
                         Web-Buddy Core
 
@@ -16,14 +17,16 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
-import { createSuccessResponse, createErrorResponse } from './events/base';
-import { UserGuidanceRequestedEvent } from './events/automation';
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.WebBuddyServer = void 0;
+const base_1 = require("./events/base");
+const automation_1 = require("./events/automation");
 /**
  * Generic Web-Buddy server that provides event routing infrastructure
  * Domain-specific implementations register their handlers with this server
  * Now supports the learning automation system with event-driven architecture
  */
-export class WebBuddyServer {
+class WebBuddyServer {
     config;
     handlers = new Map();
     eventListeners = new Map();
@@ -89,7 +92,7 @@ export class WebBuddyServer {
         try {
             // Validate event structure
             if (!event.type || !event.correlationId || !event.eventId) {
-                return createErrorResponse('Invalid event: missing type, correlationId, or eventId', event.correlationId || 'unknown', event.eventId || 'unknown');
+                return (0, base_1.createErrorResponse)('Invalid event: missing type, correlationId, or eventId', event.correlationId || 'unknown', event.eventId || 'unknown');
             }
             // Trigger event listeners first (non-blocking)
             this.triggerEventListeners(event);
@@ -100,14 +103,14 @@ export class WebBuddyServer {
                 if (event.type === 'automationRequested') {
                     return await this.handleAutomationLearning(event);
                 }
-                return createErrorResponse(`No handler registered for event type: ${event.type}`, event.correlationId, event.eventId);
+                return (0, base_1.createErrorResponse)(`No handler registered for event type: ${event.type}`, event.correlationId, event.eventId);
             }
             // Execute handler
             const result = await handler.handle(event);
-            return createSuccessResponse(result, event.correlationId, event.eventId);
+            return (0, base_1.createSuccessResponse)(result, event.correlationId, event.eventId);
         }
         catch (error) {
-            return createErrorResponse(error instanceof Error ? error.message : 'Unknown error', event.correlationId, event.eventId);
+            return (0, base_1.createErrorResponse)(error instanceof Error ? error.message : 'Unknown error', event.correlationId, event.eventId);
         }
     }
     /**
@@ -150,7 +153,7 @@ export class WebBuddyServer {
         // Check if we have a stored implementation for this action
         // This would integrate with the storage system we'll build later
         // For now, trigger user guidance request
-        const guidanceEvent = new UserGuidanceRequestedEvent({
+        const guidanceEvent = new automation_1.UserGuidanceRequestedEvent({
             requestEventId: event.eventId,
             guidanceType: 'record',
             prompt: `No automation exists for "${event.payload.action}". Would you like to record one?`,
@@ -170,7 +173,7 @@ export class WebBuddyServer {
         }, event.correlationId, event.website, event.tabId);
         // Forward to browser extension for user interaction
         await this.forwardToExtension('default', guidanceEvent);
-        return createSuccessResponse({
+        return (0, base_1.createSuccessResponse)({
             status: 'learningTriggered',
             message: 'User guidance requested for automation learning',
             guidanceEventId: guidanceEvent.eventId
@@ -316,4 +319,5 @@ export class WebBuddyServer {
         };
     }
 }
+exports.WebBuddyServer = WebBuddyServer;
 //# sourceMappingURL=server.js.map

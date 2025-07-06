@@ -1,0 +1,78 @@
+{
+  "name": "@semantest/google.com",
+  "version": "2.0.0",
+  "description": "Google domain automation package for Semantest framework using TypeScript-EDA foundation",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "clean": "rimraf dist",
+    "lint": "eslint src --ext .ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "semantest",
+    "google",
+    "search-automation",
+    "browser-automation",
+    "typescript-eda",
+    "domain-driven-design",
+    "event-driven"
+  ],
+  "author": "Semantest Team",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "@semantest/browser": "workspace:*",
+    "@typescript-eda/domain": "workspace:*",
+    "@typescript-eda/application": "workspace:*",
+    "@typescript-eda/infrastructure": "workspace:*",
+    "uuid": "^9.0.0"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.5",
+    "@types/node": "^20.6.0",
+    "@types/uuid": "^9.0.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "eslint": "^8.0.0",
+    "jest": "^29.7.0",
+    "rimraf": "^5.0.1",
+    "ts-jest": "^29.1.1",
+    "typescript": "^5.2.2"
+  },
+  "peerDependencies": {
+    "@semantest/browser": "^2.0.0",
+    "typescript": "^5.0.0"
+  },
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./domain": {
+      "import": "./dist/domain/index.js",
+      "require": "./dist/domain/index.js",
+      "types": "./dist/domain/index.d.ts"
+    },
+    "./infrastructure": {
+      "import": "./dist/infrastructure/index.js",
+      "require": "./dist/infrastructure/index.js",
+      "types": "./dist/infrastructure/index.d.ts"
+    },
+    "./application": {
+      "import": "./dist/application/index.js",
+      "require": "./dist/application/index.js",
+      "types": "./dist/application/index.d.ts"
+    }
+  },
+  "files": [
+    "dist/**/*",
+    "README.org",
+    "LICENSE"
+  ]
+}

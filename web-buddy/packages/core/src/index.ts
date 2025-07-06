@@ -27,15 +27,13 @@
 // Core client API
 export { WebBuddyClient, type WebBuddyClientConfig } from './client';
 
-// Core server infrastructure
-export { WebBuddyServer, type WebBuddyServerConfig, type ExtensionConnection } from './server';
+// Note: Server infrastructure moved to @web-buddy/server package
 
 // Core extension framework
 export { WebBuddyExtension, type WebBuddyExtensionConfig, ContentScriptIntegration } from './extension';
 
 // Import classes for factory functions
 import { WebBuddyClient } from './client';
-import { WebBuddyServer, type WebBuddyServerConfig } from './server';
 import { WebBuddyExtension } from './extension';
 
 // Core event types and utilities (new event-driven architecture)
@@ -126,31 +124,9 @@ export function createAutomationClient(config: {
 }
 
 /**
- * Factory function to create a configured WebBuddyServer
- * Provides a convenient way to create servers with default configuration
- * 
- * @param config - Server configuration
- * @returns Configured WebBuddyServer instance
+ * Note: Server creation moved to @web-buddy/server package
+ * Use createWebBuddyServer from '@web-buddy/server' instead
  */
-export function createWebBuddyServer(config: WebBuddyServerConfig = {}): WebBuddyServer {
-  return new WebBuddyServer({
-    port: 3000,
-    host: 'localhost',
-    cors: {
-      enabled: true,
-      origins: ['http://localhost:3000', 'https://*.google.com', 'https://chatgpt.com']
-    },
-    rateLimit: {
-      enabled: true,
-      windowMs: 60000, // 1 minute
-      maxRequests: 100
-    },
-    authentication: {
-      enabled: false
-    },
-    ...config
-  });
-}
 
 /**
  * Factory function to create a configured WebBuddyExtension

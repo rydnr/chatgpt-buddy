@@ -4,7 +4,7 @@
  * @author Web-Buddy Team
  */
 
-import { AdapterFor, Port } from '@typescript-eda/infrastructure';
+import { Adapter, AdapterFor, Port } from '../../stubs/typescript-eda-stubs';
 import express, { Express, Request, Response } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';

@@ -44,9 +44,9 @@
     "prettier": "^3.0.0"
   },
   "dependencies": {
-    "@typescript-eda/core": "^1.0.0"
+    
   },
   "peerDependencies": {
-    "@typescript-eda/core": "^1.0.0"
+    
   }
 }

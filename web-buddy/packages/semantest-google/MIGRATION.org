@@ -1,0 +1,331 @@
+#+TITLE: Migration Guide: @google-buddy/client to @semantest/google.com
+#+AUTHOR: Semantest Team
+#+DATE: 2025-01-06
+
+* Overview
+
+This document guides you through migrating from the legacy =@google-buddy/client= package to the new =@semantest/google.com= package, which is built on the TypeScript-EDA foundation.
+
+* Key Changes
+
+** Architecture
+- *Old*: Direct client-server communication with custom message protocol
+- *New*: Event-driven architecture with domain entities, events, and proper separation of concerns
+
+** Naming Convention
+- *Old*: =@google-buddy/client=
+- *New*: =@semantest/google.com= (DNS-style naming)
+
+** Dependencies
+- *Old*: =@web-buddy/core=
+- *New*: =@typescript-eda/domain=, =@typescript-eda/application=, =@typescript-eda/infrastructure=
+
+* Migration Steps
+
+** 1. Update Package Dependencies
+
+#+BEGIN_SRC json
+// Old package.json
+{
+  "dependencies": {
+    "@google-buddy/client": "^1.0.0",
+    "@web-buddy/core": "^1.0.0"
+  }
+}
+
+// New package.json
+{
+  "dependencies": {
+    "@semantest/google.com": "^2.0.0"
+  }
+}
+#+END_SRC
+
+** 2. Update Imports
+
+*** Basic Client Usage
+
+#+BEGIN_SRC typescript
+// Old
+import { GoogleBuddyClient } from '@google-buddy/client';
+import { WebBuddyClient } from '@web-buddy/core';
+
+// New (backward compatible)
+import { GoogleBuddyClient } from '@semantest/google.com';
+
+// New (recommended)
+import { 
+  GoogleCommunicationAdapter,
+  GoogleApplication,
+  SearchQuery 
+} from '@semantest/google.com';
+#+END_SRC
+
+** 3. Client Initialization
+
+*** Backward Compatible Mode
+
+#+BEGIN_SRC typescript
+// Old
+const webBuddyClient = new WebBuddyClient({
+  serverUrl: 'http://localhost:3000'
+});
+const googleClient = new GoogleBuddyClient(webBuddyClient);
+
+// New (backward compatible)
+const googleClient = new GoogleBuddyClient({
+  serverUrl: 'http://localhost:3000',
+  timeout: 30000
+});
+
+await googleClient.connect(); // New: explicit connection
+#+END_SRC
+
+*** Modern Event-Driven Approach
+
+#+BEGIN_SRC typescript
+// New (recommended)
+import { 
+  GoogleCommunicationAdapter, 
+  GoogleApplication,
+  SearchRequestedEvent,
+  SearchQuery 
+} from '@semantest/google.com';
+
+// Initialize communication adapter
+const adapter = new GoogleCommunicationAdapter({
+  url: 'ws://localhost:3000',
+  timeout: 30000
+});
+
+await adapter.connect();
+
+// Initialize application (for server-side)
+const app = new GoogleApplication({
+  communicationAdapter: adapter
+});
+
+// Request a search
+const query = SearchQuery.fromString('TypeScript tutorials');
+const event = await adapter.requestSearch(query, {
+  tabId: 123,
+  maxResults: 10
+});
+
+if (event instanceof SearchCompletedEvent) {
+  console.log(`Found ${event.results.length} results`);
+  event.results.forEach(result => {
+    console.log(`- ${result.title}: ${result.url}`);
+  });
+}
+#+END_SRC
+
+** 4. API Method Changes
+
+*** Search Operations
+
+#+BEGIN_SRC typescript
+// Old
+const results = await googleClient.search('query');
+
+// New (backward compatible)
+const results = await googleClient.search('query');
+
+// New (event-driven)
+const event = await adapter.requestSearch('query');
+if (event instanceof SearchCompletedEvent) {
+  const results = event.results;
+}
+#+END_SRC
+
+*** Result Clicking
+
+#+BEGIN_SRC typescript
+// Old
+const response = await googleClient.clickResult(0);
+
+// New (backward compatible)
+const response = await googleClient.clickResult(0);
+
+// New (event-driven)
+await adapter.clickResult(searchId, 0);
+#+END_SRC
+
+** 5. Error Handling
+
+#+BEGIN_SRC typescript
+// Old
+try {
+  await googleClient.search('query');
+} catch (error) {
+  console.error('Search failed:', error.message);
+}
+
+// New (event-driven)
+const event = await adapter.requestSearch('query');
+if (event instanceof SearchFailedEvent) {
+  console.error(`Search failed: ${event.error}`);
+  console.error(`Error code: ${event.errorCode}`);
+  if (event.isRetryable) {
+    // Can retry
+  }
+}
+#+END_SRC
+
+* New Features
+
+** 1. Domain Entities
+
+#+BEGIN_SRC typescript
+import { SearchQuery, SearchResult, GoogleSearch } from '@semantest/google.com';
+
+// Create validated search query
+const query = SearchQuery.fromString('machine learning', {
+  language: 'en',
+  region: 'US',
+  safeSearch: true
+});
+
+// Work with search results as entities
+const result = SearchResult.create({
+  title: 'Example Result',
+  url: 'https://example.com',
+  description: 'An example search result',
+  position: 1
+});
+
+// Track search lifecycle
+const search = GoogleSearch.create(query);
+const inProgress = search.markAsInProgress();
+const completed = inProgress.completeWithResults([result], 1, 250);
+#+END_SRC
+
+** 2. Event Subscriptions
+
+#+BEGIN_SRC typescript
+// Subscribe to search events
+adapter.on('search_completed', (data) => {
+  console.log('Search completed:', data);
+});
+
+adapter.on('search_failed', (data) => {
+  console.error('Search failed:', data);
+});
+
+// Application-level event handling
+app.on(SearchCompletedEvent, async (event) => {
+  console.log(`Search ${event.searchId} completed with ${event.results.length} results`);
+});
+#+END_SRC
+
+** 3. Advanced Filtering
+
+#+BEGIN_SRC typescript
+// Filter results by domain
+const event = await adapter.requestSearch('news');
+if (event instanceof SearchCompletedEvent) {
+  const cnnResults = event.getResultsFromDomain('cnn.com');
+  const organicResults = event.getOrganicResults();
+  const featuredResults = event.getFeaturedResults();
+}
+#+END_SRC
+
+** 4. Batch Operations
+
+#+BEGIN_SRC typescript
+// Batch search with new API
+const queries = ['typescript', 'javascript', 'nodejs'];
+const events = await adapter.batchSearch(queries, {
+  parallel: true,
+  maxResults: 5
+});
+
+events.forEach(event => {
+  console.log(`Query: ${event.query.value}, Results: ${event.results.length}`);
+});
+#+END_SRC
+
+* Testing
+
+** Unit Tests
+
+#+BEGIN_SRC typescript
+import { SearchQuery, SearchResult, GoogleSearch } from '@semantest/google.com';
+
+describe('GoogleSearch', () => {
+  it('should create a search with query', () => {
+    const query = SearchQuery.fromString('test query');
+    const search = GoogleSearch.create(query);
+    
+    expect(search.query.value).toBe('test query');
+    expect(search.status).toBe(SearchStatus.PENDING);
+  });
+  
+  it('should complete with results', () => {
+    const query = SearchQuery.fromString('test');
+    const search = GoogleSearch.create(query);
+    const result = SearchResult.create({
+      title: 'Test Result',
+      url: 'https://test.com',
+      description: 'Test description',
+      position: 1
+    });
+    
+    const inProgress = search.markAsInProgress();
+    const completed = inProgress.completeWithResults([result], 1, 100);
+    
+    expect(completed.isComplete()).toBe(true);
+    expect(completed.results).toHaveLength(1);
+  });
+});
+#+END_SRC
+
+** Integration Tests
+
+#+BEGIN_SRC typescript
+import { GoogleCommunicationAdapter } from '@semantest/google.com';
+
+describe('Google Integration', () => {
+  let adapter: GoogleCommunicationAdapter;
+  
+  beforeEach(async () => {
+    adapter = new GoogleCommunicationAdapter({
+      url: 'ws://localhost:3000'
+    });
+    await adapter.connect();
+  });
+  
+  afterEach(async () => {
+    await adapter.disconnect();
+  });
+  
+  it('should perform search', async () => {
+    const event = await adapter.requestSearch('typescript');
+    
+    expect(event).toBeInstanceOf(SearchCompletedEvent);
+    if (event instanceof SearchCompletedEvent) {
+      expect(event.results.length).toBeGreaterThan(0);
+    }
+  });
+});
+#+END_SRC
+
+* Breaking Changes
+
+1. *WebBuddyClient Dependency*: No longer passed to constructor
+2. *Connection Management*: Explicit =connect()= and =disconnect()= required
+3. *Event-Based Responses*: Methods now return events instead of plain objects
+4. *Type Safety*: Stricter TypeScript types throughout
+
+* Deprecation Warnings
+
+The following will show deprecation warnings:
+- =getWebBuddyClient()= - Use =getAdapter()= instead
+- Direct message sending - Use event-based API instead
+
+* Support
+
+For questions or issues during migration:
+- GitHub Issues: https://github.com/semantest/google.com
+- Documentation: https://docs.semantest.com/google
+- Discord: https://discord.gg/semantest

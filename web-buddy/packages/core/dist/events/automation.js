@@ -1,3 +1,4 @@
+"use strict";
 /*
                         Web-Buddy Core - Automation Learning Events
 
@@ -16,12 +17,14 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
-import { BaseEvent } from './base';
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.AutomationEventFactory = exports.UserGuidanceProvidedEvent = exports.UserGuidanceRequestedEvent = exports.AutomationFailedEvent = exports.AutomationSucceededEvent = exports.AutomationImplementedEvent = exports.AutomationRequestedEvent = void 0;
+const base_1 = require("./base");
 /**
  * Event triggered when user/system requests automation for a specific action
  * This is the starting point of the learning loop
  */
-export class AutomationRequestedEvent extends BaseEvent {
+class AutomationRequestedEvent extends base_1.BaseEvent {
     payload;
     learningContext;
     type = 'automationRequested';
@@ -32,11 +35,12 @@ export class AutomationRequestedEvent extends BaseEvent {
         this.learningContext = learningContext;
     }
 }
+exports.AutomationRequestedEvent = AutomationRequestedEvent;
 /**
  * Event triggered when user provides implementation through recording
  * Contains the Playwright script and metadata about the implementation
  */
-export class AutomationImplementedEvent extends BaseEvent {
+class AutomationImplementedEvent extends base_1.BaseEvent {
     payload;
     learningContext;
     type = 'automationImplemented';
@@ -47,10 +51,11 @@ export class AutomationImplementedEvent extends BaseEvent {
         this.learningContext = learningContext;
     }
 }
+exports.AutomationImplementedEvent = AutomationImplementedEvent;
 /**
  * Event triggered when automation executes successfully
  */
-export class AutomationSucceededEvent extends BaseEvent {
+class AutomationSucceededEvent extends base_1.BaseEvent {
     payload;
     learningContext;
     type = 'automationSucceeded';
@@ -61,10 +66,11 @@ export class AutomationSucceededEvent extends BaseEvent {
         this.learningContext = learningContext;
     }
 }
+exports.AutomationSucceededEvent = AutomationSucceededEvent;
 /**
  * Event triggered when automation fails to execute
  */
-export class AutomationFailedEvent extends BaseEvent {
+class AutomationFailedEvent extends base_1.BaseEvent {
     payload;
     learningContext;
     type = 'automationFailed';
@@ -75,10 +81,11 @@ export class AutomationFailedEvent extends BaseEvent {
         this.learningContext = learningContext;
     }
 }
+exports.AutomationFailedEvent = AutomationFailedEvent;
 /**
  * Event for requesting user interaction/guidance during automation learning
  */
-export class UserGuidanceRequestedEvent extends BaseEvent {
+class UserGuidanceRequestedEvent extends base_1.BaseEvent {
     payload;
     type = 'userGuidanceRequested';
     constructor(payload, correlationId, website, tabId) {
@@ -86,10 +93,11 @@ export class UserGuidanceRequestedEvent extends BaseEvent {
         this.payload = payload;
     }
 }
+exports.UserGuidanceRequestedEvent = UserGuidanceRequestedEvent;
 /**
  * Event sent when user provides guidance/response
  */
-export class UserGuidanceProvidedEvent extends BaseEvent {
+class UserGuidanceProvidedEvent extends base_1.BaseEvent {
     payload;
     type = 'userGuidanceProvided';
     constructor(payload, correlationId, website, tabId) {
@@ -97,10 +105,11 @@ export class UserGuidanceProvidedEvent extends BaseEvent {
         this.payload = payload;
     }
 }
+exports.UserGuidanceProvidedEvent = UserGuidanceProvidedEvent;
 /**
  * Utility functions for creating automation events
  */
-export class AutomationEventFactory {
+class AutomationEventFactory {
     static createSearchRequest(query, website, context) {
         return new AutomationRequestedEvent({
             action: 'search',
@@ -138,4 +147,5 @@ export class AutomationEventFactory {
         }, undefined, website);
     }
 }
+exports.AutomationEventFactory = AutomationEventFactory;
 //# sourceMappingURL=automation.js.map

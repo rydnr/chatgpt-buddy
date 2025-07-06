@@ -35,8 +35,8 @@
   },
   "homepage": "https://typescript-eda.org/application",
   "dependencies": {
-    "@typescript-eda/domain": "^1.0.0",
-    "@typescript-eda/infrastructure": "^1.0.0",
+    "@typescript-eda/domain": "workspace:*",
+    "@typescript-eda/infrastructure": "workspace:*",
     "reflect-metadata": "^0.2.0"
   },
   "devDependencies": {
@@ -50,8 +50,8 @@
     "typescript": "^5.0.0"
   },
   "peerDependencies": {
-    "@typescript-eda/domain": "^1.0.0",
-    "@typescript-eda/infrastructure": "^1.0.0"
+    "@typescript-eda/domain": "workspace:*",
+    "@typescript-eda/infrastructure": "workspace:*"
   },
   "files": [
     "dist",

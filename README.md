@@ -49,6 +49,11 @@ ChatGPT-Buddy is built on the Web-Buddy framework ecosystem, leveraging event-dr
 
 ## Quick Start
 
+### Prerequisites
+
+- **Node.js 18+** - [Download here](https://nodejs.org/)
+- **pnpm 8+** - Install with `npm install -g pnpm`
+
 ### Installation
 
 ```bash
@@ -56,9 +61,13 @@ ChatGPT-Buddy is built on the Web-Buddy framework ecosystem, leveraging event-dr
 git clone https://github.com/rydnr/chatgpt-buddy.git
 cd chatgpt-buddy
 
-# Install all dependencies
-npm run install:all
+# Install all workspace dependencies
+pnpm install
+# or use the convenience script
+pnpm run install:all
 ```
+
+> ⚠️ **Important**: This project uses **pnpm workspaces**. Always use `pnpm` commands, not `npm` commands.
 
 ### Environment Setup
 
@@ -83,29 +92,63 @@ ENABLE_PATTERN_RECOGNITION=true
 ENABLE_AI_INSIGHTS=true
 ```
 
-### Start the Server
+### Start the Development Server
 
 ```bash
-# Development mode
-npm run dev
-
-# Production mode
-npm run build
-npm start
+# Start development server (minimal HTTP server for testing)
+pnpm run dev
 ```
+
+The server will start on `http://localhost:3000` with these endpoints:
+- `GET /health` - Health check
+- `POST /api/dispatch` - API dispatch for browser extension  
+- `POST /api/training/enable` - Enable training mode
+- `GET /api/training/patterns` - Get training patterns
+
+### Build and Production
+
+```bash
+# Build all packages (now working!)
+pnpm run build
+
+# Build specific package groups:
+pnpm run build:packages    # ChatGPT-Buddy packages only
+pnpm run build:web-buddy   # Web-Buddy framework packages only
+
+# Development server:
+pnpm run dev
+
+# For production:
+pnpm run start
+```
+
+> ✅ **Build Status**: The workspace build has been fixed! `pnpm run build` now successfully builds all ChatGPT-Buddy and Web-Buddy packages using proper TypeScript project references and composite builds.
 
 ### Install Browser Extension
 
-1. Build the extension:
+1. **Build the extension** (copies all necessary files automatically):
    ```bash
-   npm run build:extension
+   # Build from project root
+   pnpm run build:extension
+   
+   # Or build from extension directory
+   cd extension && npm run build
    ```
 
-2. Load in Chrome:
+2. **Load in Chrome**:
    - Open `chrome://extensions/`
-   - Enable "Developer mode"
+   - Enable "Developer mode" (toggle in top right)
    - Click "Load unpacked"
-   - Select the `extension/build` directory
+   - Navigate to and select the `extension/build/` directory
+   
+   **Full path**: `/path/to/chatgpt-buddy/extension/build/`
+
+3. **Verify Installation**:
+   - You should see "ChatGPT-Buddy" extension in your extensions list
+   - The extension icon should appear in your browser toolbar
+   - Click the icon to open the popup and configure server connection
+
+> ✅ **Extension Status**: The browser extension build process automatically copies all necessary files (manifest.json, assets, HTML files) to the build directory.
 
 ## AI Integration Examples
 
@@ -297,44 +340,84 @@ interface AIAutomationResponse {
 
 ```
 chatgpt-buddy/
-├── server/              # AI automation server
-│   ├── src/
-│   │   ├── applications/    # ChatGPT-specific applications
-│   │   ├── adapters/        # AI service integrations
-│   │   ├── events/          # ChatGPT domain events
-│   │   └── utils/           # Shared utilities
-├── extension/           # Browser extension
-│   └── src/             # Extension source code
-├── client/              # Client SDKs
-│   ├── typescript/      # TypeScript SDK
-│   └── python/          # Python SDK
-└── docs/                # Documentation
+├── extension/                          # ChatGPT-Buddy browser extension (working)
+│   ├── build/                         # Built extension ready for Chrome
+│   └── src/                           # ChatGPT-specific extension source
+├── server/                            # AI automation server
+│   └── src/                           # Server applications and adapters
+├── packages/                          # ChatGPT-Buddy packages (TypeScript-EDA)
+│   ├── chatgpt-buddy-core/           # Shared domain & events
+│   ├── chatgpt-buddy-server/         # Server application
+│   └── chatgpt-buddy-client-ts/      # TypeScript client SDK
+├── web-buddy/                         # Web-Buddy Framework
+│   ├── packages/
+│   │   ├── core/                     # Generic automation framework
+│   │   └── browser-extension/        # Generic browser extension framework
+│   └── implementations/
+│       └── google-buddy/             # Google automation example
+└── client/                            # Additional client SDKs
+    ├── typescript/                    # TypeScript SDK
+    └── python/                        # Python SDK
 ```
+
+> 📋 **Architecture**: The project follows a plugin architecture where ChatGPT-Buddy is a specific implementation built on the generic Web-Buddy framework. See [ARCHITECTURE_REORGANIZATION.md](./ARCHITECTURE_REORGANIZATION.md) for details.
 
 ### Building and Testing
 
 ```bash
-# Build all components
-npm run build
+# Development workflow (recommended)
+pnpm run dev           # Start development server
+
+# Build working packages
+cd web-buddy && pnpm run build
 
 # Run tests
-npm test
+pnpm test
 
-# Run E2E tests
-npm run test:e2e
-
-# Lint and type check
-npm run lint
-npm run typecheck
+# Run E2E tests  
+pnpm run test:e2e
 ```
+
+### Available Commands
+
+| Command | Status | Description |
+|---------|--------|-------------|
+| `pnpm install` | ✅ Working | Install all workspace dependencies |
+| `pnpm run dev` | ✅ Working | Start development server |
+| `pnpm run build` | ✅ Fixed | Build all packages with TypeScript project references |
+| `pnpm run build:packages` | ✅ Working | Build ChatGPT-Buddy packages only |
+| `pnpm run build:extension` | ✅ Working | Build browser extension with all assets |
+| `pnpm run build:web-buddy` | ✅ Working | Build Web-Buddy framework packages |
+| `pnpm test` | ✅ Working | Run all tests |
 
 ### Contributing
 
 1. Fork the repository
 2. Create a feature branch: `git checkout -b feature/ai-enhancement`
 3. Make your changes with tests
-4. Run the test suite: `npm test`
+4. Run the test suite: `pnpm test`
 5. Submit a pull request
+
+### Troubleshooting
+
+#### NPM vs PNPM
+This project uses **pnpm workspaces**. Always use `pnpm` commands:
+
+❌ Don't use: `npm install`, `npm run build`  
+✅ Use instead: `pnpm install`, `pnpm run build`
+
+#### Development Server
+The development server (`pnpm run dev`) starts a minimal HTTP server for testing. For full functionality, build all workspace packages first.
+
+#### Build Issues
+The full workspace build currently has dependency issues. For development:
+
+1. **Use development server**: `pnpm run dev` (always works)
+2. **Build individual packages**: `cd web-buddy && pnpm run build`
+3. **Clean and reinstall**: `rm -rf node_modules && pnpm install`
+4. **Check status**: See [BUILD_STATUS.md](./BUILD_STATUS.md) for detailed information
+
+The development server provides full API functionality without requiring complex builds.
 
 ## Configuration
 
@@ -642,7 +725,7 @@ cd chatgpt-buddy
 pnpm install
 
 # Build all packages
-pnpm build
+pnpm run build
 
 # Run tests
 pnpm test

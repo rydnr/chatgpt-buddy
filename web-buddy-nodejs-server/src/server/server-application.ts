@@ -4,8 +4,7 @@
  * @author Web-Buddy Team
  */
 
-import { Application, Enable } from '@typescript-eda/application';
-import { listen } from '@typescript-eda/domain';
+import { Application, Enable, listen } from '../stubs/typescript-eda-stubs';
 import {
   ServerStartRequestedEvent,
   ServerStopRequestedEvent,
@@ -38,7 +37,7 @@ export class ServerApplication extends Application {
   public readonly metadata = new Map([
     ['name', 'Web-Buddy Node.js Server'],
     ['version', '1.0.0'],
-    ['capabilities', ['http-server', 'websocket-coordination', 'extension-management']],
+    ['capabilities', 'http-server,websocket-coordination,extension-management'],
     ['port', process.env.PORT || 3003],
     ['environment', process.env.NODE_ENV || 'development']
   ]);
@@ -163,7 +162,7 @@ export class ServerApplication extends Application {
       id: event.extensionId,
       version: event.metadata.version,
       capabilities: event.metadata.capabilities,
-      timestamp: event.timestamp
+      timestamp: event.connectionInfo.timestamp
     });
   }
 
@@ -311,7 +310,7 @@ export class ServerApplication extends Application {
       port: this.metadata.get('port'),
       environment: this.metadata.get('environment'),
       version: this.metadata.get('version'),
-      capabilities: this.metadata.get('capabilities')
+      capabilities: this.metadata.get('capabilities')?.toString().split(',') || []
     };
   }
 }

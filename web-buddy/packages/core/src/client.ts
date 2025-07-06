@@ -305,8 +305,23 @@ export class WebBuddyClient {
   /**
    * Generates a unique correlation ID for message tracking
    */
-  private generateCorrelationId(): string {
+  generateCorrelationId(): string {
     return `web-buddy-${Date.now()}-${uuidv4().substr(0, 8)}`;
+  }
+  
+  /**
+   * Get current connection status and transport information
+   */
+  async getTransportInfo(): Promise<{
+    type: string;
+    status: string;
+    averageLatency?: number;
+  }> {
+    return {
+      type: 'http',
+      status: 'connected',
+      averageLatency: 0
+    };
   }
   
   /**

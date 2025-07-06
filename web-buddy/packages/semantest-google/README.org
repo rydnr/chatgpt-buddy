@@ -1,0 +1,295 @@
+#+TITLE: @semantest/google.com - Google Search Automation for Semantest
+#+AUTHOR: Semantest Team
+#+DATE: 2025-01-06
+
+* Overview
+
+=@semantest/google.com= is a domain-specific package for automating Google Search interactions within the Semantest framework. Built on the TypeScript-EDA foundation, it provides a clean, event-driven API for programmatic Google search operations.
+
+* Features
+
+- *Event-Driven Architecture*: Built on TypeScript-EDA with proper domain modeling
+- *Type-Safe*: Full TypeScript support with strict typing
+- *Backward Compatible*: Supports legacy =@google-buddy/client= API
+- *Domain Entities*: =GoogleSearch=, =SearchResult=, =SearchQuery= with business logic
+- *Rich Events*: =SearchRequestedEvent=, =SearchCompletedEvent=, =SearchFailedEvent=, etc.
+- *WebSocket Communication*: Real-time bidirectional communication
+- *Extensible*: Easy to add new search features and capabilities
+
+* Installation
+
+#+BEGIN_SRC bash
+npm install @semantest/google.com
+# or
+yarn add @semantest/google.com
+# or
+pnpm add @semantest/google.com
+#+END_SRC
+
+* Quick Start
+
+** Modern Event-Driven Approach
+
+#+BEGIN_SRC typescript
+import { 
+  GoogleCommunicationAdapter,
+  SearchQuery,
+  SearchCompletedEvent,
+  SearchFailedEvent
+} from '@semantest/google.com';
+
+// Initialize adapter
+const adapter = new GoogleCommunicationAdapter({
+  url: 'ws://localhost:3000'
+});
+
+await adapter.connect();
+
+// Perform a search
+const query = SearchQuery.fromString('TypeScript tutorials');
+const event = await adapter.requestSearch(query);
+
+if (event instanceof SearchCompletedEvent) {
+  console.log(`Found ${event.totalResults} results in ${event.searchTime}ms`);
+  
+  // Process results
+  event.results.forEach((result, index) => {
+    console.log(`${index + 1}. ${result.title}`);
+    console.log(`   ${result.url}`);
+    console.log(`   ${result.description}\n`);
+  });
+  
+  // Click first result
+  if (event.results.length > 0) {
+    await adapter.clickResult(event.searchId, event.results[0]);
+  }
+} else if (event instanceof SearchFailedEvent) {
+  console.error(`Search failed: ${event.error}`);
+  if (event.isRetryable) {
+    console.log('This error is retryable');
+  }
+}
+
+await adapter.disconnect();
+#+END_SRC
+
+** Legacy Compatible Approach
+
+#+BEGIN_SRC typescript
+import { GoogleBuddyClient } from '@semantest/google.com';
+
+// Initialize client (backward compatible)
+const client = new GoogleBuddyClient({
+  serverUrl: 'http://localhost:3000'
+});
+
+await client.connect();
+
+// Simple search
+const results = await client.search('TypeScript tutorials');
+console.log(`Found ${results.length} results`);
+
+// Click first result
+if (results.length > 0) {
+  const { success, url } = await client.clickResult(0);
+  console.log(`Navigated to: ${url}`);
+}
+
+await client.disconnect();
+#+END_SRC
+
+* Architecture
+
+** Domain Layer
+
+*** Entities
+- =GoogleSearch=: Aggregate root managing search lifecycle
+- =SearchResult=: Individual search result entity
+
+*** Value Objects
+- =SearchQuery=: Encapsulates search term with validation
+
+*** Events
+- =SearchRequestedEvent=: Triggered when search is requested
+- =SearchCompletedEvent=: Contains search results
+- =SearchFailedEvent=: Contains error information
+- =ResultClickedEvent=: Tracks result interactions
+
+** Application Layer
+- =GoogleApplication=: Orchestrates search workflow using events
+
+** Infrastructure Layer
+- =GoogleSearchAdapter=: Handles browser automation
+- =GoogleCommunicationAdapter=: Manages WebSocket communication
+
+* Advanced Usage
+
+** Custom Search Options
+
+#+BEGIN_SRC typescript
+const query = SearchQuery.fromString('machine learning', {
+  language: 'en',
+  region: 'US',
+  safeSearch: true
+});
+
+const event = await adapter.requestSearch(query, {
+  maxResults: 20,
+  includeAds: false,
+  timeout: 15000
+});
+#+END_SRC
+
+** Batch Operations
+
+#+BEGIN_SRC typescript
+const queries = ['typescript', 'javascript', 'nodejs'];
+
+const events = await adapter.batchSearch(queries, {
+  parallel: true,
+  maxResults: 5
+});
+
+events.forEach(event => {
+  if (event instanceof SearchCompletedEvent) {
+    console.log(`${event.query.value}: ${event.results.length} results`);
+  }
+});
+#+END_SRC
+
+** Event Subscriptions
+
+#+BEGIN_SRC typescript
+// Subscribe to all search completions
+adapter.on('search_completed', (data) => {
+  console.log('Search completed:', data);
+});
+
+// Application-level event handling
+const app = new GoogleApplication({
+  communicationAdapter: adapter
+});
+
+app.on(SearchCompletedEvent, async (event) => {
+  // Custom handling
+  await saveSearchResults(event);
+});
+#+END_SRC
+
+** Result Filtering
+
+#+BEGIN_SRC typescript
+const event = await adapter.requestSearch('news');
+
+if (event instanceof SearchCompletedEvent) {
+  // Get specific types of results
+  const organicResults = event.getOrganicResults();
+  const featuredSnippets = event.getFeaturedResults();
+  const newsResults = event.getResultsFromDomain('news.google.com');
+  
+  // Custom filtering
+  const recentResults = event.results.filter(result => {
+    const hourAgo = new Date(Date.now() - 3600000);
+    return result.timestamp > hourAgo;
+  });
+}
+#+END_SRC
+
+* API Reference
+
+** GoogleCommunicationAdapter
+
+Main adapter for Google search communication.
+
+*** Methods
+
+- =connect(): Promise<void>=: Establish WebSocket connection
+- =disconnect(): Promise<void>=: Close connection
+- =requestSearch(query, options?): Promise<SearchCompletedEvent | SearchFailedEvent>=: Perform search
+- =clickResult(searchId, result, options?): Promise<void>=: Click on a result
+- =getSearchResults(searchId, options?): Promise<SearchResult[]>=: Get current results
+- =extractPageTitle(options?): Promise<string>=: Extract current page title
+- =batchSearch(queries, options?): Promise<SearchCompletedEvent[]>=: Perform multiple searches
+
+** Domain Entities
+
+*** SearchQuery
+- =fromString(query, options?): SearchQuery=: Create from string
+- =value: string=: Get query text
+- =toGoogleSearchUrl(): string=: Generate search URL
+
+*** SearchResult
+- =title: string=: Result title
+- =url: string=: Result URL
+- =description: string=: Result snippet
+- =position: number=: Position in results
+- =isAd: boolean=: Advertisement indicator
+- =isFeatured: boolean=: Featured snippet indicator
+
+*** GoogleSearch
+- =create(query): GoogleSearch=: Create new search
+- =markAsInProgress(): GoogleSearch=: Update status
+- =completeWithResults(results, total?, time?): GoogleSearch=: Complete search
+- =failWithError(error): GoogleSearch=: Mark as failed
+
+* Testing
+
+** Unit Tests
+
+#+BEGIN_SRC bash
+npm test
+#+END_SRC
+
+** Integration Tests
+
+#+BEGIN_SRC bash
+npm run test:integration
+#+END_SRC
+
+** Example Test
+
+#+BEGIN_SRC typescript
+import { SearchQuery, GoogleSearch, SearchStatus } from '@semantest/google.com';
+
+describe('Google Search', () => {
+  it('should validate search queries', () => {
+    expect(() => SearchQuery.fromString('')).toThrow();
+    expect(() => SearchQuery.fromString('a'.repeat(3000))).toThrow();
+    
+    const valid = SearchQuery.fromString('valid query');
+    expect(valid.value).toBe('valid query');
+  });
+  
+  it('should track search lifecycle', () => {
+    const query = SearchQuery.fromString('test');
+    const search = GoogleSearch.create(query);
+    
+    expect(search.status).toBe(SearchStatus.PENDING);
+    
+    const inProgress = search.markAsInProgress();
+    expect(inProgress.status).toBe(SearchStatus.IN_PROGRESS);
+  });
+});
+#+END_SRC
+
+* Migration from Legacy
+
+See [[file:MIGRATION.org][MIGRATION.org]] for detailed migration instructions from =@google-buddy/client=.
+
+* Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests
+5. Submit a pull request
+
+* License
+
+Apache License 2.0 - see LICENSE file for details
+
+* Support
+
+- GitHub: https://github.com/semantest/google.com
+- Documentation: https://docs.semantest.com/google
+- Discord: https://discord.gg/semantest

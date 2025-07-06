@@ -1,0 +1,103 @@
+{
+  "name": "@semantest/chatgpt.com",
+  "version": "2.0.0",
+  "description": "Semantest ChatGPT domain automation - intelligent conversation and prompt management",
+  "keywords": [
+    "semantest",
+    "chatgpt",
+    "automation",
+    "conversation",
+    "ai",
+    "prompt",
+    "openai"
+  ],
+  "homepage": "https://semantest.com/packages/chatgpt.com",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/semantest/semantest.git",
+    "directory": "packages/semantest-chatgpt.com"
+  },
+  "bugs": "https://github.com/semantest/semantest/issues",
+  "license": "GPL-3.0",
+  "author": "Semantest Team <team@semantest.com>",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "src",
+    "README.org",
+    "MIGRATION.org"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "build:watch": "tsc --watch",
+    "clean": "rimraf dist",
+    "dev": "npm run build:watch",
+    "lint": "eslint src/**/*.ts",
+    "lint:fix": "eslint src/**/*.ts --fix",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run clean && npm run build && npm run test"
+  },
+  "dependencies": {
+    "typescript-eda-domain": "workspace:*",
+    "typescript-eda-infrastructure": "workspace:*",
+    "typescript-eda-application": "workspace:*",
+    "uuid": "^9.0.0"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.0",
+    "@types/node": "^18.0.0",
+    "@types/uuid": "^9.0.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "eslint": "^8.50.0",
+    "jest": "^29.5.0",
+    "rimraf": "^5.0.0",
+    "ts-jest": "^29.1.0",
+    "typescript": "^5.0.0"
+  },
+  "peerDependencies": {
+    "@semantest/browser": "^2.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@semantest/browser": {
+      "optional": true
+    }
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "semantest": {
+    "domain": "chatgpt.com",
+    "category": "contracts",
+    "tier": 1,
+    "maturity": "stable",
+    "capabilities": [
+      "conversation-management",
+      "prompt-submission",
+      "response-extraction",
+      "project-navigation",
+      "file-upload",
+      "export-conversation"
+    ],
+    "migration": {
+      "from": "@web-buddy/implementations/chatgpt-buddy",
+      "breaking_changes": [
+        "Package name change: chatgpt-buddy → @semantest/chatgpt.com",
+        "Class names: ChatGPTBuddyClient → ChatGPTClient",
+        "Domain entities now extend TypeScript-EDA Entity class",
+        "Events now extend TypeScript-EDA Event class",
+        "Infrastructure adapters replace direct WebSocket usage"
+      ],
+      "compatibility_version": "1.x",
+      "migration_guide": "https://docs.semantest.com/migration/chatgpt.com"
+    }
+  }
+}

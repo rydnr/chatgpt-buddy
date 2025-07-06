@@ -1,3 +1,4 @@
+"use strict";
 /*
                         Web-Buddy Core - Automation Storage
 
@@ -16,10 +17,13 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.IndexedDBAutomationStorage = void 0;
+exports.createAutomationStorage = createAutomationStorage;
 /**
  * IndexedDB implementation of automation storage
  */
-export class IndexedDBAutomationStorage {
+class IndexedDBAutomationStorage {
     dbName = 'web-buddy-automations';
     version = 1;
     storeName = 'automations';
@@ -253,10 +257,11 @@ export class IndexedDBAutomationStorage {
         return true;
     }
 }
+exports.IndexedDBAutomationStorage = IndexedDBAutomationStorage;
 /**
  * Factory function to create automation storage
  */
-export function createAutomationStorage() {
+function createAutomationStorage() {
     if (typeof indexedDB !== 'undefined') {
         return new IndexedDBAutomationStorage();
     }

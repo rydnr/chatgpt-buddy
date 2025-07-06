@@ -1,0 +1,96 @@
+{
+  "name": "@semantest/browser",
+  "version": "2.0.0",
+  "description": "Semantest browser automation framework - intelligent, contract-driven web automation",
+  "keywords": [
+    "semantest",
+    "automation",
+    "browser",
+    "web",
+    "contract-driven",
+    "intelligent",
+    "semantic"
+  ],
+  "homepage": "https://semantest.com/packages/browser",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/semantest/semantest.git",
+    "directory": "packages/semantest-browser"
+  },
+  "bugs": "https://github.com/semantest/semantest/issues",
+  "license": "GPL-3.0",
+  "author": "Semantest Team <team@semantest.com>",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "src",
+    "README.md",
+    "CHANGELOG.md"
+  ],
+  "scripts": {
+    "build": "tsc && npm run build:compat",
+    "build:compat": "node scripts/generate-compatibility-shims.js",
+    "build:watch": "tsc --watch",
+    "clean": "rimraf dist",
+    "dev": "npm run build:watch",
+    "lint": "eslint src/**/*.ts",
+    "lint:fix": "eslint src/**/*.ts --fix",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "test:compatibility": "jest --testPathPattern=compatibility",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run clean && npm run build && npm run test"
+  },
+  "dependencies": {
+    "ws": "^8.14.2",
+    "uuid": "^9.0.0",
+    "typescript-eda-domain": "workspace:*",
+    "typescript-eda-infrastructure": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.0",
+    "@types/node": "^18.0.0",
+    "@types/uuid": "^9.0.0",
+    "@types/ws": "^8.5.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "eslint": "^8.50.0",
+    "jest": "^29.5.0",
+    "rimraf": "^5.0.0",
+    "ts-jest": "^29.1.0",
+    "typescript": "^5.0.0"
+  },
+  "peerDependencies": {
+    "@web-buddy/core": "^1.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@web-buddy/core": {
+      "optional": true
+    }
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "semantest": {
+    "category": "core",
+    "tier": 1,
+    "maturity": "stable",
+    "migration": {
+      "from": "@web-buddy/core",
+      "breaking_changes": [
+        "Package name change: @web-buddy/core → @semantest/browser",
+        "Class names: WebBuddyClient → SemanTestClient",
+        "Message types: WEB_BUDDY_* → SEMANTEST_*",
+        "Configuration keys: webBuddy.* → semantest.*"
+      ],
+      "compatibility_version": "1.x",
+      "migration_guide": "https://docs.semantest.com/migration/browser"
+    }
+  }
+}

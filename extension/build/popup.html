@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body {
+      width: 300px;
+      padding: 20px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      margin: 0;
+    }
+    
+    .header {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    
+    .header h1 {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 600;
+    }
+    
+    .header p {
+      margin: 5px 0 0 0;
+      font-size: 12px;
+      opacity: 0.8;
+    }
+    
+    .connection-panel {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      padding: 15px;
+      margin-bottom: 15px;
+      backdrop-filter: blur(10px);
+    }
+    
+    .connection-status {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 15px;
+    }
+    
+    .status-indicator {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .status-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      transition: all 0.3s ease;
+    }
+    
+    .status-dot.connected {
+      background: #4ade80;
+      box-shadow: 0 0 10px rgba(74, 222, 128, 0.5);
+    }
+    
+    .status-dot.disconnected {
+      background: #ef4444;
+      box-shadow: 0 0 10px rgba(239, 68, 68, 0.5);
+    }
+    
+    .status-dot.connecting {
+      background: #fbbf24;
+      box-shadow: 0 0 10px rgba(251, 191, 36, 0.5);
+      animation: pulse 1.5s infinite;
+    }
+    
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    
+    .status-text {
+      font-size: 14px;
+      font-weight: 500;
+    }
+    
+    .toggle-button {
+      background: rgba(255, 255, 255, 0.2);
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-radius: 8px;
+      padding: 8px 16px;
+      color: white;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      outline: none;
+    }
+    
+    .toggle-button:hover {
+      background: rgba(255, 255, 255, 0.3);
+      border-color: rgba(255, 255, 255, 0.5);
+      transform: translateY(-1px);
+    }
+    
+    .toggle-button:active {
+      transform: translateY(0);
+    }
+    
+    .toggle-button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+    
+    .server-input {
+      width: 100%;
+      padding: 8px 12px;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.1);
+      color: white;
+      font-size: 13px;
+      margin-bottom: 10px;
+      outline: none;
+      box-sizing: border-box;
+    }
+    
+    .server-input::placeholder {
+      color: rgba(255, 255, 255, 0.6);
+    }
+    
+    .server-input:focus {
+      border-color: rgba(255, 255, 255, 0.6);
+      background: rgba(255, 255, 255, 0.2);
+    }
+    
+    .info-panel {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+      padding: 12px;
+      font-size: 12px;
+      line-height: 1.4;
+    }
+    
+    .info-panel .label {
+      font-weight: 600;
+      opacity: 0.9;
+    }
+    
+    .info-panel .value {
+      opacity: 0.7;
+      word-break: break-all;
+    }
+    
+    .log-panel {
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 8px;
+      padding: 10px;
+      margin-top: 15px;
+      max-height: 100px;
+      overflow-y: auto;
+      font-family: 'Monaco', 'Menlo', monospace;
+      font-size: 11px;
+      line-height: 1.3;
+    }
+    
+    .log-entry {
+      margin-bottom: 4px;
+      opacity: 0.8;
+    }
+    
+    .log-entry.error {
+      color: #fecaca;
+    }
+    
+    .log-entry.success {
+      color: #bbf7d0;
+    }
+    
+    .log-entry.info {
+      color: #bfdbfe;
+    }
+    
+    .storage-btn {
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 4px;
+      padding: 4px 8px;
+      color: white;
+      font-size: 10px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      outline: none;
+      flex: 1;
+    }
+    
+    .storage-btn:hover {
+      background: rgba(255, 255, 255, 0.2);
+      border-color: rgba(255, 255, 255, 0.4);
+    }
+    
+    .storage-btn:active {
+      transform: scale(0.95);
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>🌐 Web-Buddy</h1>
+    <p>Browser Extension</p>
+  </div>
+  
+  <div class="connection-panel">
+    <div class="connection-status">
+      <div class="status-indicator">
+        <div id="statusDot" class="status-dot disconnected"></div>
+        <span id="statusText" class="status-text">Disconnected</span>
+      </div>
+      <button id="toggleButton" class="toggle-button">Connect</button>
+    </div>
+    
+    <input 
+      id="serverInput" 
+      class="server-input" 
+      type="text" 
+      placeholder="ws://localhost:3003/ws"
+      value="ws://localhost:3003/ws"
+    />
+  </div>
+  
+  <div class="info-panel">
+    <div><span class="label">Extension ID:</span></div>
+    <div id="extensionId" class="value">Loading...</div>
+    
+    <div style="margin-top: 8px;"><span class="label">Current Tab:</span></div>
+    <div id="currentTab" class="value">Loading...</div>
+    
+    <div style="margin-top: 8px;"><span class="label">Last Message:</span></div>
+    <div id="lastMessage" class="value">None</div>
+  </div>
+  
+  <div id="logPanel" class="log-panel"></div>
+
+  <!-- Storage Management Panel -->
+  <div class="info-panel" style="margin-top: 15px;">
+    <div><span class="label">Storage Stats:</span></div>
+    <div id="storageStats" class="value">Loading...</div>
+    
+    <div style="margin-top: 8px; display: flex; gap: 8px;">
+      <button id="viewPatternsBtn" class="storage-btn">View Patterns</button>
+      <button id="clearOldDataBtn" class="storage-btn">Clear Old Data</button>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

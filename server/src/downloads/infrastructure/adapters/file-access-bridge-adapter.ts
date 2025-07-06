@@ -26,7 +26,7 @@ import {
     ServerFileAccessRequested,
     ServerFileAccessProvided,
     FileDownloadCompleted
-} from '../../../shared/types';
+} from '../../domain/events/download-events';
 
 /**
  * File Access Bridge Adapter - Bridges browser downloads with server file system

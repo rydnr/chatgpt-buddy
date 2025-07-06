@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web-Buddy Extension</title>
+    <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+    <div class="popup-container">
+        <header class="popup-header">
+            <div class="logo">
+                <span class="logo-icon">🤖</span>
+                <h1>Web-Buddy</h1>
+            </div>
+            <div class="version">v1.0.0</div>
+        </header>
+
+        <main class="popup-main">
+            <!-- Connection Status -->
+            <section class="status-section">
+                <div class="status-indicator" id="status-indicator">
+                    <div class="status-dot" id="status-dot"></div>
+                    <span id="status-text">Disconnected</span>
+                </div>
+                
+                <div class="connection-info" id="connection-info">
+                    <div class="info-row">
+                        <span class="label">Server:</span>
+                        <span class="value" id="server-url">Not connected</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="label">Last Message:</span>
+                        <span class="value" id="last-message">None</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="label">Extension ID:</span>
+                        <span class="value" id="extension-id">Loading...</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Connection Controls -->
+            <section class="controls-section">
+                <div class="input-group">
+                    <label for="server-input">Server URL:</label>
+                    <input 
+                        type="text" 
+                        id="server-input" 
+                        value="ws://localhost:3002/ws"
+                        placeholder="ws://localhost:3002/ws"
+                    >
+                </div>
+                
+                <div class="button-group">
+                    <button id="connect-btn" class="primary-btn">Connect</button>
+                    <button id="disconnect-btn" class="secondary-btn" disabled>Disconnect</button>
+                </div>
+            </section>
+
+            <!-- Current Tab Info -->
+            <section class="tab-section">
+                <h3>Current Tab</h3>
+                <div class="tab-info" id="tab-info">
+                    <div class="info-row">
+                        <span class="label">Domain:</span>
+                        <span class="value" id="current-domain">Loading...</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="label">Supported:</span>
+                        <span class="value" id="domain-supported">Checking...</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Quick Actions -->
+            <section class="actions-section">
+                <h3>Quick Actions</h3>
+                <div class="action-buttons">
+                    <button id="show-time-travel-btn" class="action-btn">
+                        🕰️ Show Time Travel UI
+                    </button>
+                    <button id="test-automation-btn" class="action-btn">
+                        🧪 Test Automation
+                    </button>
+                </div>
+            </section>
+
+            <!-- Logs -->
+            <section class="logs-section">
+                <h3>Recent Activity</h3>
+                <div class="logs-container" id="logs-container">
+                    <div class="log-entry">Extension started</div>
+                </div>
+            </section>
+        </main>
+
+        <footer class="popup-footer">
+            <div class="footer-links">
+                <a href="#" id="help-link">Help</a>
+                <a href="#" id="settings-link">Settings</a>
+            </div>
+        </footer>
+    </div>
+
+    <script src="popup.js"></script>
+</body>
+</html>

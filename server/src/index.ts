@@ -6,7 +6,10 @@
 
 import 'reflect-metadata';
 import dotenv from 'dotenv';
-import { ServerApplication, ServerStartRequestedEvent, ServerStopRequestedEvent } from '@web-buddy/nodejs-server';
+// import { ServerApplication, ServerStartRequestedEvent, ServerStopRequestedEvent } from '@web-buddy/nodejs-server';
+// Temporary direct import while workspace builds
+import { ServerApplication } from '../../web-buddy-nodejs-server/src/server/server-application';
+import { ServerStartRequestedEvent, ServerStopRequestedEvent } from '../../web-buddy-nodejs-server/src/core/events/server-events';
 import { ChatGPTAutomationApplication } from './applications/chatgpt-automation-application';
 import { logger } from './utils/logger';
 

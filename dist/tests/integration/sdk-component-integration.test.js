@@ -1,0 +1,317 @@
+"use strict";
+/**
+ * SDK Component Integration Tests
+ *
+ * Tests the integration between different SDK components without
+ * requiring complex infrastructure setup.
+ */
+Object.defineProperty(exports, "__esModule", { value: true });
+const globals_1 = require("@jest/globals");
+// Mock HTTP client for testing
+class MockHttpClient {
+    constructor() {
+        this.responses = new Map();
+    }
+    setMockResponse(endpoint, response) {
+        this.responses.set(endpoint, response);
+    }
+    async post(endpoint, data) {
+        const mockResponse = this.responses.get(endpoint);
+        if (mockResponse) {
+            if (mockResponse.error) {
+                throw new Error(mockResponse.error);
+            }
+            return mockResponse;
+        }
+        // Default successful response
+        return {
+            success: true,
+            correlationId: data.message?.correlationId || 'default-id',
+            data: 'Mock response'
+        };
+    }
+}
+describe('🧩 SDK Component Integration Tests', () => {
+    let mockHttpClient;
+    beforeEach(() => {
+        mockHttpClient = new MockHttpClient();
+        globals_1.jest.clearAllMocks();
+    });
+    describe('📤 Event-Driven Client Integration', () => {
+        class TestEventDrivenClient {
+            constructor(httpClient) {
+                this.httpClient = httpClient;
+            }
+            async sendEvent(event, extensionId, tabId) {
+                const dispatchPayload = {
+                    target: { extensionId, tabId },
+                    message: {
+                        action: this.mapEventToAction(event),
+                        payload: this.extractEventPayload(event),
+                        correlationId: event.correlationId
+                    }
+                };
+                try {
+                    const response = await this.httpClient.post('/api/dispatch', dispatchPayload);
+                    return {
+                        correlationId: event.correlationId,
+                        success: true,
+                        data: response.data
+                    };
+                }
+                catch (error) {
+                    return {
+                        correlationId: event.correlationId,
+                        success: false,
+                        error: error.message
+                    };
+                }
+            }
+            mapEventToAction(event) {
+                const actionMap = {
+                    'ProjectSelectionRequested': 'SELECT_PROJECT',
+                    'PromptSubmissionRequested': 'FILL_PROMPT',
+                    'ResponseRetrievalRequested': 'GET_RESPONSE'
+                };
+                return actionMap[event.eventType] || 'UNKNOWN_ACTION';
+            }
+            extractEventPayload(event) {
+                // Extract payload based on event type
+                return Object.fromEntries(Object.entries(event).filter(([key]) => !['eventType', 'correlationId', 'timestamp'].includes(key)));
+            }
+        }
+        test('should successfully send and receive events', async () => {
+            const client = new TestEventDrivenClient(mockHttpClient);
+            // Setup mock response
+            mockHttpClient.setMockResponse('/api/dispatch', {
+                success: true,
+                data: 'Project selected successfully'
+            });
+            const event = {
+                eventType: 'ProjectSelectionRequested',
+                correlationId: 'test-integration-001',
+                timestamp: new Date()
+            };
+            const response = await client.sendEvent(event, 'ext-123', 456);
+            expect(response.success).toBe(true);
+            expect(response.correlationId).toBe('test-integration-001');
+            expect(response.data).toBe('Project selected successfully');
+        });
+        test('should handle API errors gracefully', async () => {
+            const client = new TestEventDrivenClient(mockHttpClient);
+            // Setup mock error response
+            mockHttpClient.setMockResponse('/api/dispatch', {
+                error: 'Network timeout'
+            });
+            const event = {
+                eventType: 'ProjectSelectionRequested',
+                correlationId: 'test-integration-error',
+                timestamp: new Date()
+            };
+            const response = await client.sendEvent(event, 'ext-123', 456);
+            expect(response.success).toBe(false);
+            expect(response.correlationId).toBe('test-integration-error');
+            expect(response.error).toBe('Network timeout');
+        });
+    });
+    describe('🔄 Event Transformation Pipeline', () => {
+        class EventTransformer {
+            transformToChatGPTBuddyFormat(event) {
+                return {
+                    action: this.getActionType(event),
+                    payload: this.getPayload(event),
+                    correlationId: event.correlationId
+                };
+            }
+            transformToWebBuddyFormat(event, extensionId, tabId) {
+                return {
+                    target: { extensionId, tabId },
+                    message: this.transformToChatGPTBuddyFormat(event)
+                };
+            }
+            getActionType(event) {
+                const actionMap = {
+                    'ProjectSelectionRequested': 'SELECT_PROJECT',
+                    'ChatSelectionRequested': 'SELECT_CHAT',
+                    'PromptSubmissionRequested': 'FILL_PROMPT',
+                    'ResponseRetrievalRequested': 'GET_RESPONSE',
+                    'GoogleImageDownloadRequested': 'DOWNLOAD_IMAGE'
+                };
+                return actionMap[event.eventType] || 'UNKNOWN_ACTION';
+            }
+            getPayload(event) {
+                // Create payload based on event type
+                const payload = {};
+                Object.entries(event).forEach(([key, value]) => {
+                    if (!['eventType', 'correlationId', 'timestamp'].includes(key)) {
+                        payload[key] = value;
+                    }
+                });
+                return payload;
+            }
+        }
+        test('should transform domain events to ChatGPT-Buddy format', () => {
+            const transformer = new EventTransformer();
+            const domainEvent = {
+                eventType: 'ProjectSelectionRequested',
+                correlationId: 'transform-test-001',
+                timestamp: new Date(),
+                projectName: 'coding-assistant'
+            };
+            const transformed = transformer.transformToChatGPTBuddyFormat(domainEvent);
+            expect(transformed).toEqual({
+                action: 'SELECT_PROJECT',
+                payload: { projectName: 'coding-assistant' },
+                correlationId: 'transform-test-001'
+            });
+        });
+        test('should transform to Web-Buddy dispatch format', () => {
+            const transformer = new EventTransformer();
+            const domainEvent = {
+                eventType: 'PromptSubmissionRequested',
+                correlationId: 'transform-test-002',
+                timestamp: new Date(),
+                promptText: 'Hello ChatGPT!',
+                selector: '#prompt-textarea'
+            };
+            const transformed = transformer.transformToWebBuddyFormat(domainEvent, 'ext-456', 789);
+            expect(transformed).toEqual({
+                target: { extensionId: 'ext-456', tabId: 789 },
+                message: {
+                    action: 'FILL_PROMPT',
+                    payload: {
+                        promptText: 'Hello ChatGPT!',
+                        selector: '#prompt-textarea'
+                    },
+                    correlationId: 'transform-test-002'
+                }
+            });
+        });
+    });
+    describe('📊 Correlation ID Management', () => {
+        class CorrelationIdManager {
+            constructor() {
+                this.activeRequests = new Map();
+            }
+            generateCorrelationId(prefix = 'sdk') {
+                const timestamp = Date.now();
+                const random = Math.random().toString(36).substr(2, 9);
+                return `${prefix}-${timestamp}-${random}`;
+            }
+            trackRequest(correlationId, timeoutMs = 30000) {
+                this.activeRequests.set(correlationId, {
+                    timestamp: new Date(),
+                    timeout: timeoutMs
+                });
+            }
+            completeRequest(correlationId) {
+                return this.activeRequests.delete(correlationId);
+            }
+            getActiveRequestCount() {
+                return this.activeRequests.size;
+            }
+            cleanup() {
+                const now = new Date();
+                const toRemove = [];
+                this.activeRequests.forEach((request, id) => {
+                    const elapsed = now.getTime() - request.timestamp.getTime();
+                    if (elapsed > request.timeout) {
+                        toRemove.push(id);
+                    }
+                });
+                toRemove.forEach(id => this.activeRequests.delete(id));
+                return toRemove.length;
+            }
+        }
+        test('should generate unique correlation IDs', () => {
+            const manager = new CorrelationIdManager();
+            const ids = Array.from({ length: 1000 }, () => manager.generateCorrelationId());
+            const uniqueIds = new Set(ids);
+            expect(uniqueIds.size).toBe(ids.length);
+            expect(ids.every(id => id.startsWith('sdk-'))).toBe(true);
+        });
+        test('should track and complete requests', () => {
+            const manager = new CorrelationIdManager();
+            const id1 = manager.generateCorrelationId('test');
+            const id2 = manager.generateCorrelationId('test');
+            manager.trackRequest(id1);
+            manager.trackRequest(id2);
+            expect(manager.getActiveRequestCount()).toBe(2);
+            const completed = manager.completeRequest(id1);
+            expect(completed).toBe(true);
+            expect(manager.getActiveRequestCount()).toBe(1);
+            const completedAgain = manager.completeRequest(id1);
+            expect(completedAgain).toBe(false); // Already completed
+        });
+        test('should cleanup expired requests', async () => {
+            const manager = new CorrelationIdManager();
+            const id1 = manager.generateCorrelationId('test');
+            const id2 = manager.generateCorrelationId('test');
+            // Track with very short timeout
+            manager.trackRequest(id1, 10); // 10ms timeout
+            manager.trackRequest(id2, 10000); // 10s timeout
+            expect(manager.getActiveRequestCount()).toBe(2);
+            // Wait for first to expire
+            await new Promise(resolve => setTimeout(resolve, 20));
+            const cleanedUp = manager.cleanup();
+            expect(cleanedUp).toBe(1); // One request cleaned up
+            expect(manager.getActiveRequestCount()).toBe(1); // One still active
+        });
+    });
+    describe('🔌 Extension Connection Simulation', () => {
+        class ExtensionConnectionManager {
+            constructor() {
+                this.connections = new Map();
+            }
+            registerExtension(extensionId, mockWs) {
+                this.connections.set(extensionId, {
+                    ws: mockWs,
+                    registered: new Date()
+                });
+            }
+            isExtensionConnected(extensionId) {
+                return this.connections.has(extensionId);
+            }
+            sendToExtension(extensionId, message) {
+                const connection = this.connections.get(extensionId);
+                if (connection) {
+                    connection.ws.send(JSON.stringify(message));
+                    return true;
+                }
+                return false;
+            }
+            getConnectionCount() {
+                return this.connections.size;
+            }
+        }
+        test('should manage extension connections', () => {
+            const manager = new ExtensionConnectionManager();
+            const mockWs = { send: globals_1.jest.fn() };
+            expect(manager.getConnectionCount()).toBe(0);
+            manager.registerExtension('ext-123', mockWs);
+            expect(manager.getConnectionCount()).toBe(1);
+            expect(manager.isExtensionConnected('ext-123')).toBe(true);
+            expect(manager.isExtensionConnected('ext-456')).toBe(false);
+        });
+        test('should send messages to connected extensions', () => {
+            const manager = new ExtensionConnectionManager();
+            const mockWs = { send: globals_1.jest.fn() };
+            manager.registerExtension('ext-123', mockWs);
+            const message = {
+                type: 'dispatch',
+                tabId: 456,
+                message: {
+                    action: 'SELECT_PROJECT',
+                    payload: { selector: '#project' },
+                    correlationId: 'conn-test-001'
+                }
+            };
+            const sent = manager.sendToExtension('ext-123', message);
+            expect(sent).toBe(true);
+            expect(mockWs.send).toHaveBeenCalledWith(JSON.stringify(message));
+            const notSent = manager.sendToExtension('ext-nonexistent', message);
+            expect(notSent).toBe(false);
+        });
+    });
+});
+//# sourceMappingURL=sdk-component-integration.test.js.map

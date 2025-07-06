@@ -1,3 +1,4 @@
+"use strict";
 /*
                         Web-Buddy Core - Automation Learning Manager
 
@@ -16,17 +17,19 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
-import { v4 as uuidv4 } from 'uuid';
-import { createAutomationStorage } from '../storage/automation-storage';
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.AutomationManager = void 0;
+const uuid_1 = require("uuid");
+const automation_storage_1 = require("../storage/automation-storage");
 /**
  * Manages the learning workflow and automation storage
  * Coordinates between events, storage, and user preferences
  */
-export class AutomationManager {
+class AutomationManager {
     storage;
     userPreferences = new Map();
     constructor(storage) {
-        this.storage = storage || createAutomationStorage();
+        this.storage = storage || (0, automation_storage_1.createAutomationStorage)();
     }
     /**
      * Handle an automation request - core learning workflow
@@ -76,7 +79,7 @@ export class AutomationManager {
      */
     async saveAutomation(event) {
         const automation = {
-            id: uuidv4(),
+            id: (0, uuid_1.v4)(),
             eventType: 'automationRequested', // The event type that triggers this automation
             action: event.payload.action,
             website: this.extractWebsite(event),
@@ -278,4 +281,5 @@ export class AutomationManager {
         };
     }
 }
+exports.AutomationManager = AutomationManager;
 //# sourceMappingURL=automation-manager.js.map
