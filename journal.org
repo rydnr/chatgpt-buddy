@@ -1691,6 +1691,30 @@ Following the DNS-style naming convention established in Phase 6:
 - Original =chatgpt-buddy= folder will become git-less
 - New =semantest-workspace= will contain all separated repositories
 - Each repository will need dependency updates and CI/CD configuration
+
+** Automated Script Ready
+The =scripts/separate-monorepo.sh= script is fully updated and ready to use:
+- Correctly extracts three separate TypeScript-EDA repositories
+- Handles all Semantest components with proper DNS-style naming
+- Creates organized workspace with categorized README
+- Includes prerequisite checks and error handling
+- Provides clear next steps after completion
+
+*** To run the script:
+#+BEGIN_SRC bash
+cd ~/github/rydnr/chatgpt-buddy
+chmod +x scripts/separate-monorepo.sh
+./scripts/separate-monorepo.sh
+#+END_SRC
+
+The script will:
+1. Check prerequisites (git, gh CLI, authentication)
+2. Create backup recommendation
+3. Extract each component preserving history
+4. Create GitHub repositories under semantest organization
+5. Set up workspace at =~/github/rydnr/semantest-workspace=
+6. Clean up temporary branches
+7. Provide instructions to make original directory git-less
 - Enterprise adoption of certified developers
 
 Phase 8 transforms Semantest from a technical project into a professional discipline, establishing industry standards for semantic web automation expertise and creating sustainable growth through education and certification.
