@@ -1,0 +1,324 @@
+# Semantest Enterprise Helm Chart Values
+
+# Global configuration
+global:
+  imageRegistry: ""
+  imagePullSecrets: []
+  storageClass: ""
+  postgresql:
+    auth:
+      postgresPassword: "semantest-postgres-password"
+      username: "semantest"
+      password: "semantest-password"
+      database: "semantest"
+  redis:
+    auth:
+      enabled: true
+      password: "semantest-redis-password"
+
+# Coordination Service
+coordinationService:
+  enabled: true
+  replicaCount: 3
+  image:
+    repository: semantest/coordination-service
+    tag: "latest"
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 8080
+    targetPort: 8080
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+    requests:
+      cpu: 500m
+      memory: 512Mi
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+# MCP Bridge Service
+mcpBridgeService:
+  enabled: true
+  replicaCount: 2
+  image:
+    repository: semantest/mcp-bridge
+    tag: "latest"
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 8081
+    targetPort: 8081
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 250m
+      memory: 256Mi
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 6
+    targetCPUUtilizationPercentage: 70
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+# Security Service
+securityService:
+  enabled: true
+  replicaCount: 2
+  image:
+    repository: semantest/security-service
+    tag: "latest"
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 8082
+    targetPort: 8082
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 250m
+      memory: 256Mi
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 4
+    targetCPUUtilizationPercentage: 70
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+# Model Registry Service
+modelRegistryService:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: semantest/model-registry
+    tag: "latest"
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 8080
+    targetPort: 8080
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 250m
+      memory: 256Mi
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+# Ingress configuration
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+  hosts:
+    - host: semantest.local
+      paths:
+        - path: /
+          pathType: Prefix
+          backend:
+            service:
+              name: coordination-service
+              port:
+                number: 8080
+        - path: /api/ai
+          pathType: Prefix
+          backend:
+            service:
+              name: mcp-bridge-service
+              port:
+                number: 8081
+        - path: /api/security
+          pathType: Prefix
+          backend:
+            service:
+              name: security-service
+              port:
+                number: 8082
+  tls:
+    - secretName: semantest-tls
+      hosts:
+        - semantest.local
+
+# Database configuration
+postgresql:
+  enabled: true
+  auth:
+    postgresPassword: "semantest-postgres-password"
+    username: "semantest"
+    password: "semantest-password"
+    database: "semantest"
+  primary:
+    persistence:
+      enabled: true
+      size: 20Gi
+    resources:
+      limits:
+        cpu: 2000m
+        memory: 2Gi
+      requests:
+        cpu: 1000m
+        memory: 1Gi
+
+# Message broker configuration
+kafka:
+  enabled: true
+  replicaCount: 3
+  persistence:
+    enabled: true
+    size: 10Gi
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+    requests:
+      cpu: 500m
+      memory: 512Mi
+  zookeeper:
+    enabled: true
+    replicaCount: 3
+    persistence:
+      enabled: true
+      size: 5Gi
+
+# Cache configuration
+redis:
+  enabled: true
+  auth:
+    enabled: true
+    password: "semantest-redis-password"
+  master:
+    persistence:
+      enabled: true
+      size: 5Gi
+    resources:
+      limits:
+        cpu: 500m
+        memory: 512Mi
+      requests:
+        cpu: 250m
+        memory: 256Mi
+
+# Monitoring configuration
+monitoring:
+  prometheus:
+    enabled: true
+    server:
+      persistentVolume:
+        enabled: true
+        size: 20Gi
+      resources:
+        limits:
+          cpu: 1000m
+          memory: 2Gi
+        requests:
+          cpu: 500m
+          memory: 1Gi
+  grafana:
+    enabled: true
+    persistence:
+      enabled: true
+      size: 5Gi
+    resources:
+      limits:
+        cpu: 500m
+        memory: 512Mi
+      requests:
+        cpu: 250m
+        memory: 256Mi
+    adminUser: admin
+    adminPassword: "grafana-admin-password"
+
+# Logging configuration
+logging:
+  elasticsearch:
+    enabled: true
+    clusterName: "semantest-logs"
+    master:
+      replicaCount: 1
+      persistence:
+        enabled: true
+        size: 10Gi
+      resources:
+        limits:
+          cpu: 1000m
+          memory: 1Gi
+        requests:
+          cpu: 500m
+          memory: 512Mi
+
+# Security configuration
+security:
+  rbac:
+    create: true
+  serviceAccount:
+    create: true
+    name: semantest-service-account
+  networkPolicies:
+    enabled: true
+  podSecurityPolicy:
+    enabled: true
+
+# Secrets configuration
+secrets:
+  # External secrets (should be provided via external secret management)
+  database:
+    url: "postgresql://semantest:semantest-password@postgresql:5432/semantest"
+  redis:
+    url: "redis://:semantest-redis-password@redis:6379"
+  jwt:
+    secret: "jwt-secret-key-change-in-production"
+  encryption:
+    key: "encryption-key-change-in-production"
+  mcp:
+    endpoint: "https://mcp.example.com"
+    apiKey: "mcp-api-key-change-in-production"
+
+# Resource limits and requests
+resourceQuota:
+  enabled: true
+  hard:
+    requests.cpu: "20"
+    requests.memory: "40Gi"
+    limits.cpu: "40"
+    limits.memory: "80Gi"
+    persistentvolumeclaims: "20"
+
+# Node affinity and tolerations
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+# Pod disruption budgets
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+# Horizontal Pod Autoscaler
+autoscaling:
+  enabled: true
+  minReplicas: 1
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80

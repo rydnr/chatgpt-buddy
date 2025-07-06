@@ -1,0 +1,49 @@
+# Semantest Enterprise Kubernetes Namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: semantest
+  labels:
+    name: semantest
+    app.kubernetes.io/name: semantest
+    app.kubernetes.io/instance: production
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/component: platform
+    app.kubernetes.io/managed-by: kubernetes
+  annotations:
+    kubernetes.io/managed-by: "semantest-platform"
+    description: "Semantest Enterprise Production Namespace"
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: semantest-quota
+  namespace: semantest
+spec:
+  hard:
+    requests.cpu: "20"
+    requests.memory: 40Gi
+    limits.cpu: "40"
+    limits.memory: 80Gi
+    persistentvolumeclaims: "20"
+    services: "20"
+    secrets: "50"
+    configmaps: "50"
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: semantest-limits
+  namespace: semantest
+spec:
+  limits:
+  - default:
+      cpu: "1"
+      memory: "1Gi"
+    defaultRequest:
+      cpu: "100m"
+      memory: "128Mi"
+    type: Container
+  - default:
+      storage: "10Gi"
+    type: PersistentVolumeClaim

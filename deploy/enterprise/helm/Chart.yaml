@@ -1,0 +1,46 @@
+apiVersion: v2
+name: semantest
+description: Semantest Enterprise Platform - Contract-based web automation ecosystem
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+home: https://github.com/rydnr/chatgpt-buddy
+sources:
+  - https://github.com/rydnr/chatgpt-buddy
+maintainers:
+  - name: Semantest Team
+    email: contact@semantest.com
+keywords:
+  - automation
+  - testing
+  - web
+  - ai
+  - microservices
+dependencies:
+  - name: postgresql
+    version: "12.1.5"
+    repository: https://charts.bitnami.com/bitnami
+    condition: postgresql.enabled
+  - name: kafka
+    version: "20.0.6"
+    repository: https://charts.bitnami.com/bitnami
+    condition: kafka.enabled
+  - name: redis
+    version: "17.4.3"
+    repository: https://charts.bitnami.com/bitnami
+    condition: redis.enabled
+  - name: prometheus
+    version: "19.6.1"
+    repository: https://prometheus-community.github.io/helm-charts
+    condition: monitoring.prometheus.enabled
+  - name: grafana
+    version: "6.50.7"
+    repository: https://grafana.github.io/helm-charts
+    condition: monitoring.grafana.enabled
+  - name: elasticsearch
+    version: "19.5.0"
+    repository: https://helm.elastic.co
+    condition: logging.elasticsearch.enabled
+annotations:
+  category: Web Automation
+  licenses: GPL-3.0

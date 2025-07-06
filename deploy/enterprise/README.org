@@ -1,0 +1,374 @@
+#+TITLE: Semantest Enterprise Deployment Guide
+#+AUTHOR: Semantest Team
+#+DATE: 2025-07-06
+
+* Overview
+
+This directory contains comprehensive deployment configurations for Semantest Enterprise Platform, supporting both Docker Compose and Kubernetes deployment scenarios with full monitoring and observability capabilities.
+
+** Deployment Options
+
+*** Docker Compose (Quick Start)
+- =docker-compose.production.yml= - Complete production stack with monitoring
+- Ideal for: Development, testing, and small-scale production deployments
+- Features: All services, monitoring stack, automated backups
+
+*** Kubernetes (Enterprise Scale)
+- =kubernetes/= - Complete Kubernetes manifests for production deployment
+- =helm/= - Helm charts for streamlined Kubernetes deployments
+- Ideal for: Large-scale production, multi-tenant environments
+- Features: Auto-scaling, high availability, advanced security
+
+* Quick Start with Docker Compose
+
+** Prerequisites
+- Docker Engine 20.10+
+- Docker Compose 2.0+
+- 8GB+ RAM available
+- 50GB+ disk space
+
+** Environment Setup
+
+#+begin_src bash
+# Clone the repository
+git clone https://github.com/rydnr/chatgpt-buddy.git
+cd chatgpt-buddy/deploy/enterprise
+
+# Copy and configure environment variables
+cp .env.example .env
+# Edit .env with your specific configuration
+#+end_src
+
+** Required Environment Variables
+
+#+begin_src bash
+# Database
+DB_PASSWORD=your-secure-database-password
+
+# Redis
+REDIS_PASSWORD=your-secure-redis-password
+
+# Security
+JWT_SECRET=your-jwt-secret-key
+ENCRYPTION_KEY=your-encryption-key
+
+# MCP Integration
+MCP_ENDPOINT=https://your-mcp-provider.com/api
+MCP_API_KEY=your-mcp-api-key
+
+# Monitoring
+GRAFANA_PASSWORD=your-grafana-admin-password
+
+# Backup (Optional)
+BACKUP_S3_BUCKET=your-backup-bucket
+AWS_ACCESS_KEY_ID=your-aws-access-key
+AWS_SECRET_ACCESS_KEY=your-aws-secret-key
+
+# Alerts (Optional)
+ALERT_WEBHOOK_URL=https://your-alert-webhook.com/endpoint
+#+end_src
+
+** Deployment
+
+#+begin_src bash
+# Start the complete stack
+docker-compose -f docker-compose.production.yml up -d
+
+# Verify deployment
+docker-compose -f docker-compose.production.yml ps
+
+# View logs
+docker-compose -f docker-compose.production.yml logs -f
+#+end_src
+
+** Service Access
+
+- *Semantest API*: http://localhost (via Nginx)
+- *Grafana Monitoring*: http://localhost:3000 (admin/your-grafana-password)
+- *Prometheus Metrics*: http://localhost:9090
+- *Elasticsearch Logs*: http://localhost:9200
+- *Kibana Logs UI*: http://localhost:5601
+
+* Kubernetes Deployment
+
+** Prerequisites
+- Kubernetes 1.24+
+- Helm 3.8+
+- kubectl configured
+- Ingress controller (nginx recommended)
+- Cert-manager (for TLS)
+- StorageClass configured
+
+** Quick Kubernetes Deployment
+
+#+begin_src bash
+# Apply namespace and RBAC
+kubectl apply -f kubernetes/namespace.yaml
+
+# Create secrets (update values first)
+kubectl create secret generic semantest-secrets \
+  --from-literal=database-url="postgresql://semantest:password@postgres:5432/semantest" \
+  --from-literal=redis-url="redis://:password@redis:6379" \
+  --from-literal=jwt-secret="your-jwt-secret" \
+  --from-literal=encryption-key="your-encryption-key" \
+  --from-literal=mcp-endpoint="https://your-mcp-provider.com/api" \
+  --from-literal=mcp-api-key="your-mcp-api-key" \
+  -n semantest
+
+# Deploy core services
+kubectl apply -f kubernetes/coordination-service.yaml
+kubectl apply -f kubernetes/mcp-bridge-service.yaml
+
+# Deploy monitoring stack
+kubectl apply -f kubernetes/monitoring.yaml
+
+# Verify deployment
+kubectl get pods -n semantest
+#+end_src
+
+** Helm Deployment (Recommended)
+
+#+begin_src bash
+# Add required Helm repositories
+helm repo add bitnami https://charts.bitnami.com/bitnami
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm repo add grafana https://grafana.github.io/helm-charts
+helm repo add elastic https://helm.elastic.co
+helm repo update
+
+# Install Semantest platform
+helm install semantest ./helm \
+  --namespace semantest \
+  --create-namespace \
+  --values helm/values.yaml
+
+# Verify installation
+helm status semantest -n semantest
+kubectl get pods -n semantest
+#+end_src
+
+** Customizing Helm Values
+
+Edit =helm/values.yaml= to customize:
+- Replica counts and resource limits
+- Storage classes and sizes  
+- Ingress configuration
+- Security settings
+- Monitoring and logging options
+
+* Monitoring and Observability
+
+** Metrics Collection
+- *Prometheus*: Collects metrics from all services
+- *Grafana*: Visualizes metrics with pre-built dashboards
+- *Service Metrics*: Application-specific business metrics
+- *Infrastructure Metrics*: CPU, memory, disk, network
+
+** Log Management
+- *Elasticsearch*: Centralized log storage and indexing
+- *Kibana*: Log visualization and search interface
+- *Fluentd*: Log collection and forwarding
+- *Structured Logging*: JSON format with correlation IDs
+
+** Alerting
+- *Prometheus Alertmanager*: Metric-based alerting
+- *Grafana Alerts*: Dashboard-based alerting
+- *Webhook Integration*: Slack, PagerDuty, custom endpoints
+- *Health Check Service*: Service availability monitoring
+
+** Key Dashboards
+- *Semantest Enterprise Dashboard*: Overall platform health
+- *Service Performance*: Individual service metrics
+- *AI Model Performance*: ML model effectiveness
+- *Infrastructure Overview*: System resource utilization
+
+* Security Configuration
+
+** Network Security
+- TLS/SSL encryption for all external connections
+- Mutual TLS (mTLS) for internal service communication
+- Network policies for traffic isolation
+- Ingress with rate limiting and DDoS protection
+
+** Authentication & Authorization
+- OAuth2/OIDC integration
+- JWT token-based authentication
+- Role-based access control (RBAC)
+- Service account authentication
+
+** Data Security
+- Encryption at rest for databases
+- Encrypted communication channels
+- Secret management via Kubernetes secrets
+- Audit logging for all security events
+
+** Compliance Features
+- SOC 2 compliance monitoring
+- GDPR data handling capabilities
+- Audit trail generation
+- Security scan integration
+
+* Backup and Disaster Recovery
+
+** Automated Backups
+- Daily PostgreSQL database backups
+- Redis data snapshots
+- Configuration backup
+- S3-compatible storage support
+
+** Backup Configuration
+
+#+begin_src yaml
+backup-service:
+  environment:
+    - BACKUP_SCHEDULE=0 2 * * *  # Daily at 2 AM
+    - BACKUP_RETENTION_DAYS=30
+    - S3_BUCKET=${BACKUP_S3_BUCKET}
+#+end_src
+
+** Recovery Procedures
+1. Database restoration from backup
+2. Configuration restoration
+3. Service restart and validation
+4. Data consistency verification
+
+* Scaling and Performance
+
+** Horizontal Pod Autoscaling (HPA)
+- CPU-based scaling (70% threshold)
+- Memory-based scaling (80% threshold)
+- Custom metrics scaling (queue depth, response time)
+- Minimum and maximum replica limits
+
+** Vertical Scaling
+- Resource limit adjustments
+- Storage expansion
+- Database connection pool tuning
+- Cache size optimization
+
+** Performance Optimization
+- Connection pooling for databases
+- Redis caching for frequently accessed data
+- CDN integration for static assets
+- Async processing for heavy workloads
+
+* Troubleshooting
+
+** Common Issues
+
+*** Service Startup Failures
+
+#+begin_src bash
+# Check pod status
+kubectl get pods -n semantest
+
+# View pod logs
+kubectl logs -f deployment/coordination-service -n semantest
+
+# Check events
+kubectl get events -n semantest --sort-by='.lastTimestamp'
+#+end_src
+
+*** Database Connection Issues
+
+#+begin_src bash
+# Test database connectivity
+kubectl exec -it deployment/coordination-service -n semantest -- \
+  pg_isready -h postgres -p 5432 -U semantest
+
+# Check database logs
+kubectl logs -f statefulset/postgresql -n semantest
+#+end_src
+
+*** Performance Issues
+
+#+begin_src bash
+# Check resource usage
+kubectl top pods -n semantest
+kubectl top nodes
+
+# View metrics in Grafana
+open http://localhost:3000/d/semantest-dashboard
+#+end_src
+
+** Health Checks
+
+All services expose health endpoints:
+- =/health= - Basic health check
+- =/ready= - Readiness check
+- =/metrics= - Prometheus metrics
+
+** Log Analysis
+
+Use Kibana for log analysis:
+1. Access Kibana at http://localhost:5601
+2. Create index pattern for =semantest-*=
+3. Search by correlation ID, service, or error level
+4. Set up log-based alerts
+
+* Maintenance
+
+** Regular Maintenance Tasks
+
+*** Weekly
+- Review monitoring dashboards
+- Check backup success
+- Update security patches
+- Analyze performance trends
+
+*** Monthly
+- Database maintenance (VACUUM, REINDEX)
+- Log retention cleanup
+- Security audit review
+- Capacity planning review
+
+*** Quarterly
+- Disaster recovery testing
+- Security penetration testing
+- Performance benchmarking
+- Documentation updates
+
+** Update Procedures
+
+*** Rolling Updates
+
+#+begin_src bash
+# Update service image
+kubectl set image deployment/coordination-service \
+  coordination-service=semantest/coordination-service:v1.1.0 \
+  -n semantest
+
+# Monitor rollout
+kubectl rollout status deployment/coordination-service -n semantest
+#+end_src
+
+*** Database Migrations
+
+#+begin_src bash
+# Run migrations
+kubectl exec -it deployment/coordination-service -n semantest -- \
+  npm run migrate
+
+# Verify migration
+kubectl exec -it deployment/coordination-service -n semantest -- \
+  npm run migrate:status
+#+end_src
+
+* Support
+
+** Documentation
+- [[../../docs/][Complete Documentation]]
+- [[../../docs/api-reference/][API Reference]]
+- [[../../docs/architecture/][Architecture Guide]]
+
+** Community
+- GitHub Issues: https://github.com/rydnr/chatgpt-buddy/issues
+- Discussions: https://github.com/rydnr/chatgpt-buddy/discussions
+
+** Enterprise Support
+- 24/7 support available
+- SLA guarantees
+- Custom deployment assistance
+- Performance optimization consulting
+
+For enterprise support inquiries, contact: enterprise@semantest.com
