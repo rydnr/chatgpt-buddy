@@ -1,0 +1,1306 @@
+# Semantest Cloud Infrastructure Architecture
+
+#+TITLE: Semantest Cloud Infrastructure Architecture
+#+AUTHOR: Semantest Development Team
+#+DATE: 2025-07-06
+
+* Overview
+
+This document outlines the cloud infrastructure architecture for Semantest Phase 7, enabling secure, scalable, and enterprise-ready automation coordination. The cloud infrastructure provides centralized orchestration, monitoring, and management for distributed Semantest automation workflows.
+
+* Cloud Architecture Principles
+
+** Core Design Principles
+
+1. **Security First**: All communications encrypted, zero-trust networking
+2. **Scalable by Default**: Auto-scaling based on automation load
+3. **Multi-Tenant**: Secure isolation between different organizations
+4. **Event-Driven**: Asynchronous coordination through message queues
+5. **Observability**: Comprehensive monitoring and audit trails
+6. **Resilient**: Fault-tolerant with automatic recovery
+
+** Architecture Patterns
+
+- **Microservices**: Loosely coupled services with clear boundaries
+- **Event Sourcing**: Complete audit trail of all automation activities
+- **CQRS**: Optimized read/write patterns for coordination and reporting
+- **Circuit Breaker**: Fault tolerance for external service dependencies
+- **Bulkhead**: Resource isolation to prevent cascade failures
+
+* High-Level Cloud Architecture
+
+#+BEGIN_SRC text
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         Semantest Cloud Platform                           │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  API Gateway Layer                                                         │
+│  ┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐             │
+│  │   GraphQL API   │ │    REST API     │ │  WebSocket API  │             │
+│  │   Coordination  │ │   Management    │ │   Real-time     │             │
+│  └─────────────────┘ └─────────────────┘ └─────────────────┘             │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  Service Mesh Layer                                                        │
+│  ┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐             │
+│  │   Coordination  │ │     MCP Bridge  │ │    Monitoring   │             │
+│  │    Service      │ │    Service      │ │    Service      │             │
+│  └─────────────────┘ └─────────────────┘ └─────────────────┘             │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  Message Bus Layer                                                         │
+│  ┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐             │
+│  │   Event Stream  │ │  Command Queue  │ │   Result Queue  │             │
+│  │   (Kafka)       │ │   (RabbitMQ)    │ │   (RabbitMQ)    │             │
+│  └─────────────────┘ └─────────────────┘ └─────────────────┘             │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  Data Layer                                                                │
+│  ┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐             │
+│  │   Event Store   │ │  Configuration  │ │    Metrics      │             │
+│  │  (PostgreSQL)   │ │   Database      │ │   Database      │             │
+│  └─────────────────┘ └─────────────────┘ └─────────────────┘             │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  Infrastructure Layer                                                      │
+│  ┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐             │
+│  │   Kubernetes    │ │     Docker      │ │   Service Mesh  │             │
+│  │    Cluster      │ │   Containers    │ │    (Istio)      │             │
+│  └─────────────────┘ └─────────────────┘ └─────────────────┘             │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         Client Environments                                │
+│  ┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐             │
+│  │   Enterprise    │ │    Developer    │ │   CI/CD         │             │
+│  │   Deployments   │ │   Workstations  │ │   Pipelines     │             │
+│  └─────────────────┘ └─────────────────┘ └─────────────────┘             │
+└─────────────────────────────────────────────────────────────────────────────┘
+#+END_SRC
+
+* Core Cloud Services
+
+** Coordination Service
+
+The central orchestration service managing automation workflows across distributed clients.
+
+#+BEGIN_SRC typescript
+// Cloud Coordination Service
+export class CloudCoordinationService extends Application {
+  constructor(
+    eventBus: EventBus,
+    private workflowEngine: WorkflowEngine,
+    private clientRegistry: ClientRegistry,
+    private securityService: SecurityService
+  ) {
+    super(eventBus, new Map([
+      ['workflowEngine', workflowEngine],
+      ['clientRegistry', clientRegistry],
+      ['securityService', securityService]
+    ]));
+  }
+
+  @Listen('AutomationWorkflowSubmittedEvent')
+  async handleWorkflowSubmitted(event: AutomationWorkflowSubmittedEvent): Promise<void> {
+    // 1. Validate workflow and permissions
+    const validation = await this.securityService.validateWorkflow(
+      event.workflow,
+      event.submittedBy
+    );
+
+    if (!validation.isValid) {
+      await this.publishEvent(new WorkflowRejectedEvent(
+        event.workflowId,
+        validation.errors,
+        event.correlationId
+      ));
+      return;
+    }
+
+    // 2. Find available clients for execution
+    const availableClients = await this.clientRegistry.findCapableClients(
+      event.workflow.requiredCapabilities
+    );
+
+    if (availableClients.length === 0) {
+      await this.publishEvent(new WorkflowQueuedEvent(
+        event.workflowId,
+        'No available clients',
+        event.correlationId
+      ));
+      return;
+    }
+
+    // 3. Schedule workflow execution
+    const execution = await this.workflowEngine.scheduleExecution(
+      event.workflow,
+      availableClients[0]
+    );
+
+    await this.publishEvent(new WorkflowScheduledEvent(
+      event.workflowId,
+      execution.id,
+      availableClients[0].id,
+      event.correlationId
+    ));
+  }
+
+  @Listen('ClientHeartbeatEvent')
+  async handleClientHeartbeat(event: ClientHeartbeatEvent): Promise<void> {
+    await this.clientRegistry.updateClientStatus(
+      event.clientId,
+      event.status,
+      event.capabilities
+    );
+
+    // Check for pending workflows that can now be executed
+    const pendingWorkflows = await this.workflowEngine.getPendingWorkflows();
+    
+    for (const workflow of pendingWorkflows) {
+      if (this.clientCanExecute(event, workflow)) {
+        await this.scheduleWorkflowExecution(workflow, event.clientId);
+      }
+    }
+  }
+
+  private clientCanExecute(
+    clientEvent: ClientHeartbeatEvent,
+    workflow: AutomationWorkflow
+  ): boolean {
+    return workflow.requiredCapabilities.every(required =>
+      clientEvent.capabilities.some(available =>
+        available.name === required.name &&
+        this.isVersionCompatible(available.version, required.version)
+      )
+    );
+  }
+}
+#+END_SRC
+
+** MCP Bridge Service
+
+Integration with Model Context Protocol for AI workflow coordination.
+
+#+BEGIN_SRC typescript
+// MCP Bridge Service for AI Integration
+export class MCPBridgeService extends Application {
+  constructor(
+    eventBus: EventBus,
+    private mcpClient: MCPClient,
+    private aiModelRegistry: AIModelRegistry,
+    private workflowService: WorkflowService
+  ) {
+    super(eventBus, new Map([
+      ['mcpClient', mcpClient],
+      ['aiModelRegistry', aiModelRegistry],
+      ['workflowService', workflowService]
+    ]));
+  }
+
+  @Listen('AIWorkflowRequestedEvent')
+  async handleAIWorkflowRequested(event: AIWorkflowRequestedEvent): Promise<void> {
+    try {
+      // 1. Determine appropriate AI model
+      const model = await this.aiModelRegistry.selectModel(
+        event.workflowType,
+        event.requirements
+      );
+
+      // 2. Create MCP context
+      const context = await this.mcpClient.createContext({
+        modelId: model.id,
+        workflow: event.workflow,
+        capabilities: event.availableCapabilities,
+        constraints: event.constraints
+      });
+
+      // 3. Request AI workflow generation
+      const mcpRequest: MCPWorkflowRequest = {
+        contextId: context.id,
+        objective: event.objective,
+        domain: event.domain,
+        examples: event.examples,
+        preferences: event.preferences
+      };
+
+      const aiWorkflow = await this.mcpClient.generateWorkflow(mcpRequest);
+
+      // 4. Validate generated workflow
+      const validation = await this.workflowService.validateWorkflow(aiWorkflow);
+
+      if (validation.isValid) {
+        await this.publishEvent(new AIWorkflowGeneratedEvent(
+          event.requestId,
+          aiWorkflow,
+          model.id,
+          event.correlationId
+        ));
+      } else {
+        await this.publishEvent(new AIWorkflowGenerationFailedEvent(
+          event.requestId,
+          validation.errors,
+          event.correlationId
+        ));
+      }
+
+    } catch (error) {
+      await this.publishEvent(new AIWorkflowGenerationFailedEvent(
+        event.requestId,
+        [error.message],
+        event.correlationId
+      ));
+    }
+  }
+
+  @Listen('WorkflowExecutionCompletedEvent')
+  async handleWorkflowCompleted(event: WorkflowExecutionCompletedEvent): Promise<void> {
+    // Provide feedback to AI model for learning
+    const feedback: MCPFeedback = {
+      workflowId: event.workflowId,
+      success: event.success,
+      performance: event.performance,
+      issues: event.issues,
+      improvements: event.suggestedImprovements
+    };
+
+    await this.mcpClient.provideFeedback(feedback);
+  }
+}
+
+// MCP Client for AI integration
+export class MCPClient {
+  constructor(
+    private httpClient: HttpClient,
+    private config: MCPConfig
+  ) {}
+
+  async createContext(request: MCPContextRequest): Promise<MCPContext> {
+    const response = await this.httpClient.post('/mcp/contexts', {
+      modelId: request.modelId,
+      workflow: request.workflow,
+      capabilities: request.capabilities,
+      constraints: request.constraints
+    });
+
+    return MCPContext.fromJSON(response.data);
+  }
+
+  async generateWorkflow(request: MCPWorkflowRequest): Promise<AutomationWorkflow> {
+    const response = await this.httpClient.post('/mcp/workflows/generate', {
+      contextId: request.contextId,
+      objective: request.objective,
+      domain: request.domain,
+      examples: request.examples,
+      preferences: request.preferences
+    });
+
+    return AutomationWorkflow.fromJSON(response.data);
+  }
+
+  async provideFeedback(feedback: MCPFeedback): Promise<void> {
+    await this.httpClient.post('/mcp/feedback', feedback);
+  }
+}
+#+END_SRC
+
+** Security Service
+
+Comprehensive security management for cloud automation.
+
+#+BEGIN_SRC typescript
+// Cloud Security Service
+export class CloudSecurityService {
+  constructor(
+    private authProvider: AuthProvider,
+    private accessControl: AccessControlService,
+    private auditLogger: AuditLogger,
+    private encryption: EncryptionService
+  ) {}
+
+  async validateWorkflow(
+    workflow: AutomationWorkflow,
+    submittedBy: UserId
+  ): Promise<ValidationResult> {
+    // 1. Authentication validation
+    const user = await this.authProvider.validateUser(submittedBy);
+    if (!user) {
+      return { isValid: false, errors: ['Invalid user credentials'] };
+    }
+
+    // 2. Authorization validation
+    const hasPermission = await this.accessControl.canSubmitWorkflow(
+      user,
+      workflow.domain,
+      workflow.capabilities
+    );
+
+    if (!hasPermission) {
+      await this.auditLogger.logUnauthorizedAccess(user, workflow);
+      return { isValid: false, errors: ['Insufficient permissions'] };
+    }
+
+    // 3. Workflow content validation
+    const contentValidation = await this.validateWorkflowContent(workflow);
+    if (!contentValidation.isValid) {
+      return contentValidation;
+    }
+
+    // 4. Rate limiting
+    const rateLimitOk = await this.accessControl.checkRateLimit(user);
+    if (!rateLimitOk) {
+      return { isValid: false, errors: ['Rate limit exceeded'] };
+    }
+
+    // 5. Log successful validation
+    await this.auditLogger.logWorkflowSubmission(user, workflow);
+
+    return { isValid: true, errors: [] };
+  }
+
+  async encryptSensitiveData(data: Record<string, any>): Promise<EncryptedData> {
+    const sensitiveFields = this.identifySensitiveFields(data);
+    const encrypted: Record<string, any> = { ...data };
+
+    for (const field of sensitiveFields) {
+      if (data[field]) {
+        encrypted[field] = await this.encryption.encrypt(data[field]);
+      }
+    }
+
+    return {
+      data: encrypted,
+      encryptedFields: sensitiveFields,
+      encryptionVersion: this.encryption.getVersion()
+    };
+  }
+
+  private async validateWorkflowContent(
+    workflow: AutomationWorkflow
+  ): Promise<ValidationResult> {
+    const errors: string[] = [];
+
+    // Check for potentially dangerous operations
+    const dangerousPatterns = [
+      /eval\(/i,
+      /new Function\(/i,
+      /document\.write/i,
+      /<script/i,
+      /javascript:/i
+    ];
+
+    const workflowJson = JSON.stringify(workflow);
+    for (const pattern of dangerousPatterns) {
+      if (pattern.test(workflowJson)) {
+        errors.push(`Workflow contains potentially dangerous content: ${pattern}`);
+      }
+    }
+
+    // Validate resource limits
+    if (workflow.estimatedDuration > 3600000) { // 1 hour
+      errors.push('Workflow duration exceeds maximum allowed time');
+    }
+
+    if (workflow.steps.length > 100) {
+      errors.push('Workflow has too many steps');
+    }
+
+    return {
+      isValid: errors.length === 0,
+      errors
+    };
+  }
+
+  private identifySensitiveFields(data: Record<string, any>): string[] {
+    const sensitiveKeywords = [
+      'password', 'secret', 'key', 'token', 'credential',
+      'auth', 'session', 'cookie', 'private'
+    ];
+
+    return Object.keys(data).filter(key =>
+      sensitiveKeywords.some(keyword =>
+        key.toLowerCase().includes(keyword.toLowerCase())
+      )
+    );
+  }
+}
+#+END_SRC
+
+* Infrastructure Components
+
+** Kubernetes Deployment
+
+#+BEGIN_SRC yaml
+# Coordination Service Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: semantest-coordination-service
+  namespace: semantest-cloud
+  labels:
+    app: coordination-service
+    version: v1
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: coordination-service
+  template:
+    metadata:
+      labels:
+        app: coordination-service
+        version: v1
+    spec:
+      containers:
+      - name: coordination-service
+        image: semantest/coordination-service:1.0.0
+        ports:
+        - containerPort: 8080
+          name: http
+        - containerPort: 9090
+          name: grpc
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: database-credentials
+              key: url
+        - name: KAFKA_BROKERS
+          value: "kafka-cluster:9092"
+        - name: REDIS_URL
+          value: "redis-cluster:6379"
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1000
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+
+---
+# MCP Bridge Service Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: semantest-mcp-bridge
+  namespace: semantest-cloud
+  labels:
+    app: mcp-bridge
+    version: v1
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: mcp-bridge
+  template:
+    metadata:
+      labels:
+        app: mcp-bridge
+        version: v1
+    spec:
+      containers:
+      - name: mcp-bridge
+        image: semantest/mcp-bridge:1.0.0
+        ports:
+        - containerPort: 8081
+          name: http
+        env:
+        - name: MCP_ENDPOINT
+          value: "https://api.anthropic.com/v1/mcp"
+        - name: AI_MODEL_REGISTRY_URL
+          value: "http://model-registry:8080"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "125m"
+          limits:
+            memory: "512Mi"
+            cpu: "250m"
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1000
+
+---
+# Security Service Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: semantest-security-service
+  namespace: semantest-cloud
+  labels:
+    app: security-service
+    version: v1
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: security-service
+  template:
+    metadata:
+      labels:
+        app: security-service
+        version: v1
+    spec:
+      containers:
+      - name: security-service
+        image: semantest/security-service:1.0.0
+        ports:
+        - containerPort: 8082
+          name: http
+        env:
+        - name: AUTH_PROVIDER_URL
+          value: "https://auth.semantest.com"
+        - name: ENCRYPTION_KEY
+          valueFrom:
+            secretKeyRef:
+              name: encryption-keys
+              key: primary
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "125m"
+          limits:
+            memory: "512Mi"
+            cpu: "250m"
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1000
+#+END_SRC
+
+** Service Mesh Configuration
+
+#+BEGIN_SRC yaml
+# Istio Virtual Service for API Gateway
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: semantest-api-gateway
+  namespace: semantest-cloud
+spec:
+  hosts:
+  - api.semantest.com
+  gateways:
+  - semantest-gateway
+  http:
+  - match:
+    - uri:
+        prefix: /api/v1/coordination
+    route:
+    - destination:
+        host: coordination-service
+        port:
+          number: 8080
+    timeout: 30s
+    retries:
+      attempts: 3
+      perTryTimeout: 10s
+  - match:
+    - uri:
+        prefix: /api/v1/mcp
+    route:
+    - destination:
+        host: mcp-bridge
+        port:
+          number: 8081
+    timeout: 60s
+  - match:
+    - uri:
+        prefix: /api/v1/security
+    route:
+    - destination:
+        host: security-service
+        port:
+          number: 8082
+    timeout: 15s
+
+---
+# Istio Destination Rule for Load Balancing
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: semantest-services
+  namespace: semantest-cloud
+spec:
+  host: "*.semantest-cloud.svc.cluster.local"
+  trafficPolicy:
+    loadBalancer:
+      simple: LEAST_CONN
+    connectionPool:
+      tcp:
+        maxConnections: 100
+      http:
+        http1MaxPendingRequests: 50
+        maxRequestsPerConnection: 2
+    outlierDetection:
+      consecutiveErrors: 3
+      interval: 30s
+      baseEjectionTime: 30s
+
+---
+# Network Policy for Security
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: semantest-network-policy
+  namespace: semantest-cloud
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: istio-system
+    - namespaceSelector:
+        matchLabels:
+          name: semantest-cloud
+    ports:
+    - protocol: TCP
+      port: 8080
+    - protocol: TCP
+      port: 8081
+    - protocol: TCP
+      port: 8082
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: kube-system
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 5432
+    - protocol: TCP
+      port: 9092
+#+END_SRC
+
+** Message Queue Configuration
+
+#+BEGIN_SRC yaml
+# Kafka Cluster Configuration
+apiVersion: kafka.strimzi.io/v1beta2
+kind: Kafka
+metadata:
+  name: semantest-kafka
+  namespace: semantest-cloud
+spec:
+  kafka:
+    replicas: 3
+    listeners:
+      - name: plain
+        port: 9092
+        type: internal
+        tls: false
+      - name: tls
+        port: 9093
+        type: internal
+        tls: true
+        authentication:
+          type: tls
+    config:
+      offsets.topic.replication.factor: 3
+      transaction.state.log.replication.factor: 3
+      transaction.state.log.min.isr: 2
+      log.message.format.version: "3.0"
+      inter.broker.protocol.version: "3.0"
+    storage:
+      type: persistent-claim
+      size: 100Gi
+      class: fast-ssd
+  zookeeper:
+    replicas: 3
+    storage:
+      type: persistent-claim
+      size: 10Gi
+      class: fast-ssd
+  entityOperator:
+    topicOperator: {}
+    userOperator: {}
+
+---
+# Kafka Topics
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: automation-events
+  namespace: semantest-cloud
+  labels:
+    strimzi.io/cluster: semantest-kafka
+spec:
+  partitions: 12
+  replicas: 3
+  config:
+    retention.ms: 604800000  # 7 days
+    segment.ms: 86400000     # 1 day
+
+---
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: workflow-commands
+  namespace: semantest-cloud
+  labels:
+    strimzi.io/cluster: semantest-kafka
+spec:
+  partitions: 6
+  replicas: 3
+  config:
+    retention.ms: 259200000  # 3 days
+    segment.ms: 3600000      # 1 hour
+
+---
+# RabbitMQ Cluster
+apiVersion: rabbitmq.com/v1beta1
+kind: RabbitmqCluster
+metadata:
+  name: semantest-rabbitmq
+  namespace: semantest-cloud
+spec:
+  replicas: 3
+  image: rabbitmq:3.11-management
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+  rabbitmq:
+    additionalConfig: |
+      log.console.level = info
+      channel_max = 1700
+      default_user_tags.administrator = true
+      default_vhost = semantest
+  persistence:
+    storageClassName: fast-ssd
+    storage: 20Gi
+  affinity:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+      - labelSelector:
+          matchExpressions:
+          - key: app.kubernetes.io/name
+            operator: In
+            values:
+            - rabbitmq
+        topologyKey: kubernetes.io/hostname
+#+END_SRC
+
+* Data Architecture
+
+** Event Store Design
+
+#+BEGIN_SRC sql
+-- Event Store Schema (PostgreSQL)
+CREATE SCHEMA IF NOT EXISTS semantest_events;
+
+-- Events table for event sourcing
+CREATE TABLE semantest_events.events (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    stream_id VARCHAR(255) NOT NULL,
+    event_type VARCHAR(255) NOT NULL,
+    event_data JSONB NOT NULL,
+    metadata JSONB DEFAULT '{}',
+    version INTEGER NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    correlation_id UUID,
+    causation_id UUID,
+    
+    CONSTRAINT unique_stream_version UNIQUE (stream_id, version)
+);
+
+-- Indexes for performance
+CREATE INDEX idx_events_stream_id ON semantest_events.events (stream_id);
+CREATE INDEX idx_events_event_type ON semantest_events.events (event_type);
+CREATE INDEX idx_events_created_at ON semantest_events.events (created_at);
+CREATE INDEX idx_events_correlation_id ON semantest_events.events (correlation_id);
+
+-- Snapshots for aggregate reconstruction optimization
+CREATE TABLE semantest_events.snapshots (
+    stream_id VARCHAR(255) PRIMARY KEY,
+    aggregate_type VARCHAR(255) NOT NULL,
+    aggregate_data JSONB NOT NULL,
+    version INTEGER NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Workflow executions
+CREATE TABLE semantest_events.workflow_executions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    workflow_id VARCHAR(255) NOT NULL,
+    client_id VARCHAR(255) NOT NULL,
+    status VARCHAR(50) NOT NULL,
+    started_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    completed_at TIMESTAMP WITH TIME ZONE,
+    result JSONB,
+    error_message TEXT,
+    performance_metrics JSONB
+);
+
+-- Client registry
+CREATE TABLE semantest_events.client_registrations (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    client_id VARCHAR(255) UNIQUE NOT NULL,
+    client_type VARCHAR(100) NOT NULL,
+    capabilities JSONB NOT NULL,
+    status VARCHAR(50) NOT NULL,
+    last_heartbeat TIMESTAMP WITH TIME ZONE,
+    registered_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    metadata JSONB DEFAULT '{}'
+);
+
+-- Audit trail
+CREATE TABLE semantest_events.audit_log (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id VARCHAR(255),
+    action VARCHAR(255) NOT NULL,
+    resource_type VARCHAR(255),
+    resource_id VARCHAR(255),
+    details JSONB DEFAULT '{}',
+    ip_address INET,
+    user_agent TEXT,
+    timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+#+END_SRC
+
+** Configuration Database
+
+#+BEGIN_SRC sql
+-- Configuration Schema
+CREATE SCHEMA IF NOT EXISTS semantest_config;
+
+-- Organizations (multi-tenancy)
+CREATE TABLE semantest_config.organizations (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(255) NOT NULL,
+    slug VARCHAR(100) UNIQUE NOT NULL,
+    settings JSONB DEFAULT '{}',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Users and authentication
+CREATE TABLE semantest_config.users (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    organization_id UUID REFERENCES semantest_config.organizations(id),
+    email VARCHAR(255) UNIQUE NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    role VARCHAR(100) NOT NULL,
+    permissions JSONB DEFAULT '[]',
+    settings JSONB DEFAULT '{}',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- API keys for programmatic access
+CREATE TABLE semantest_config.api_keys (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES semantest_config.users(id),
+    name VARCHAR(255) NOT NULL,
+    key_hash VARCHAR(255) NOT NULL,
+    permissions JSONB DEFAULT '[]',
+    expires_at TIMESTAMP WITH TIME ZONE,
+    last_used_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Workflow templates
+CREATE TABLE semantest_config.workflow_templates (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    organization_id UUID REFERENCES semantest_config.organizations(id),
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    template JSONB NOT NULL,
+    tags VARCHAR(255)[],
+    is_public BOOLEAN DEFAULT FALSE,
+    created_by UUID REFERENCES semantest_config.users(id),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+#+END_SRC
+
+* Security Architecture
+
+** Authentication and Authorization
+
+#+BEGIN_SRC typescript
+// OAuth2/OIDC Integration
+export class AuthProvider {
+  constructor(
+    private oidcClient: OIDCClient,
+    private jwtService: JWTService,
+    private userRepository: UserRepository
+  ) {}
+
+  async authenticateUser(token: string): Promise<User | null> {
+    try {
+      // Verify JWT token
+      const payload = await this.jwtService.verify(token);
+      
+      // Validate with OIDC provider
+      const userInfo = await this.oidcClient.getUserInfo(token);
+      
+      // Load user from database
+      const user = await this.userRepository.findByEmail(userInfo.email);
+      
+      if (!user) {
+        // Auto-provision user if from trusted domain
+        if (this.isTrustedDomain(userInfo.email)) {
+          return await this.provisionUser(userInfo);
+        }
+        return null;
+      }
+
+      return user;
+    } catch (error) {
+      console.error('Authentication failed:', error);
+      return null;
+    }
+  }
+
+  async generateAPIKey(user: User, permissions: Permission[]): Promise<APIKey> {
+    const keyData = {
+      userId: user.id,
+      permissions,
+      expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000) // 1 year
+    };
+
+    const token = await this.jwtService.sign(keyData);
+    const hash = await this.hashAPIKey(token);
+
+    const apiKey = APIKey.create(
+      user.id,
+      hash,
+      permissions,
+      keyData.expiresAt
+    );
+
+    await this.apiKeyRepository.save(apiKey);
+    
+    return apiKey;
+  }
+}
+
+// Role-Based Access Control
+export class AccessControlService {
+  private permissions = new Map<Role, Permission[]>([
+    ['viewer', [Permission.READ_WORKFLOWS, Permission.READ_EXECUTIONS]],
+    ['developer', [
+      Permission.READ_WORKFLOWS,
+      Permission.CREATE_WORKFLOWS,
+      Permission.EXECUTE_WORKFLOWS,
+      Permission.READ_EXECUTIONS
+    ]],
+    ['admin', [
+      Permission.READ_WORKFLOWS,
+      Permission.CREATE_WORKFLOWS,
+      Permission.EXECUTE_WORKFLOWS,
+      Permission.DELETE_WORKFLOWS,
+      Permission.READ_EXECUTIONS,
+      Permission.MANAGE_USERS,
+      Permission.MANAGE_API_KEYS
+    ]]
+  ]);
+
+  async canSubmitWorkflow(
+    user: User,
+    domain: string,
+    capabilities: string[]
+  ): Promise<boolean> {
+    // Check basic permission
+    if (!this.hasPermission(user, Permission.CREATE_WORKFLOWS)) {
+      return false;
+    }
+
+    // Check domain-specific permissions
+    const domainPermissions = user.getDomainPermissions(domain);
+    if (!domainPermissions.includes('execute')) {
+      return false;
+    }
+
+    // Check capability-specific permissions
+    const allowedCapabilities = user.getAllowedCapabilities(domain);
+    const hasRequiredCapabilities = capabilities.every(cap =>
+      allowedCapabilities.includes(cap)
+    );
+
+    return hasRequiredCapabilities;
+  }
+
+  private hasPermission(user: User, permission: Permission): boolean {
+    const rolePermissions = this.permissions.get(user.role) || [];
+    return rolePermissions.includes(permission) || 
+           user.customPermissions.includes(permission);
+  }
+}
+#+END_SRC
+
+** Network Security
+
+#+BEGIN_SRC typescript
+// TLS and Certificate Management
+export class TLSManager {
+  constructor(
+    private certManager: CertificateManager,
+    private secretsManager: SecretsManager
+  ) {}
+
+  async setupMutualTLS(clientId: string): Promise<TLSConfig> {
+    // Generate client certificate
+    const clientCert = await this.certManager.generateClientCertificate(
+      clientId,
+      { validityDays: 90 }
+    );
+
+    // Store in secrets manager
+    await this.secretsManager.storeSecret(
+      `client-cert-${clientId}`,
+      {
+        certificate: clientCert.certificate,
+        privateKey: clientCert.privateKey,
+        caCertificate: clientCert.caCertificate
+      }
+    );
+
+    return {
+      clientCertificate: clientCert.certificate,
+      caCertificate: clientCert.caCertificate,
+      tlsVersion: 'TLSv1.3',
+      cipherSuites: [
+        'TLS_AES_256_GCM_SHA384',
+        'TLS_CHACHA20_POLY1305_SHA256',
+        'TLS_AES_128_GCM_SHA256'
+      ]
+    };
+  }
+
+  async rotateCertificates(): Promise<void> {
+    const expiringCerts = await this.certManager.getExpiringCertificates(30); // 30 days
+    
+    for (const cert of expiringCerts) {
+      const newCert = await this.certManager.renewCertificate(cert.id);
+      await this.secretsManager.updateSecret(cert.secretId, newCert);
+      
+      // Notify clients of certificate rotation
+      await this.notifyClientCertificateRotation(cert.clientId, newCert);
+    }
+  }
+}
+
+// Zero-Trust Network Policy
+export class ZeroTrustService {
+  async validateRequest(request: IncomingRequest): Promise<SecurityValidation> {
+    const validations: ValidationResult[] = [];
+
+    // 1. Client certificate validation
+    validations.push(await this.validateClientCertificate(request));
+
+    // 2. API key validation
+    validations.push(await this.validateAPIKey(request));
+
+    // 3. Request signature validation
+    validations.push(await this.validateRequestSignature(request));
+
+    // 4. Rate limiting
+    validations.push(await this.validateRateLimit(request));
+
+    // 5. Geo-location validation
+    validations.push(await this.validateGeoLocation(request));
+
+    // 6. Payload validation
+    validations.push(await this.validatePayload(request));
+
+    const overallValid = validations.every(v => v.isValid);
+    const errors = validations.flatMap(v => v.errors);
+
+    return {
+      isValid: overallValid,
+      errors,
+      securityLevel: this.calculateSecurityLevel(validations),
+      recommendations: this.generateSecurityRecommendations(validations)
+    };
+  }
+}
+#+END_SRC
+
+* Monitoring and Observability
+
+** Comprehensive Monitoring Stack
+
+#+BEGIN_SRC typescript
+// OpenTelemetry Integration
+export class TelemetryService {
+  private tracer: Tracer;
+  private meter: Meter;
+  private logger: Logger;
+
+  constructor() {
+    this.tracer = trace.getTracer('semantest-cloud');
+    this.meter = metrics.getMeter('semantest-cloud');
+    this.logger = new Logger('semantest-cloud');
+  }
+
+  createWorkflowSpan(workflowId: string, operation: string): Span {
+    return this.tracer.startSpan(`workflow.${operation}`, {
+      attributes: {
+        'workflow.id': workflowId,
+        'workflow.operation': operation,
+        'service.name': 'semantest-cloud',
+        'service.version': process.env.SERVICE_VERSION || 'unknown'
+      }
+    });
+  }
+
+  recordWorkflowMetric(
+    workflowId: string,
+    metricName: string,
+    value: number,
+    unit: string = 'count'
+  ): void {
+    const metric = this.meter.createCounter(metricName, {
+      description: `Workflow ${metricName} metric`,
+      unit
+    });
+
+    metric.add(value, {
+      'workflow.id': workflowId,
+      'workflow.type': this.getWorkflowType(workflowId)
+    });
+  }
+
+  async logWorkflowEvent(
+    level: LogLevel,
+    message: string,
+    workflowId: string,
+    metadata?: Record<string, any>
+  ): Promise<void> {
+    await this.logger.log(level, message, {
+      workflowId,
+      timestamp: new Date().toISOString(),
+      service: 'semantest-cloud',
+      ...metadata
+    });
+  }
+}
+
+// Health Check System
+export class HealthCheckService {
+  private checks: Map<string, HealthCheck> = new Map();
+
+  constructor() {
+    this.registerDefaultChecks();
+  }
+
+  private registerDefaultChecks(): void {
+    this.addCheck('database', new DatabaseHealthCheck());
+    this.addCheck('kafka', new KafkaHealthCheck());
+    this.addCheck('redis', new RedisHealthCheck());
+    this.addCheck('mcp-bridge', new MCPBridgeHealthCheck());
+  }
+
+  addCheck(name: string, check: HealthCheck): void {
+    this.checks.set(name, check);
+  }
+
+  async runHealthChecks(): Promise<HealthCheckResult> {
+    const results: Record<string, HealthCheckStatus> = {};
+    let overallHealthy = true;
+
+    for (const [name, check] of this.checks) {
+      try {
+        const result = await check.execute();
+        results[name] = result;
+        
+        if (result.status !== 'healthy') {
+          overallHealthy = false;
+        }
+      } catch (error) {
+        results[name] = {
+          status: 'unhealthy',
+          message: error.message,
+          timestamp: new Date()
+        };
+        overallHealthy = false;
+      }
+    }
+
+    return {
+      status: overallHealthy ? 'healthy' : 'unhealthy',
+      checks: results,
+      timestamp: new Date()
+    };
+  }
+}
+
+// Performance Monitoring
+export class PerformanceMonitor {
+  private metrics: Map<string, PerformanceMetric[]> = new Map();
+
+  startWorkflowTimer(workflowId: string): WorkflowTimer {
+    const startTime = performance.now();
+    
+    return {
+      end: (status: 'success' | 'failure' | 'timeout') => {
+        const duration = performance.now() - startTime;
+        this.recordWorkflowPerformance(workflowId, duration, status);
+      }
+    };
+  }
+
+  private recordWorkflowPerformance(
+    workflowId: string,
+    duration: number,
+    status: string
+  ): void {
+    const metric: PerformanceMetric = {
+      workflowId,
+      duration,
+      status,
+      timestamp: Date.now(),
+      memoryUsage: process.memoryUsage(),
+      cpuUsage: process.cpuUsage()
+    };
+
+    if (!this.metrics.has(workflowId)) {
+      this.metrics.set(workflowId, []);
+    }
+
+    this.metrics.get(workflowId)!.push(metric);
+
+    // Cleanup old metrics (keep last 100 per workflow)
+    const workflowMetrics = this.metrics.get(workflowId)!;
+    if (workflowMetrics.length > 100) {
+      this.metrics.set(workflowId, workflowMetrics.slice(-100));
+    }
+  }
+
+  getPerformanceStats(workflowId?: string): PerformanceStats {
+    if (workflowId) {
+      return this.calculateStatsForWorkflow(workflowId);
+    }
+
+    return this.calculateOverallStats();
+  }
+}
+#+END_SRC
+
+This cloud infrastructure architecture provides a robust, secure, and scalable foundation for Semantest's cloud-based automation coordination. The design emphasizes security, observability, and enterprise-grade reliability while maintaining the semantic automation principles that make Semantest unique.
