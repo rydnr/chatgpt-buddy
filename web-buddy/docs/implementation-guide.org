@@ -1,0 +1,679 @@
+#+TITLE: Web-Buddy Framework Implementation Guide
+#+AUTHOR: Web-Buddy Team
+#+DATE: 2025-07-06
+#+DESCRIPTION: Comprehensive guide for implementing automation solutions with the Web-Buddy framework
+
+* Overview
+The Web-Buddy framework provides a robust, contract-based approach to web automation. This guide walks you through implementing automation solutions using the three-layer architecture: Core Infrastructure, Domain Implementations, and Client Wrappers.
+
+* Quick Start
+
+** Prerequisites
+- Node.js 18+ and pnpm
+- TypeScript 5.0+
+- Modern browser (Chrome, Firefox, or Safari)
+- Basic understanding of web automation concepts
+
+** Installation
+#+BEGIN_SRC bash
+# Clone the repository
+git clone https://github.com/rydnr/chatgpt-buddy.git
+cd chatgpt-buddy/web-buddy
+
+# Install dependencies
+pnpm install
+
+# Build the framework
+pnpm build
+
+# Run tests to verify installation
+pnpm test
+#+END_SRC
+
+** Basic Usage Example
+#+BEGIN_SRC typescript
+import { GoogleBuddyClient } from '@web-buddy/google-buddy';
+
+// Initialize the client
+const googleClient = new GoogleBuddyClient({
+  serverUrl: 'ws://localhost:3001'
+});
+
+// Perform a search
+await googleClient.enterSearchTerm('web automation');
+const results = await googleClient.getSearchResults();
+console.log('Search results:', results);
+#+END_SRC
+
+* Architecture Overview
+
+The Web-Buddy framework follows a three-layer architecture designed for maintainability, testability, and extensibility:
+
+#+BEGIN_SRC ascii
+┌─────────────────────────────────────────────────┐
+│                CLIENT LAYER                     │
+│   GoogleBuddyClient.enterSearchTerm()          │ ← Business-focused APIs
+│   ChatGPTBuddyClient.selectProject()           │
+├─────────────────────────────────────────────────┤
+│               DOMAIN LAYER                      │
+│   ENTER_SEARCH_TERM, SELECT_PROJECT            │ ← Site-specific logic
+│   Google handlers, ChatGPT handlers            │
+├─────────────────────────────────────────────────┤
+│               CORE LAYER                        │
+│   WebBuddyClient, WebBuddyServer               │ ← Infrastructure
+│   Message routing, WebSocket management        │
+└─────────────────────────────────────────────────┘
+#+END_SRC
+
+* Core Concepts
+
+** Messages and Events
+All communication in Web-Buddy follows an event-driven pattern:
+
+#+BEGIN_SRC typescript
+interface WebBuddyMessage {
+  readonly type: string;
+  readonly payload: Record<string, any>;
+  readonly correlationId: string;
+  readonly timestamp: Date;
+  readonly website?: string;
+}
+#+END_SRC
+
+** Automation Contracts
+Contracts define what automation capabilities are available:
+
+#+BEGIN_SRC typescript
+interface WebBuddyContract {
+  version: string;
+  domain: string;
+  title: string;
+  capabilities: Record<string, AutomationCapability>;
+  workflows?: Record<string, WorkflowDefinition>;
+}
+#+END_SRC
+
+** ATDD Validation
+Every capability is validated through Acceptance Test-Driven Development:
+
+#+BEGIN_SRC typescript
+const contractResult = await testRunner.executeContractTests(contract, {
+  browser: 'chromium',
+  baseUrl: 'https://google.com',
+  timeout: 30000
+});
+#+END_SRC
+
+* Implementation Patterns
+
+** 1. Using Existing Domain Implementations
+
+The fastest way to get started is using existing domain implementations:
+
+*** Google Search Automation
+#+BEGIN_SRC typescript
+import { GoogleBuddyClient } from '@web-buddy/google-buddy';
+
+const client = new GoogleBuddyClient();
+
+// Basic search
+await client.enterSearchTerm('TypeScript tutorials');
+await client.submitSearch();
+
+// Get results with filtering
+const results = await client.getSearchResults({
+  maxResults: 10,
+  filterDomains: ['github.com', 'stackoverflow.com']
+});
+
+// Navigate to first result
+if (results.length > 0) {
+  await client.clickSearchResult(0);
+}
+#+END_SRC
+
+*** ChatGPT Conversation Management
+#+BEGIN_SRC typescript
+import { ChatGPTBuddyClient } from '@web-buddy/chatgpt-buddy';
+
+const client = new ChatGPTBuddyClient();
+
+// Select a project context
+await client.selectProject('web-development');
+
+// Start a conversation
+await client.sendMessage('Help me optimize this TypeScript code for performance');
+
+// Get the response
+const response = await client.waitForResponse();
+console.log('ChatGPT response:', response);
+#+END_SRC
+
+*** Wikipedia Research
+#+BEGIN_SRC typescript
+import { WikipediaBuddyClient } from '@web-buddy/wikipedia-buddy';
+
+const client = new WikipediaBuddyClient();
+
+// Search for an article
+await client.searchArticle('Machine Learning');
+
+// Get article summary
+const summary = await client.getArticleSummary();
+
+// Navigate to references
+const references = await client.getReferences();
+#+END_SRC
+
+** 2. Creating New Domain Implementations
+
+To add automation for a new website, create a domain implementation:
+
+*** Step 1: Define Domain Messages
+#+BEGIN_SRC typescript
+// implementations/linkedin-buddy/src/messages.ts
+export interface ConnectWithUserMessage extends WebBuddyMessage {
+  type: 'CONNECT_WITH_USER';
+  payload: {
+    profileUrl: string;
+    personalNote?: string;
+  };
+}
+
+export interface SearchPeopleMessage extends WebBuddyMessage {
+  type: 'SEARCH_PEOPLE';
+  payload: {
+    keywords: string;
+    location?: string;
+    industry?: string;
+  };
+}
+#+END_SRC
+
+*** Step 2: Implement Domain Handlers
+#+BEGIN_SRC typescript
+// implementations/linkedin-buddy/src/handlers.ts
+export class LinkedInHandlers {
+  constructor(private page: Page) {}
+
+  async handleConnectWithUser(message: ConnectWithUserMessage): Promise<void> {
+    await this.page.goto(message.payload.profileUrl);
+    
+    // Wait for connect button
+    await this.page.waitForSelector('[data-test-id="connect-button"]');
+    await this.page.click('[data-test-id="connect-button"]');
+    
+    // Add personal note if provided
+    if (message.payload.personalNote) {
+      await this.page.fill('[name="message"]', message.payload.personalNote);
+    }
+    
+    // Send invitation
+    await this.page.click('[data-test-id="send-invitation"]');
+  }
+
+  async handleSearchPeople(message: SearchPeopleMessage): Promise<SearchResult[]> {
+    // Navigate to people search
+    await this.page.goto('https://linkedin.com/search/results/people/');
+    
+    // Enter search criteria
+    await this.page.fill('[data-test-id="search-input"]', message.payload.keywords);
+    
+    // Apply filters if provided
+    if (message.payload.location) {
+      await this.applyLocationFilter(message.payload.location);
+    }
+    
+    // Return search results
+    return await this.extractSearchResults();
+  }
+}
+#+END_SRC
+
+*** Step 3: Create Client Wrapper
+#+BEGIN_SRC typescript
+// implementations/linkedin-buddy/src/client.ts
+export class LinkedInBuddyClient {
+  constructor(private webBuddyClient: WebBuddyClient) {}
+
+  /**
+   * Send a connection request to a LinkedIn user
+   */
+  async connectWithUser(profileUrl: string, personalNote?: string): Promise<void> {
+    await this.webBuddyClient.sendMessage({
+      type: 'CONNECT_WITH_USER',
+      payload: { profileUrl, personalNote },
+      correlationId: this.generateCorrelationId()
+    });
+  }
+
+  /**
+   * Search for people on LinkedIn
+   */
+  async searchPeople(criteria: PeopleSearchCriteria): Promise<SearchResult[]> {
+    const response = await this.webBuddyClient.sendMessage({
+      type: 'SEARCH_PEOPLE',
+      payload: criteria,
+      correlationId: this.generateCorrelationId()
+    });
+    
+    return response.payload.results;
+  }
+}
+#+END_SRC
+
+*** Step 4: Define Automation Contract
+#+BEGIN_SRC typescript
+// implementations/linkedin-buddy/src/contract.ts
+export const linkedInContract: WebBuddyContract = {
+  version: '1.0.0',
+  domain: 'linkedin.com',
+  title: 'LinkedIn Professional Networking Automation',
+  capabilities: {
+    connectWithUser: {
+      type: 'action',
+      description: 'Send connection request to a LinkedIn user',
+      selector: '[data-test-id="connect-button"]',
+      parameters: [
+        {
+          name: 'profileUrl',
+          type: 'string',
+          description: 'URL of the LinkedIn profile',
+          required: true
+        },
+        {
+          name: 'personalNote',
+          type: 'string',
+          description: 'Optional personal message',
+          required: false,
+          maxLength: 300
+        }
+      ]
+    },
+    searchPeople: {
+      type: 'query',
+      description: 'Search for people on LinkedIn',
+      selector: '[data-test-id="search-input"]',
+      parameters: [
+        {
+          name: 'keywords',
+          type: 'string',
+          description: 'Search keywords',
+          required: true
+        },
+        {
+          name: 'location',
+          type: 'string',
+          description: 'Geographic location filter',
+          required: false
+        }
+      ]
+    }
+  }
+};
+#+END_SRC
+
+*** Step 5: Create ATDD Tests
+#+BEGIN_SRC typescript
+// implementations/linkedin-buddy/tests/linkedin-atdd.spec.ts
+import { test, expect } from '@playwright/test';
+import { ContractTestRunner } from '@web-buddy/testing';
+import { linkedInContract } from '../src/contract';
+
+test.describe('LinkedIn Automation Contract Validation', () => {
+  test('should validate all capabilities work correctly', async ({ page }) => {
+    const testRunner = new ContractTestRunner();
+    
+    const results = await testRunner.executeContractTests(linkedInContract, {
+      page,
+      baseUrl: 'https://linkedin.com',
+      timeout: 30000
+    });
+    
+    // Verify all capabilities passed
+    for (const result of results) {
+      expect(result.success).toBe(true);
+    }
+  });
+});
+#+END_SRC
+
+** 3. Cross-Domain Workflows
+
+Combine multiple domain implementations for complex workflows:
+
+#+BEGIN_SRC typescript
+import { GoogleBuddyClient } from '@web-buddy/google-buddy';
+import { ChatGPTBuddyClient } from '@web-buddy/chatgpt-buddy';
+import { LinkedInBuddyClient } from '@web-buddy/linkedin-buddy';
+
+class CompetitiveResearchWorkflow {
+  constructor(
+    private google: GoogleBuddyClient,
+    private chatgpt: ChatGPTBuddyClient,
+    private linkedin: LinkedInBuddyClient
+  ) {}
+
+  async researchCompetitor(companyName: string): Promise<CompetitorReport> {
+    // 1. Google search for company information
+    await this.google.enterSearchTerm(`${companyName} company overview`);
+    const searchResults = await this.google.getSearchResults({ maxResults: 5 });
+    
+    // 2. Analyze findings with ChatGPT
+    await this.chatgpt.selectProject('competitive-analysis');
+    const analysisPrompt = `Analyze this company based on these search results: 
+                           ${searchResults.map(r => r.snippet).join('\n')}`;
+    await this.chatgpt.sendMessage(analysisPrompt);
+    const analysis = await this.chatgpt.waitForResponse();
+    
+    // 3. Find key employees on LinkedIn
+    const keyPeople = await this.linkedin.searchPeople({
+      keywords: `${companyName} CEO CTO founder`,
+      location: 'United States'
+    });
+    
+    return {
+      companyName,
+      webPresence: searchResults,
+      aiAnalysis: analysis,
+      keyEmployees: keyPeople
+    };
+  }
+}
+#+END_SRC
+
+* Testing Your Implementation
+
+** Contract Validation
+Always validate your automation contracts:
+
+#+BEGIN_SRC typescript
+import { ContractDiscovery, ContractTestRunner } from '@web-buddy/testing';
+
+// Discover automation capabilities from a page
+const discovery = new ContractDiscovery();
+const discoveryResult = await discovery.discoverFromPage(page);
+
+// Validate discovered contracts
+for (const contract of discoveryResult.contracts) {
+  const testRunner = new ContractTestRunner();
+  const results = await testRunner.executeContractTests(contract, {
+    page,
+    baseUrl: 'https://example.com',
+    timeout: 30000
+  });
+  
+  console.log(`Contract validation for ${contract.domain}:`, results);
+}
+#+END_SRC
+
+** Cross-Browser Testing
+Test your automation across different browsers:
+
+#+BEGIN_SRC typescript
+import { TestUtilities } from '@web-buddy/testing';
+
+const crossBrowserResults = await TestUtilities.runCrossBrowserTests(
+  [myContract],
+  'https://example.com',
+  ['chromium', 'firefox', 'webkit']
+);
+
+for (const [browser, reports] of crossBrowserResults) {
+  console.log(`${browser} test results:`, reports);
+}
+#+END_SRC
+
+** Performance Benchmarking
+Benchmark your automation performance:
+
+#+BEGIN_SRC typescript
+const benchmark = await TestUtilities.benchmarkPerformance(
+  myContract,
+  'https://example.com',
+  5 // iterations
+);
+
+console.log('Performance benchmark:', {
+  averageTime: benchmark.overall.avg,
+  capabilityBreakdown: benchmark.capabilities
+});
+#+END_SRC
+
+* Best Practices
+
+** 1. Contract Design
+- =Start with the contract=: Define capabilities before implementation
+- =Keep capabilities atomic=: Each capability should do one thing well
+- =Provide examples=: Include realistic parameter examples in contracts
+- =Version your contracts=: Use semantic versioning for contract changes
+
+** 2. Error Handling
+- =Graceful degradation=: Provide fallback selectors for brittle elements
+- =Meaningful errors=: Include context about what went wrong and why
+- =Retry logic=: Implement retries for transient failures
+- =Timeout management=: Set appropriate timeouts for different operations
+
+#+BEGIN_SRC typescript
+export class RobustHandler {
+  async handleWithRetry<T>(operation: () => Promise<T>, maxRetries: number = 3): Promise<T> {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        return await operation();
+      } catch (error) {
+        if (attempt === maxRetries) {
+          throw new Error(`Operation failed after ${maxRetries} attempts: ${error.message}`);
+        }
+        
+        // Exponential backoff
+        await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
+      }
+    }
+    throw new Error('Unexpected retry loop exit');
+  }
+}
+#+END_SRC
+
+** 3. Security Considerations
+- =Input validation=: Validate all parameters before processing
+- =Secure communication=: Use WSS for production WebSocket connections
+- =Permission management=: Request minimal necessary browser permissions
+- =Data sanitization=: Sanitize data extracted from web pages
+
+** 4. Performance Optimization
+- =Lazy loading=: Only load browser contexts when needed
+- =Connection pooling=: Reuse WebSocket connections where possible
+- =Parallel execution=: Run independent operations concurrently
+- =Resource cleanup=: Always clean up browser resources after use
+
+* Troubleshooting
+
+** Common Issues
+
+*** "Element not found" errors
+#+BEGIN_SRC typescript
+// Problem: Selector doesn't match any elements
+await page.click('[data-test="button"]'); // ❌ Fails
+
+// Solution: Use robust waiting and fallback selectors
+await page.waitForSelector('[data-test="button"], .submit-btn, button[type="submit"]');
+await page.click('[data-test="button"], .submit-btn, button[type="submit"]');
+#+END_SRC
+
+*** WebSocket connection failures
+#+BEGIN_SRC typescript
+// Problem: Connection drops during automation
+// Solution: Implement reconnection logic
+class RobustWebBuddyClient extends WebBuddyClient {
+  private reconnectAttempts = 0;
+  private maxReconnectAttempts = 5;
+
+  protected async handleConnectionLoss(): Promise<void> {
+    if (this.reconnectAttempts < this.maxReconnectAttempts) {
+      this.reconnectAttempts++;
+      await this.reconnect();
+    } else {
+      throw new Error('Max reconnection attempts exceeded');
+    }
+  }
+}
+#+END_SRC
+
+*** Browser context isolation issues
+#+BEGIN_SRC typescript
+// Problem: Tests interfere with each other
+// Solution: Use fresh browser contexts
+test.beforeEach(async ({ browser }) => {
+  const context = await browser.newContext({
+    // Clear state for each test
+    viewport: { width: 1280, height: 720 },
+    ignoreHTTPSErrors: true
+  });
+  
+  const page = await context.newPage();
+  // Use fresh page for each test
+});
+#+END_SRC
+
+** Debugging Tips
+
+*** Enable verbose logging
+#+BEGIN_SRC typescript
+const client = new GoogleBuddyClient({
+  debug: true,
+  logLevel: 'verbose'
+});
+#+END_SRC
+
+*** Capture screenshots on failures
+#+BEGIN_SRC typescript
+try {
+  await performAutomation();
+} catch (error) {
+  await page.screenshot({ path: 'failure-screenshot.png' });
+  throw error;
+}
+#+END_SRC
+
+*** Use browser dev tools
+#+BEGIN_SRC typescript
+// Run in non-headless mode for debugging
+const browser = await chromium.launch({ 
+  headless: false,
+  devtools: true 
+});
+#+END_SRC
+
+* Migration Guide
+
+** From Legacy Automation Tools
+
+*** From Selenium
+#+BEGIN_SRC typescript
+// Selenium (before)
+driver.findElement(By.id("search")).sendKeys("query");
+driver.findElement(By.id("submit")).click();
+
+// Web-Buddy (after)
+await googleClient.enterSearchTerm("query");
+await googleClient.submitSearch();
+#+END_SRC
+
+*** From Puppeteer
+#+BEGIN_SRC typescript
+// Puppeteer (before)
+await page.goto('https://google.com');
+await page.type('#search', 'query');
+await page.click('#submit');
+
+// Web-Buddy (after)
+await googleClient.enterSearchTerm("query"); // Handles navigation and interaction
+#+END_SRC
+
+** Upgrading Between Versions
+
+*** Breaking Changes in v2.0
+- Contract schema format updated
+- Message correlation ID generation changed
+- Browser extension API redesigned
+
+*** Migration Steps
+1. Update contract definitions to new schema
+2. Replace deprecated message types
+3. Update browser extension manifest
+4. Run migration test suite
+
+* Advanced Topics
+
+** Custom Message Types
+#+BEGIN_SRC typescript
+interface CustomMessage extends WebBuddyMessage {
+  type: 'CUSTOM_AUTOMATION';
+  payload: {
+    customField: string;
+    metadata: Record<string, any>;
+  };
+}
+#+END_SRC
+
+** Plugin Development
+#+BEGIN_SRC typescript
+class MyAutomationPlugin implements WebBuddyPlugin {
+  getName(): string {
+    return 'my-automation-plugin';
+  }
+
+  getCapabilities(): AutomationCapability[] {
+    return [
+      {
+        type: 'action',
+        name: 'customAction',
+        description: 'Performs custom automation'
+      }
+    ];
+  }
+
+  async executeCapability(capability: string, params: any): Promise<any> {
+    // Implementation here
+  }
+}
+#+END_SRC
+
+** Enterprise Integration
+#+BEGIN_SRC typescript
+// Enterprise configuration
+const enterpriseClient = new WebBuddyClient({
+  serverUrl: 'wss://automation.company.com',
+  authentication: {
+    type: 'oauth2',
+    clientId: process.env.OAUTH_CLIENT_ID,
+    clientSecret: process.env.OAUTH_CLIENT_SECRET
+  },
+  monitoring: {
+    enabled: true,
+    endpoint: 'https://monitoring.company.com/metrics'
+  }
+});
+#+END_SRC
+
+* Resources
+
+** Documentation
+- [[file:adrs/adr-001-layered-client-architecture.org][ADR-001: Layered Client Architecture]]
+- [[file:../specs/web-buddy-framework-roadmap.md][Framework Roadmap]]
+- [[file:../journal.org][Development Journal]]
+
+** Example Code
+- [[file:../examples/][Example Applications]]
+- [[file:../implementations/google-buddy/][Google Automation Example]]
+- [[file:../implementations/chatgpt-buddy/][ChatGPT Automation Example]]
+
+** Community
+- GitHub Issues: Report bugs and request features
+- Discussions: Ask questions and share implementations
+- Contributing: Guidelines for contributing to the framework
+
+** API Reference
+- Core Layer: ~@web-buddy/core~ API documentation
+- Testing Framework: ~@web-buddy/testing~ API documentation
+- Domain Implementations: Individual package documentation
