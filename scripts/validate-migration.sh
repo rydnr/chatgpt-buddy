@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Migration Validation Script
 # This script validates the repository migration setup and tests extracted repositories

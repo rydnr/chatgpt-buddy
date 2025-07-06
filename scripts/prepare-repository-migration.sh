@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Repository Migration Preparation Script
 # This script prepares the current monorepo for separation into multiple repositories

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # NPM Publishing Configuration Script
 # This script configures NPM publishing order and dependency management

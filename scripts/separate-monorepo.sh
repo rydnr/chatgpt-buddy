@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Semantest Monorepo Separation Script
 # This script helps separate the monorepo into individual repositories

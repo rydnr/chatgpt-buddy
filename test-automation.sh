@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Simple automation test script using curl
 SERVER_URL="http://localhost:3003"
