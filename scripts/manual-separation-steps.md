@@ -25,28 +25,47 @@ mkdir ~/github/rydnr/semantest-workspace
 cd ~/github/rydnr/semantest-workspace
 ```
 
-### 4. Extract and create the first repository (TypeScript-EDA)
+### 4. Extract and create TypeScript-EDA repositories (3 separate repos)
 
 ```bash
 # Go back to original repo
 cd ~/github/rydnr/chatgpt-buddy
 
-# Extract typescript-eda history
-git subtree split --prefix=typescript-eda -b typescript-eda-branch
+# Extract TypeScript-EDA Domain
+git subtree split --prefix=typescript-eda-domain -b ts-eda-domain-branch
+gh repo create semantest/typescript-eda-domain --public --description "Core domain primitives for event-driven architecture"
 
-# Create new repo on GitHub (using browser or gh CLI)
-gh repo create semantest/typescript-eda --public --description "Event-driven architecture framework for TypeScript"
+# Extract TypeScript-EDA Infrastructure
+git subtree split --prefix=typescript-eda-infrastructure -b ts-eda-infra-branch
+gh repo create semantest/typescript-eda-infrastructure --public --description "Infrastructure adapters for TypeScript-EDA"
 
-# Clone the new empty repo
+# Extract TypeScript-EDA Application
+git subtree split --prefix=typescript-eda-application -b ts-eda-app-branch
+gh repo create semantest/typescript-eda-application --public --description "Application layer orchestration for TypeScript-EDA"
+
+# Clone and push each repository
 cd ~/github/rydnr/semantest-workspace
-git clone https://github.com/semantest/typescript-eda.git
-cd typescript-eda
 
-# Pull the history from the branch
-git pull ~/github/rydnr/chatgpt-buddy typescript-eda-branch
-
-# Push to GitHub
+# Domain
+git clone https://github.com/semantest/typescript-eda-domain.git
+cd typescript-eda-domain
+git pull ~/github/rydnr/chatgpt-buddy ts-eda-domain-branch
 git push origin main
+cd ..
+
+# Infrastructure
+git clone https://github.com/semantest/typescript-eda-infrastructure.git
+cd typescript-eda-infrastructure
+git pull ~/github/rydnr/chatgpt-buddy ts-eda-infra-branch
+git push origin main
+cd ..
+
+# Application
+git clone https://github.com/semantest/typescript-eda-application.git
+cd typescript-eda-application
+git pull ~/github/rydnr/chatgpt-buddy ts-eda-app-branch
+git push origin main
+cd ..
 ```
 
 ### 5. Repeat for each component
@@ -90,7 +109,7 @@ git push origin main
 cd ~/github/rydnr/chatgpt-buddy
 
 # Clean up temporary branches
-git branch -D typescript-eda-branch browser-branch nodejs-server-branch # etc...
+git branch -D ts-eda-domain-branch ts-eda-infra-branch ts-eda-app-branch browser-branch nodejs-server-branch # etc...
 
 # Remove git from original directory (this makes it git-less)
 rm -rf .git
@@ -103,7 +122,9 @@ rm -rf .git
 ├── chatgpt-buddy/          # Original files (now git-less)
 ├── chatgpt-buddy-backup-YYYYMMDD/  # Backup with git history
 └── semantest-workspace/    # New workspace with separate repos
-    ├── typescript-eda/
+    ├── typescript-eda-domain/
+    ├── typescript-eda-infrastructure/
+    ├── typescript-eda-application/
     ├── browser/
     ├── nodejs.server/
     ├── google.com/

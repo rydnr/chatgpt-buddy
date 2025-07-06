@@ -120,8 +120,10 @@ main() {
     echo -e "\n${YELLOW}Pushing current changes to origin...${NC}"
     git push origin main || echo -e "${YELLOW}Warning: Could not push to origin${NC}"
     
-    # Extract components
-    extract_component "typescript-eda" "typescript-eda-only" "typescript-eda" "Event-driven architecture framework for TypeScript"
+    # Extract TypeScript-EDA components (3 separate repositories)
+    extract_component "typescript-eda-domain" "ts-eda-domain-only" "typescript-eda-domain" "Core domain primitives for event-driven architecture"
+    extract_component "typescript-eda-infrastructure" "ts-eda-infra-only" "typescript-eda-infrastructure" "Infrastructure adapters for TypeScript-EDA"
+    extract_component "typescript-eda-application" "ts-eda-app-only" "typescript-eda-application" "Application layer orchestration for TypeScript-EDA"
     extract_component "web-buddy/packages/core" "browser-only" "browser" "Core browser automation framework for Semantest"
     extract_component "web-buddy-nodejs-server" "nodejs-server-only" "nodejs.server" "Node.js server for Semantest browser automation"
     extract_component "web-buddy/packages/semantest-google" "google-only" "google.com" "Google search automation for Semantest"
@@ -141,12 +143,21 @@ This directory contains all Semantest repositories for local development.
 
 ## Repositories
 
-- `typescript-eda/` - Event-driven architecture framework
+### TypeScript-EDA Framework
+- `typescript-eda-domain/` - Core domain primitives (Entity, Event, ValueObject)
+- `typescript-eda-infrastructure/` - Infrastructure adapters and ports
+- `typescript-eda-application/` - Application layer orchestration
+
+### Browser Automation
 - `browser/` - Core browser automation framework  
 - `nodejs.server/` - Node.js server component
+- `extension.chrome/` - Chrome browser extension
+
+### Website Implementations
 - `google.com/` - Google search automation
 - `chatgpt.com/` - ChatGPT automation
-- `extension.chrome/` - Chrome browser extension
+
+### SDKs and Tools
 - `client.typescript/` - TypeScript client SDK
 - `docs/` - Documentation site
 - `deploy/` - Deployment configurations
@@ -177,7 +188,7 @@ EOF
     # Clean up branches
     echo -e "\n${YELLOW}Cleaning up temporary branches...${NC}"
     cd $BASE_DIR
-    git branch -D typescript-eda-only browser-only nodejs-server-only google-only chatgpt-only extension-chrome-only client-typescript-only docs-only deploy-only 2>/dev/null || true
+    git branch -D ts-eda-domain-only ts-eda-infra-only ts-eda-app-only browser-only nodejs-server-only google-only chatgpt-only extension-chrome-only client-typescript-only docs-only deploy-only 2>/dev/null || true
     
     echo -e "\n${GREEN}✓ Monorepo separation complete!${NC}"
     echo -e "\n${YELLOW}Next steps:${NC}"

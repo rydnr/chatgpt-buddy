@@ -29,9 +29,17 @@ git push origin main
 ### 3. Component Extraction Commands
 
 ```bash
-# TypeScript-EDA
-git subtree split --prefix=typescript-eda -b ts-eda
-gh repo create semantest/typescript-eda --public
+# TypeScript-EDA Domain
+git subtree split --prefix=typescript-eda-domain -b ts-eda-domain
+gh repo create semantest/typescript-eda-domain --public
+
+# TypeScript-EDA Infrastructure
+git subtree split --prefix=typescript-eda-infrastructure -b ts-eda-infra
+gh repo create semantest/typescript-eda-infrastructure --public
+
+# TypeScript-EDA Application
+git subtree split --prefix=typescript-eda-application -b ts-eda-app
+gh repo create semantest/typescript-eda-application --public
 
 # Browser Core
 git subtree split --prefix=web-buddy/packages/core -b browser
