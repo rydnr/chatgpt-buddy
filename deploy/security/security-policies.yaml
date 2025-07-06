@@ -1,0 +1,199 @@
+# Semantest Security Policies - Kubernetes Network and Pod Security
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: security-policies
+  namespace: semantest
+data:
+  password-policy.json: |
+    {
+      "minLength": 12,
+      "requireUppercase": true,
+      "requireLowercase": true,
+      "requireNumbers": true,
+      "requireSpecialChars": true,
+      "preventReuse": 12,
+      "maxAge": 90,
+      "lockoutThreshold": 5,
+      "lockoutDuration": 900
+    }
+  
+  session-policy.json: |
+    {
+      "maxDuration": 3600,
+      "idleTimeout": 900,
+      "concurrentSessions": 3,
+      "requireMFA": true,
+      "rememberMeDuration": 604800
+    }
+  
+  api-security.json: |
+    {
+      "rateLimiting": {
+        "global": {
+          "requests": 1000,
+          "window": 60
+        },
+        "authenticated": {
+          "requests": 5000,
+          "window": 60
+        },
+        "unauthenticated": {
+          "requests": 100,
+          "window": 60
+        }
+      },
+      "cors": {
+        "allowedOrigins": ["https://semantest.com"],
+        "allowedMethods": ["GET", "POST", "PUT", "DELETE"],
+        "allowedHeaders": ["Content-Type", "Authorization"],
+        "maxAge": 86400
+      }
+    }
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: semantest-network-policy
+  namespace: semantest
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/part-of: semantest
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: semantest
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/part-of: semantest
+    ports:
+    - protocol: TCP
+      port: 8080
+    - protocol: TCP
+      port: 8081
+    - protocol: TCP
+      port: 8082
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+    ports:
+    - protocol: TCP
+      port: 8080
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: semantest
+    ports:
+    - protocol: TCP
+      port: 5432  # PostgreSQL
+    - protocol: TCP
+      port: 9092  # Kafka
+    - protocol: TCP
+      port: 6379  # Redis
+    - protocol: TCP
+      port: 9200  # Elasticsearch
+  - to:
+    - namespaceSelector: {}
+    ports:
+    - protocol: TCP
+      port: 443   # HTTPS for external APIs
+    - protocol: TCP
+      port: 53    # DNS
+    - protocol: UDP
+      port: 53    # DNS
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: semantest-pdb
+  namespace: semantest
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/part-of: semantest
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: semantest-security-quota
+  namespace: semantest
+spec:
+  hard:
+    requests.cpu: "20"
+    requests.memory: "40Gi"
+    limits.cpu: "40"
+    limits.memory: "80Gi"
+    persistentvolumeclaims: "20"
+    services: "20"
+    secrets: "100"  # Increased for security keys
+    configmaps: "50"
+---
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  name: semantest-security-policy
+  namespace: semantest
+spec:
+  privileged: false
+  allowPrivilegeEscalation: false
+  requiredDropCapabilities:
+    - ALL
+  volumes:
+    - 'configMap'
+    - 'emptyDir'
+    - 'projected'
+    - 'secret'
+    - 'downwardAPI'
+    - 'persistentVolumeClaim'
+  hostNetwork: false
+  hostIPC: false
+  hostPID: false
+  runAsUser:
+    rule: 'MustRunAsNonRoot'
+  seLinux:
+    rule: 'RunAsAny'
+  supplementalGroups:
+    rule: 'RunAsAny'
+  fsGroup:
+    rule: 'RunAsAny'
+  readOnlyRootFilesystem: true
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: semantest-security-role
+  namespace: semantest
+rules:
+- apiGroups: [""]
+  resources: ["pods", "services"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["configmaps"]
+  verbs: ["get", "list"]
+  resourceNames: ["security-policies"]
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["get"]
+  resourceNames: ["semantest-secrets", "semantest-tls"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: semantest-security-binding
+  namespace: semantest
+subjects:
+- kind: ServiceAccount
+  name: semantest-service-account
+  namespace: semantest
+roleRef:
+  kind: Role
+  name: semantest-security-role
+  apiGroup: rbac.authorization.k8s.io
