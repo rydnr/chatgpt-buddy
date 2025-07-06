@@ -1,0 +1,784 @@
+# Migration Guide: Web-Buddy to Semantest
+
+#+TITLE: Migration Guide: Web-Buddy to Semantest
+#+AUTHOR: Semantest Development Team
+#+DATE: 2025-07-06
+
+* Overview
+
+This comprehensive guide helps you migrate from the legacy Web-Buddy framework to the new Semantest ecosystem. The migration maintains 100% backward compatibility while providing access to enhanced semantic automation capabilities.
+
+* Why Migrate to Semantest?
+
+** Professional Positioning
+- Enterprise-ready DNS-style naming convention
+- Professional branding suitable for business environments
+- Scalable package organization for ecosystem growth
+
+** Enhanced Architecture
+- Built on proven TypeScript-EDA patterns
+- Event-driven architecture for better separation of concerns
+- Comprehensive domain modeling with entities and value objects
+
+** Improved Developer Experience
+- Semantic contracts instead of brittle CSS selectors
+- Automated contract discovery and validation
+- Advanced testing framework with ATDD support
+
+** Future-Proof Technology
+- Active development and community support
+- Plugin marketplace ready
+- Cloud integration and AI learning capabilities planned
+
+* Migration Strategy
+
+** Zero-Disruption Approach
+
+The migration follows a zero-disruption strategy:
+
+1. **Parallel Operation**: Old and new packages work side-by-side
+2. **Backward Compatibility**: All existing APIs continue to work
+3. **Gradual Migration**: Migrate at your own pace
+4. **Automated Tools**: Migration scripts handle the heavy lifting
+
+** Migration Timeline
+
+- **Immediate**: Install new packages alongside existing ones
+- **Week 1-2**: Begin migrating core functionality
+- **Week 3-4**: Migrate domain-specific implementations
+- **Week 5-6**: Update tests and documentation
+- **Month 2+**: Leverage new Semantest-only features
+
+* Automated Migration
+
+** Migration Tool Installation
+
+#+BEGIN_SRC bash
+# Install the migration toolset
+npm install -g @semantest/migration-tools
+
+# Verify installation
+semantest-migrate --version
+#+END_SRC
+
+** Running Automated Migration
+
+#+BEGIN_SRC bash
+# Analyze your project
+semantest-migrate analyze ./your-project
+
+# Preview migration changes
+semantest-migrate preview ./your-project --output ./migration-preview
+
+# Perform the migration
+semantest-migrate migrate ./your-project --backup
+#+END_SRC
+
+** Migration Tool Options
+
+#+BEGIN_SRC bash
+Usage: semantest-migrate [command] [options]
+
+Commands:
+  analyze     Analyze project for migration compatibility
+  preview     Show what changes will be made
+  migrate     Perform the actual migration
+  validate    Validate migrated code
+
+Options:
+  --backup           Create backup before migration
+  --preserve-old     Keep old imports alongside new ones
+  --update-tests     Update test files
+  --update-docs      Update documentation
+  --dry-run         Show changes without applying them
+#+END_SRC
+
+* Manual Migration Guide
+
+## Package Mapping
+
+### Core Framework
+#+BEGIN_SRC typescript
+// OLD: Web-Buddy Core
+import { WebBuddyClient } from '@web-buddy/core';
+
+// NEW: Semantest Browser
+import { SemanTestClient } from '@semantest/browser';
+#+END_SRC
+
+### Domain Packages
+#+BEGIN_SRC typescript
+// OLD: Domain Buddy Packages
+import { GoogleBuddyClient } from 'google-buddy';
+import { ChatGPTBuddyClient } from 'chatgpt-buddy';
+import { WikipediaBuddyClient } from 'wikipedia-buddy';
+
+// NEW: Semantest Domain Packages
+import { GoogleClient } from '@semantest/google.com';
+import { ChatGPTClient } from '@semantest/chatgpt.com';
+import { WikipediaClient } from '@semantest/wikipedia.org';
+#+END_SRC
+
+### Server Components
+#+BEGIN_SRC typescript
+// OLD: Web-Buddy Server
+import { WebBuddyServer } from '@web-buddy/server';
+
+// NEW: Semantest Server
+import { WebBuddyServer } from '@semantest/nodejs.server';
+#+END_SRC
+
+## API Migration Examples
+
+### Google Search Migration
+
+#+BEGIN_SRC typescript
+// OLD: GoogleBuddyClient
+import { GoogleBuddyClient } from 'google-buddy';
+
+async function oldGoogleSearch() {
+  const client = new GoogleBuddyClient();
+  await client.initialize();
+  
+  const results = await client.search('TypeScript');
+  console.log(results);
+  
+  await client.cleanup();
+}
+
+// NEW: GoogleClient (Enhanced)
+import { GoogleClient } from '@semantest/google.com';
+
+async function newGoogleSearch() {
+  const client = new GoogleClient({
+    timeout: 30000,
+    retryAttempts: 3
+  });
+  await client.initialize();
+  
+  const results = await client.search('TypeScript', {
+    maxResults: 10,
+    language: 'en',
+    timeRange: 'month'
+  });
+  
+  console.log(`Found ${results.length} results`);
+  results.forEach(result => {
+    console.log(`${result.title}: ${result.url}`);
+  });
+  
+  await client.cleanup();
+}
+
+// COMPATIBILITY: Old API still works
+import { GoogleBuddyClient } from '@semantest/google.com';
+
+async function compatibilityExample() {
+  // This still works exactly as before
+  const client = new GoogleBuddyClient();
+  await client.initialize();
+  const results = await client.search('TypeScript');
+  await client.cleanup();
+}
+#+END_SRC
+
+### ChatGPT Conversation Migration
+
+#+BEGIN_SRC typescript
+// OLD: ChatGPTBuddyClient
+import { ChatGPTBuddyClient } from 'chatgpt-buddy';
+
+async function oldChatGPTUsage() {
+  const client = new ChatGPTBuddyClient();
+  await client.initialize();
+  
+  await client.sendMessage('Hello!');
+  const response = await client.getResponse();
+  
+  await client.cleanup();
+}
+
+// NEW: ChatGPTClient (Enhanced)
+import { ChatGPTClient } from '@semantest/chatgpt.com';
+
+async function newChatGPTUsage() {
+  const client = new ChatGPTClient({
+    timeout: 60000,
+    autoSave: true
+  });
+  await client.initialize();
+  
+  // Enhanced project management
+  const project = await client.createProject('My Research', 'AI Research Project');
+  await client.selectProject(project.id);
+  
+  // Enhanced conversation management
+  const conversation = await client.startConversation('Technical Discussion');
+  
+  await client.sendPrompt('Explain TypeScript decorators');
+  const response = await client.getLatestResponse();
+  
+  // New capabilities
+  const history = await client.getConversationHistory();
+  const exported = await client.exportConversation('markdown');
+  
+  await client.cleanup();
+}
+
+// COMPATIBILITY: Old API still works
+import { ChatGPTBuddyClient } from '@semantest/chatgpt.com';
+
+async function compatibilityExample() {
+  const client = new ChatGPTBuddyClient();
+  await client.initialize();
+  
+  // Old methods work unchanged
+  await client.sendMessage('Hello!');
+  const response = await client.getResponse();
+  
+  await client.cleanup();
+}
+#+END_SRC
+
+### Wikipedia Research Migration
+
+#+BEGIN_SRC typescript
+// OLD: WikipediaBuddyClient  
+import { WikipediaBuddyClient } from 'wikipedia-buddy';
+
+async function oldWikipediaUsage() {
+  const client = new WikipediaBuddyClient();
+  await client.initialize();
+  
+  await client.goToArticle('Machine Learning');
+  const content = await client.getArticleContent();
+  
+  await client.cleanup();
+}
+
+// NEW: WikipediaClient (Enhanced)
+import { WikipediaClient } from '@semantest/wikipedia.org';
+import { ArticleId, WikiURL } from '@semantest/wikipedia.org';
+
+async function newWikipediaUsage() {
+  const client = new WikipediaClient({
+    language: 'en',
+    cacheEnabled: true
+  });
+  await client.initialize();
+  
+  // Enhanced article management
+  const article = await client.navigateToArticle('Machine Learning');
+  
+  console.log(`Article: ${article.title}`);
+  console.log(`Word count: ${article.getWordCount()}`);
+  console.log(`Sections: ${article.sections.length}`);
+  
+  // Work with value objects
+  const articleId = ArticleId.fromTitle('Deep Learning');
+  const url = WikiURL.forArticle(articleId);
+  
+  // Enhanced content extraction
+  const sections = article.sections;
+  const introduction = article.getSection('Introduction');
+  const related = await client.getRelatedArticles();
+  
+  await client.cleanup();
+}
+
+// COMPATIBILITY: Old API still works
+import { WikipediaBuddyClient } from '@semantest/wikipedia.org';
+
+async function compatibilityExample() {
+  const client = new WikipediaBuddyClient();
+  await client.initialize();
+  
+  // Old methods work unchanged
+  await client.goToArticle('Machine Learning');
+  const content = await client.getArticleContent();
+  
+  await client.cleanup();
+}
+#+END_SRC
+
+## Configuration Migration
+
+### Package.json Updates
+
+#+BEGIN_SRC json
+{
+  "dependencies": {
+    // OLD: Remove these gradually
+    "chatgpt-buddy": "^0.9.0",
+    "google-buddy": "^0.9.0", 
+    "wikipedia-buddy": "^0.9.0",
+    "@web-buddy/core": "^0.9.0",
+    "@web-buddy/server": "^0.9.0",
+    
+    // NEW: Add these
+    "@semantest/browser": "^1.0.0",
+    "@semantest/google.com": "^1.0.0",
+    "@semantest/chatgpt.com": "^1.0.0",
+    "@semantest/wikipedia.org": "^1.0.0",
+    "@semantest/nodejs.server": "^1.0.0",
+    
+    // Foundation libraries (new)
+    "typescript-eda-domain": "^1.0.0",
+    "typescript-eda-infrastructure": "^1.0.0",
+    "typescript-eda-application": "^1.0.0"
+  }
+}
+#+END_SRC
+
+### TypeScript Configuration
+
+#+BEGIN_SRC json
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "commonjs",
+    "lib": ["ES2020", "DOM"],
+    "strict": true,
+    "esModuleInterop": true,
+    
+    // NEW: Required for Semantest
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    
+    "baseUrl": ".",
+    "paths": {
+      // NEW: Semantest path mappings
+      "@semantest/*": ["node_modules/@semantest/*"],
+      "@/*": ["src/*"]
+    }
+  }
+}
+#+END_SRC
+
+## Test Migration
+
+### Jest Configuration Updates
+
+#+BEGIN_SRC javascript
+// OLD: jest.config.js
+module.exports = {
+  preset: 'ts-jest',
+  testEnvironment: 'node',
+  testMatch: ['**/__tests__/**/*.test.ts'],
+  moduleNameMapping: {
+    // OLD mappings
+    '^chatgpt-buddy$': '<rootDir>/node_modules/chatgpt-buddy',
+  }
+};
+
+// NEW: jest.config.js  
+module.exports = {
+  preset: 'ts-jest',
+  testEnvironment: 'node',
+  testMatch: ['**/__tests__/**/*.test.ts'],
+  moduleNameMapping: {
+    // NEW: Semantest mappings
+    '^@semantest/(.*)$': '<rootDir>/node_modules/@semantest/$1',
+    '^@/(.*)$': '<rootDir>/src/$1'
+  },
+  setupFilesAfterEnv: ['<rootDir>/src/test-setup.ts']
+};
+#+END_SRC
+
+### Test Code Migration
+
+#+BEGIN_SRC typescript
+// OLD: test file
+import { GoogleBuddyClient } from 'google-buddy';
+
+describe('Google Search Tests', () => {
+  let client: GoogleBuddyClient;
+  
+  beforeEach(async () => {
+    client = new GoogleBuddyClient();
+    await client.initialize();
+  });
+  
+  test('should search successfully', async () => {
+    const results = await client.search('test');
+    expect(results.length).toBeGreaterThan(0);
+  });
+});
+
+// NEW: enhanced test file
+import { GoogleClient } from '@semantest/google.com';
+import { SearchRequestedEvent, SearchCompletedEvent } from '@semantest/google.com';
+
+describe('Google Search Tests', () => {
+  let client: GoogleClient;
+  
+  beforeEach(async () => {
+    client = new GoogleClient({
+      timeout: 30000,
+      retryAttempts: 2
+    });
+    await client.initialize();
+  });
+  
+  afterEach(async () => {
+    await client.cleanup();
+  });
+  
+  test('should search successfully with enhanced options', async () => {
+    const results = await client.search('TypeScript', {
+      maxResults: 5,
+      language: 'en'
+    });
+    
+    expect(results.length).toBeGreaterThan(0);
+    expect(results.length).toBeLessThanOrEqual(5);
+    
+    // Test enhanced result structure
+    results.forEach(result => {
+      expect(result).toHaveProperty('title');
+      expect(result).toHaveProperty('url');
+      expect(result).toHaveProperty('snippet');
+      expect(result).toHaveProperty('position');
+    });
+  });
+  
+  test('should emit search events', async () => {
+    const events: any[] = [];
+    
+    client.on('searchRequested', (event: SearchRequestedEvent) => {
+      events.push({ type: 'requested', query: event.query });
+    });
+    
+    client.on('searchCompleted', (event: SearchCompletedEvent) => {
+      events.push({ type: 'completed', results: event.results.length });
+    });
+    
+    await client.search('test query');
+    
+    expect(events).toHaveLength(2);
+    expect(events[0].type).toBe('requested');
+    expect(events[1].type).toBe('completed');
+  });
+});
+#+END_SRC
+
+* Advanced Migration Scenarios
+
+## Custom Extensions Migration
+
+#+BEGIN_SRC typescript
+// OLD: Custom Web-Buddy extension
+import { WebBuddyExtension } from '@web-buddy/core';
+
+class CustomExtension extends WebBuddyExtension {
+  async handleMessage(message: any) {
+    // Custom logic
+  }
+}
+
+// NEW: Custom Semantest extension using TypeScript-EDA
+import { Application } from 'typescript-eda-application';
+import { Listen } from 'typescript-eda-infrastructure';
+
+class CustomApplication extends Application {
+  @Listen('CustomEvent')
+  async handleCustomEvent(event: CustomEvent) {
+    // Enhanced event-driven logic
+  }
+  
+  @Listen('SearchRequestedEvent')  
+  async handleSearchRequested(event: SearchRequestedEvent) {
+    // React to search events
+  }
+}
+#+END_SRC
+
+## Server Integration Migration
+
+#+BEGIN_SRC typescript
+// OLD: Web-Buddy server setup
+import { WebBuddyServer } from '@web-buddy/server';
+
+const server = new WebBuddyServer({
+  port: 3000
+});
+
+server.on('message', (message) => {
+  // Handle messages
+});
+
+await server.start();
+
+// NEW: Enhanced Semantest server
+import { WebBuddyServer } from '@semantest/nodejs.server';
+
+const server = new WebBuddyServer({
+  port: 3000,
+  cors: { 
+    origin: 'https://yourdomain.com' 
+  },
+  websocket: {
+    pingInterval: 30000,
+    maxConnections: 1000
+  },
+  auth: {
+    enabled: true,
+    strategy: 'jwt'
+  }
+});
+
+// Enhanced event handling
+server.on('clientConnected', (clientInfo) => {
+  console.log(`Client connected: ${clientInfo.id}`);
+});
+
+server.on('messageReceived', (message) => {
+  // Enhanced message routing
+});
+
+await server.start();
+#+END_SRC
+
+* Migration Validation
+
+## Validation Checklist
+
+- [ ] All packages installed correctly
+- [ ] TypeScript configuration updated  
+- [ ] Tests pass with new packages
+- [ ] Import statements updated
+- [ ] Event listeners migrated
+- [ ] Error handling updated
+- [ ] Documentation updated
+- [ ] Performance benchmarks maintained
+
+## Automated Validation
+
+#+BEGIN_SRC bash
+# Run migration validation
+semantest-migrate validate ./your-project
+
+# Check for breaking changes
+semantest-migrate compatibility-check ./your-project
+
+# Performance comparison
+semantest-migrate benchmark ./your-project
+#+END_SRC
+
+## Validation Script Example
+
+#+BEGIN_SRC typescript
+// migration-validation.ts
+import { GoogleClient } from '@semantest/google.com';
+import { ChatGPTClient } from '@semantest/chatgpt.com';
+import { WikipediaClient } from '@semantest/wikipedia.org';
+
+async function validateMigration() {
+  console.log('🧪 Validating Semantest migration...');
+
+  const tests = [
+    async () => {
+      const client = new GoogleClient();
+      await client.initialize();
+      const results = await client.search('test');
+      await client.cleanup();
+      return results.length > 0;
+    },
+    
+    async () => {
+      const client = new ChatGPTClient();
+      await client.initialize();
+      await client.startConversation('Test');
+      await client.cleanup();
+      return true;
+    },
+    
+    async () => {
+      const client = new WikipediaClient();
+      await client.initialize();
+      const article = await client.navigateToArticle('Test');
+      await client.cleanup();
+      return article.title.length > 0;
+    }
+  ];
+
+  for (let i = 0; i < tests.length; i++) {
+    try {
+      const passed = await tests[i]();
+      console.log(`✅ Test ${i + 1}: ${passed ? 'PASSED' : 'FAILED'}`);
+    } catch (error) {
+      console.log(`❌ Test ${i + 1}: FAILED - ${error.message}`);
+    }
+  }
+
+  console.log('✅ Migration validation completed');
+}
+
+validateMigration().catch(console.error);
+#+END_SRC
+
+* Troubleshooting
+
+## Common Migration Issues
+
+### Import Resolution Errors
+
+**Problem**: Cannot resolve @semantest/* imports
+**Solution**:
+#+BEGIN_SRC bash
+# Clear node_modules and reinstall
+rm -rf node_modules package-lock.json
+npm install
+
+# Verify TypeScript paths configuration
+npx tsc --showConfig
+#+END_SRC
+
+### Decorator Compilation Errors
+
+**Problem**: Decorators are not enabled
+**Solution**:
+#+BEGIN_SRC json
+// tsconfig.json
+{
+  "compilerOptions": {
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true
+  }
+}
+#+END_SRC
+
+### Event Handler Migration
+
+**Problem**: Old event handlers not working
+**Solution**:
+#+BEGIN_SRC typescript
+// OLD: String-based events  
+client.on('search-completed', handler);
+
+// NEW: Type-safe events
+client.on('searchCompleted', handler);
+
+// Or use the new event system
+@Listen('SearchCompletedEvent')
+async handleSearchCompleted(event: SearchCompletedEvent) {
+  // Handle event
+}
+#+END_SRC
+
+### Performance Regression
+
+**Problem**: Slower performance after migration
+**Solution**:
+#+BEGIN_SRC typescript
+// Enable caching and optimization
+const client = new GoogleClient({
+  cacheResults: true,
+  parallelRequests: 3,
+  timeout: 30000
+});
+#+END_SRC
+
+## Getting Help
+
+### Community Support
+- [[https://github.com/rydnr/chatgpt-buddy/discussions][GitHub Discussions]]
+- [[https://github.com/rydnr/chatgpt-buddy/issues][GitHub Issues]]
+- [[file:../troubleshooting/README.org][Troubleshooting Guide]]
+
+### Migration Support
+- Email: migration-support@semantest.com  
+- Documentation: [[file:../community/README.org][Community Hub]]
+- Examples: [[file:../examples/README.org][Example Applications]]
+
+* Post-Migration Benefits
+
+## Immediate Benefits
+- ✅ Enhanced type safety with TypeScript-EDA
+- ✅ Improved error handling and debugging
+- ✅ Better performance with caching and optimization
+- ✅ Event-driven architecture benefits
+
+## Long-term Benefits  
+- 🚀 Access to new Semantest features
+- 🔗 Plugin marketplace integration
+- ☁️ Cloud deployment capabilities
+- 🤖 AI learning system integration
+
+## Exclusive Semantest Features
+
+Once migrated, you gain access to:
+
+### Contract-Based Testing
+#+BEGIN_SRC typescript
+import { SemanTestClient } from '@semantest/browser';
+
+const client = new SemanTestClient();
+const contracts = await client.discoverCapabilities('google.com');
+
+// Validate contracts automatically
+for (const contract of contracts) {
+  const result = await client.validateContract(contract);
+  console.log(`Contract ${contract.title}: ${result.isValid ? 'VALID' : 'INVALID'}`);
+}
+#+END_SRC
+
+### Advanced Monitoring
+#+BEGIN_SRC typescript
+import { AutomationMonitor } from '@semantest/monitoring';
+
+const monitor = new AutomationMonitor();
+monitor.trackPerformance(true);
+monitor.trackErrors(true);
+
+// Real-time automation health dashboard
+monitor.startDashboard();
+#+END_SRC
+
+### Plugin Ecosystem
+#+BEGIN_SRC bash
+# Install community plugins
+npm install @semantest/github.com
+npm install @semantest/slack.com
+npm install @semantest/gmail.com
+#+END_SRC
+
+* Migration Completion
+
+## Final Steps
+
+1. **Remove Legacy Dependencies**
+   #+BEGIN_SRC bash
+   npm uninstall chatgpt-buddy google-buddy wikipedia-buddy
+   npm uninstall @web-buddy/core @web-buddy/server
+   #+END_SRC
+
+2. **Update Documentation**
+   - Update README files
+   - Update API documentation  
+   - Update team onboarding guides
+
+3. **Team Training**
+   - Share migration guide with team
+   - Conduct training sessions on new features
+   - Update development workflows
+
+4. **Celebration** 🎉
+   - You've successfully migrated to Semantest!
+   - Share your success story with the community
+   - Explore new Semantest capabilities
+
+## Success Metrics
+
+Track your migration success:
+- ✅ All tests passing
+- ✅ Performance maintained or improved  
+- ✅ Team productivity maintained
+- ✅ New features being utilized
+- ✅ Community engagement increased
+
+---
+
+**Congratulations on migrating to Semantest!** You're now part of the next generation of semantic web automation. Welcome to the future! 🚀
+
+For ongoing support and to share your migration experience, visit our [[file:../community/README.org][Community Hub]].

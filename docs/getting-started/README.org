@@ -1,0 +1,490 @@
+# Semantest Getting Started Guide
+
+#+TITLE: Getting Started with Semantest
+#+AUTHOR: Semantest Development Team
+#+DATE: 2025-07-06
+
+* Introduction
+
+Welcome to Semantest - the next generation of semantic web automation. This guide will help you get up and running with intelligent, contract-driven browser automation in minutes.
+
+* What You'll Learn
+
+By the end of this guide, you'll be able to:
+
+- Install and configure Semantest packages
+- Create your first semantic automation contract
+- Execute cross-browser automation workflows
+- Integrate with existing TypeScript projects
+- Understand the event-driven architecture
+
+* Prerequisites
+
+** System Requirements
+
+- Node.js 18+ or 20+
+- TypeScript 5.0+
+- Modern web browser (Chrome, Firefox, or Safari)
+- Basic understanding of async/await patterns
+
+** Optional but Recommended
+
+- Experience with event-driven architectures
+- Familiarity with domain-driven design patterns
+- Understanding of browser automation concepts
+
+* Installation
+
+** Core Package Installation
+
+#+BEGIN_SRC bash
+# Create a new project
+mkdir my-semantest-project
+cd my-semantest-project
+npm init -y
+
+# Install TypeScript and core dependencies
+npm install -D typescript @types/node
+npm install @semantest/browser
+#+END_SRC
+
+** Domain-Specific Packages
+
+Choose the domains you need to automate:
+
+#+BEGIN_SRC bash
+# Google Search automation
+npm install @semantest/google.com
+
+# ChatGPT conversation management
+npm install @semantest/chatgpt.com
+
+# Wikipedia content extraction
+npm install @semantest/wikipedia.org
+#+END_SRC
+
+** TypeScript Configuration
+
+Create =tsconfig.json=:
+
+#+BEGIN_SRC json
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "commonjs",
+    "lib": ["ES2020", "DOM"],
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "declaration": true,
+    "sourceMap": true
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist"]
+}
+#+END_SRC
+
+* Your First Semantic Automation
+
+** Basic Google Search Example
+
+Create =src/basic-search.ts=:
+
+#+BEGIN_SRC typescript
+import { GoogleClient } from '@semantest/google.com';
+
+async function basicGoogleSearch() {
+  // Initialize the Google automation client
+  const client = new GoogleClient();
+  await client.initialize();
+
+  try {
+    // Perform semantic search - no CSS selectors needed
+    console.log('Searching for TypeScript tutorials...');
+    const results = await client.search('TypeScript beginner tutorials');
+    
+    console.log(`Found ${results.length} results:`);
+    results.slice(0, 5).forEach((result, index) => {
+      console.log(`${index + 1}. ${result.title}`);
+      console.log(`   ${result.url}`);
+      console.log(`   ${result.snippet}\n`);
+    });
+
+  } catch (error) {
+    console.error('Search failed:', error);
+  } finally {
+    await client.cleanup();
+  }
+}
+
+// Run the example
+basicGoogleSearch().catch(console.error);
+#+END_SRC
+
+** Running Your First Example
+
+#+BEGIN_SRC bash
+# Compile TypeScript
+npx tsc
+
+# Run the example
+node dist/basic-search.js
+#+END_SRC
+
+* Understanding Semantic Contracts
+
+** What is a Semantic Contract?
+
+A semantic contract defines what an application can do without specifying how to do it. Instead of brittle CSS selectors, you work with meaningful capabilities:
+
+#+BEGIN_SRC typescript
+// Traditional approach (brittle)
+await page.click('#search-button');
+await page.waitForSelector('.result-item:nth-child(1)');
+
+// Semantic approach (robust)
+const results = await client.search('machine learning');
+const firstResult = results[0];
+#+END_SRC
+
+** Contract Discovery
+
+Semantest automatically discovers available contracts:
+
+#+BEGIN_SRC typescript
+import { SemanTestClient } from '@semantest/browser';
+
+const client = new SemanTestClient();
+await client.initialize();
+
+// Discover what capabilities are available
+const contracts = await client.discoverCapabilities('google.com');
+console.log('Available capabilities:', contracts.map(c => c.name));
+#+END_SRC
+
+* Advanced Examples
+
+** Multi-Domain Research Workflow
+
+Create =src/research-workflow.ts=:
+
+#+BEGIN_SRC typescript
+import { GoogleClient } from '@semantest/google.com';
+import { WikipediaClient } from '@semantest/wikipedia.org';
+import { ChatGPTClient } from '@semantest/chatgpt.com';
+
+async function researchWorkflow(topic: string) {
+  const google = new GoogleClient();
+  const wikipedia = new WikipediaClient();
+  const chatgpt = new ChatGPTClient();
+
+  await Promise.all([
+    google.initialize(),
+    wikipedia.initialize(),
+    chatgpt.initialize()
+  ]);
+
+  try {
+    // 1. Search for the topic
+    console.log(`Researching: ${topic}`);
+    const searchResults = await google.search(topic);
+    
+    // 2. Get Wikipedia article
+    await wikipedia.navigateToArticle(topic);
+    const article = await wikipedia.extractCurrentArticle();
+    
+    // 3. Generate summary with ChatGPT
+    if (article) {
+      const prompt = `Summarize this Wikipedia article about ${topic}:\n\n${article.summary}`;
+      await chatgpt.sendPrompt(prompt);
+      const summary = await chatgpt.getLatestResponse();
+      
+      console.log('AI Summary:', summary);
+    }
+
+  } finally {
+    await Promise.all([
+      google.cleanup(),
+      wikipedia.cleanup(),
+      chatgpt.cleanup()
+    ]);
+  }
+}
+
+// Run research on artificial intelligence
+researchWorkflow('artificial intelligence').catch(console.error);
+#+END_SRC
+
+** Event-Driven Automation
+
+Leverage the event-driven architecture for complex workflows:
+
+#+BEGIN_SRC typescript
+import { GoogleClient } from '@semantest/google.com';
+import { SearchRequestedEvent, SearchCompletedEvent } from '@semantest/google.com';
+
+class SearchAnalyzer {
+  private client: GoogleClient;
+
+  constructor() {
+    this.client = new GoogleClient();
+  }
+
+  async initialize() {
+    await this.client.initialize();
+    
+    // Listen for search events
+    this.client.on('searchCompleted', this.analyzeResults.bind(this));
+  }
+
+  private async analyzeResults(event: SearchCompletedEvent) {
+    const results = event.getResults();
+    console.log(`Analyzed ${results.length} results`);
+    
+    // Perform additional analysis
+    const domains = new Set(results.map(r => new URL(r.url).hostname));
+    console.log(`Results from ${domains.size} unique domains`);
+  }
+
+  async searchAndAnalyze(query: string) {
+    return await this.client.search(query);
+  }
+}
+
+// Usage
+async function eventDrivenExample() {
+  const analyzer = new SearchAnalyzer();
+  await analyzer.initialize();
+  
+  await analyzer.searchAndAnalyze('semantic web automation');
+}
+
+eventDrivenExample().catch(console.error);
+#+END_SRC
+
+* Testing Your Automation
+
+** Unit Testing with Jest
+
+Install testing dependencies:
+
+#+BEGIN_SRC bash
+npm install -D jest @types/jest ts-jest
+#+END_SRC
+
+Create =jest.config.js=:
+
+#+BEGIN_SRC javascript
+module.exports = {
+  preset: 'ts-jest',
+  testEnvironment: 'node',
+  testMatch: ['**/__tests__/**/*.test.ts'],
+  collectCoverageFrom: [
+    'src/**/*.ts',
+    '!src/**/*.d.ts',
+  ],
+};
+#+END_SRC
+
+Create =src/__tests__/google-search.test.ts=:
+
+#+BEGIN_SRC typescript
+import { GoogleClient } from '@semantest/google.com';
+
+describe('Google Search Automation', () => {
+  let client: GoogleClient;
+
+  beforeEach(async () => {
+    client = new GoogleClient();
+    await client.initialize();
+  });
+
+  afterEach(async () => {
+    await client.cleanup();
+  });
+
+  test('should perform basic search', async () => {
+    const results = await client.search('TypeScript testing');
+    
+    expect(results).toBeDefined();
+    expect(results.length).toBeGreaterThan(0);
+    expect(results[0]).toHaveProperty('title');
+    expect(results[0]).toHaveProperty('url');
+  });
+
+  test('should handle empty search results gracefully', async () => {
+    const results = await client.search('xyzabc123nonexistentterm999');
+    
+    expect(results).toBeDefined();
+    expect(Array.isArray(results)).toBe(true);
+  });
+});
+#+END_SRC
+
+Run tests:
+
+#+BEGIN_SRC bash
+npx jest
+#+END_SRC
+
+* Best Practices
+
+** Project Structure
+
+Organize your Semantest project for maintainability:
+
+#+BEGIN_SRC text
+my-semantest-project/
+├── src/
+│   ├── automation/
+│   │   ├── google/
+│   │   ├── chatgpt/
+│   │   └── wikipedia/
+│   ├── contracts/
+│   ├── workflows/
+│   └── __tests__/
+├── dist/
+├── tsconfig.json
+├── jest.config.js
+└── package.json
+#+END_SRC
+
+** Error Handling
+
+Always implement comprehensive error handling:
+
+#+BEGIN_SRC typescript
+import { GoogleClient } from '@semantest/google.com';
+import { AutomationError, NetworkError } from '@semantest/browser';
+
+async function robustSearch(query: string) {
+  const client = new GoogleClient();
+  
+  try {
+    await client.initialize();
+    return await client.search(query);
+    
+  } catch (error) {
+    if (error instanceof NetworkError) {
+      console.log('Network issue, retrying...');
+      // Implement retry logic
+    } else if (error instanceof AutomationError) {
+      console.log('Automation failed:', error.message);
+      // Handle automation-specific errors
+    } else {
+      console.error('Unexpected error:', error);
+    }
+    throw error;
+  } finally {
+    await client.cleanup();
+  }
+}
+#+END_SRC
+
+** Performance Optimization
+
+Optimize your automation for speed and reliability:
+
+#+BEGIN_SRC typescript
+import { GoogleClient } from '@semantest/google.com';
+
+// Configure client for optimal performance
+const client = new GoogleClient({
+  timeout: 30000,           // 30 second timeout
+  retryAttempts: 3,         // Retry failed operations
+  cacheResults: true,       // Cache search results
+  parallelRequests: 2       // Limit concurrent requests
+});
+
+// Use batch operations when possible
+const queries = ['AI', 'machine learning', 'deep learning'];
+const results = await client.batchSearch(queries);
+#+END_SRC
+
+* Migration from Web-Buddy
+
+If you're migrating from the legacy Web-Buddy framework:
+
+** Automated Migration
+
+#+BEGIN_SRC bash
+# Install migration tools
+npm install -D @semantest/migration-tools
+
+# Run automated migration
+npx semantest-migrate --input ./src --output ./src-migrated
+#+END_SRC
+
+** Manual Migration Example
+
+#+BEGIN_SRC typescript
+// Old Web-Buddy code
+import { ChatGPTBuddyClient } from 'chatgpt-buddy';
+
+// New Semantest code
+import { ChatGPTClient } from '@semantest/chatgpt.com';
+
+// The API is mostly compatible
+const client = new ChatGPTClient(); // Was: new ChatGPTBuddyClient()
+await client.initialize();
+await client.sendPrompt('Hello!');
+#+END_SRC
+
+* Troubleshooting
+
+** Common Issues
+
+*** Browser Not Found
+#+BEGIN_SRC bash
+# Install browser dependencies
+npx playwright install
+#+END_SRC
+
+*** TypeScript Compilation Errors
+#+BEGIN_SRC bash
+# Update TypeScript and regenerate types
+npm update typescript
+npx tsc --noEmit
+#+END_SRC
+
+*** Network Timeout Issues
+#+BEGIN_SRC typescript
+// Increase timeout in client configuration
+const client = new GoogleClient({
+  timeout: 60000 // 60 seconds
+});
+#+END_SRC
+
+** Getting Help
+
+- Check the [[file:../troubleshooting/README.org][Troubleshooting Guide]]
+- Search [[https://github.com/rydnr/chatgpt-buddy/issues][GitHub Issues]]
+- Ask in [[https://github.com/rydnr/chatgpt-buddy/discussions][GitHub Discussions]]
+
+* Next Steps
+
+Now that you have Semantest running:
+
+1. [[file:../examples/README.org][Explore Example Applications]]
+2. [[file:../api-reference/README.org][Read the API Reference]]
+3. [[file:../architecture/README.org][Understand the Architecture]]
+4. [[file:../contributing/README.org][Contribute to the Project]]
+
+* Learning Resources
+
+** Documentation
+- [[file:../api-reference/README.org][Complete API Reference]]
+- [[file:../architecture/README.org][Architecture Decision Records]]
+- [[file:../examples/README.org][Example Applications]]
+
+** Community
+- [[https://github.com/rydnr/chatgpt-buddy][GitHub Repository]]
+- [[https://github.com/rydnr/chatgpt-buddy/discussions][Community Discussions]]
+- [[file:../community/README.org][Community Hub]]
+
+Welcome to the future of semantic web automation! 🚀

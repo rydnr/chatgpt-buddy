@@ -1,0 +1,162 @@
+# Welcome to the Semantest Community
+
+#+TITLE: Semantest Community Hub
+#+AUTHOR: Semantest Community
+#+DATE: 2025-07-06
+
+* Overview
+
+Welcome to the Semantest ecosystem - a revolutionary platform for semantic web automation that transforms how developers approach browser automation and testing.
+
+* What is Semantest?
+
+Semantest represents a paradigm shift from fragile CSS selector-based automation to intelligent, contract-driven web automation. Instead of writing brittle tests that break when UI changes, you define semantic contracts that describe what your application can do, not how to do it.
+
+** Core Benefits
+
+- *Semantic Contracts*: Define automation capabilities through meaningful contracts
+- *AI-Assisted Implementation*: Leverage AI to implement and maintain automation
+- *Zero CSS Dependencies*: No more breaking tests due to CSS changes
+- *Multi-Domain Support*: Works across Google, ChatGPT, Wikipedia, and any website
+- *Event-Driven Architecture*: Built on proven TypeScript-EDA patterns
+
+* Getting Started
+
+** Quick Installation
+
+#+BEGIN_SRC bash
+# Install the core browser framework
+npm install @semantest/browser
+
+# Install domain-specific packages
+npm install @semantest/google.com
+npm install @semantest/chatgpt.com
+npm install @semantest/wikipedia.org
+#+END_SRC
+
+** Basic Usage Example
+
+#+BEGIN_SRC typescript
+import { SemanTestClient } from '@semantest/browser';
+import { GoogleClient } from '@semantest/google.com';
+
+const client = new GoogleClient();
+await client.initialize();
+
+// Semantic search - no CSS selectors needed
+const results = await client.search('TypeScript best practices');
+console.log(`Found ${results.length} results`);
+#+END_SRC
+
+* Community Resources
+
+** Documentation
+- [[file:../getting-started/README.org][Getting Started Guide]]
+- [[file:../api-reference/README.org][API Reference]]
+- [[file:../examples/README.org][Example Applications]]
+- [[file:../migration-guide/README.org][Migration from Web-Buddy]]
+
+** Examples & Tutorials
+- [[file:../examples/research-automation/README.org][Research Automation Workflow]]
+- [[file:../examples/competitive-intelligence/README.org][Competitive Intelligence]]
+- [[file:../examples/contract-validation/README.org][Contract Validation Demo]]
+
+** Development Resources
+- [[file:../architecture/README.org][Architecture Decision Records]]
+- [[file:../contributing/README.org][Contributing Guidelines]]
+- [[file:../troubleshooting/README.org][Troubleshooting Guide]]
+
+* Community Guidelines
+
+** Open Source Philosophy
+
+Semantest is committed to open source development under the GNU General Public License v3.0. We believe in:
+
+- *Transparency*: All development happens in the open
+- *Collaboration*: Community contributions drive innovation
+- *Accessibility*: Tools should be available to everyone
+- *Quality*: Rigorous testing and architectural standards
+
+** How to Contribute
+
+1. *Start Small*: Begin with documentation improvements or bug reports
+2. *Domain Packages*: Create new @semantest packages for your favorite websites
+3. *Infrastructure*: Contribute to the TypeScript-EDA foundation
+4. *Testing*: Help expand our comprehensive test suite
+
+** Communication Channels
+
+- *GitHub Issues*: Bug reports and feature requests
+- *Discussions*: Community questions and ideas
+- *Documentation*: Improvements and examples
+
+* Ecosystem Packages
+
+** Core Framework
+- =@semantest/browser=: Core semantic automation framework
+- =@semantest/nodejs.server=: Server-side coordination and API gateway
+
+** Domain Implementations
+- =@semantest/google.com=: Google Search automation
+- =@semantest/chatgpt.com=: ChatGPT conversation management
+- =@semantest/wikipedia.org=: Wikipedia content extraction
+
+** Supporting Libraries
+- =typescript-eda-domain=: Domain modeling foundation
+- =typescript-eda-infrastructure=: Infrastructure adapters
+- =typescript-eda-application=: Application orchestration
+
+* Success Stories
+
+The Semantest ecosystem has already demonstrated success in:
+
+- *Research Automation*: Automated multi-source research workflows
+- *Competitive Analysis*: Intelligent competitor monitoring
+- *Content Generation*: AI-assisted content creation pipelines
+- *Testing Automation*: Robust cross-browser validation
+
+* Migration from Web-Buddy
+
+Existing Web-Buddy users can seamlessly migrate to Semantest:
+
+#+BEGIN_SRC bash
+# Install migration tools
+npm install @semantest/migration-tools
+
+# Run automated migration
+npx semantest-migrate ./your-project
+#+END_SRC
+
+All existing APIs continue to work during the transition period with full backward compatibility.
+
+* Future Roadmap
+
+** Phase 7: Cloud Integration (Q3 2025)
+- Secure cloud orchestration
+- MCP (Model Context Protocol) bridge
+- Enterprise deployment options
+
+** Phase 8: AI Learning System (Q4 2025)
+- Automated contract generation
+- Self-healing automation
+- Intelligent pattern recognition
+
+** Phase 9: Plugin Marketplace (Q1 2026)
+- Community plugin ecosystem
+- Commercial plugin distribution
+- Enterprise plugin management
+
+* Join the Community
+
+Ready to revolutionize web automation? Start your Semantest journey today:
+
+1. [[file:../getting-started/README.org][Read the Getting Started Guide]]
+2. [[file:../examples/basic-usage/README.org][Try the Basic Usage Example]]
+3. [[https://github.com/rydnr/chatgpt-buddy][Star the Repository]]
+4. [[https://github.com/rydnr/chatgpt-buddy/discussions][Join the Discussion]]
+
+Together, we're building the future of intelligent web automation.
+
+---
+
+*Semantest - Where semantics meet testing, and automation becomes intelligent.*

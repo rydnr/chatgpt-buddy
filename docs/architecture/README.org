@@ -1,0 +1,1341 @@
+# Semantest Architecture Documentation
+
+#+TITLE: Semantest Architecture Documentation
+#+AUTHOR: Semantest Development Team
+#+DATE: 2025-07-06
+
+* Overview
+
+This document provides a comprehensive overview of the Semantest platform architecture, design decisions, and implementation patterns. Semantest is built on proven software engineering principles including Domain-Driven Design (DDD), Hexagonal Architecture, and Event-Driven Architecture (EDA).
+
+* Architectural Principles
+
+** Core Principles
+
+1. **Semantic Over Syntactic**: Focus on what applications can do, not how they do it
+2. **Contract-Driven**: Automation capabilities defined through formal contracts
+3. **Event-Driven**: All interactions flow through domain events
+4. **Domain-Centric**: Business logic isolated from infrastructure concerns
+5. **Type-Safe**: Comprehensive TypeScript typing throughout
+6. **Test-Driven**: All functionality validated through automated tests
+
+** Design Patterns
+
+- **Hexagonal Architecture**: Clean separation between domain and infrastructure
+- **Domain-Driven Design**: Rich domain models with proper aggregates and entities
+- **Event Sourcing**: Important state changes captured as domain events
+- **CQRS**: Separation of read and write operations where beneficial
+- **Repository Pattern**: Consistent data access abstractions
+
+* System Architecture
+
+** High-Level Overview
+
+#+BEGIN_SRC text
+┌─────────────────────────────────────────────────────────────┐
+│                    Semantest Platform                      │
+├─────────────────────────────────────────────────────────────┤
+│  Client Layer                                              │
+│  ┌─────────────────┐ ┌─────────────────┐ ┌──────────────┐  │
+│  │   Google.com    │ │   ChatGPT.com   │ │ Wikipedia.org│  │
+│  │     Client      │ │     Client      │ │    Client    │  │
+│  └─────────────────┘ └─────────────────┘ └──────────────┘  │
+├─────────────────────────────────────────────────────────────┤
+│  Application Layer                                         │
+│  ┌─────────────────┐ ┌─────────────────┐ ┌──────────────┐  │
+│  │     Google      │ │     ChatGPT     │ │  Wikipedia   │  │
+│  │  Application    │ │  Application    │ │ Application  │  │
+│  └─────────────────┘ └─────────────────┘ └──────────────┘  │
+├─────────────────────────────────────────────────────────────┤
+│  Domain Layer                                              │
+│  ┌─────────────────────────────────────────────────────────┐│
+│  │           Semantic Automation Domain                   ││
+│  │  Entities • Value Objects • Domain Events • Services  ││
+│  └─────────────────────────────────────────────────────────┘│
+├─────────────────────────────────────────────────────────────┤
+│  Infrastructure Layer                                      │
+│  ┌─────────────────┐ ┌─────────────────┐ ┌──────────────┐  │
+│  │   WebSocket     │ │      DOM        │ │   Browser    │  │
+│  │  Communication │ │   Interaction   │ │   Automation │  │
+│  └─────────────────┘ └─────────────────┘ └──────────────┘  │
+└─────────────────────────────────────────────────────────────┘
+#+END_SRC
+
+** Layer Responsibilities
+
+*** Client Layer
+- User-facing APIs for developers
+- High-level automation workflows
+- Backward compatibility with legacy interfaces
+- Error handling and result formatting
+
+*** Application Layer  
+- Orchestrates domain operations
+- Handles cross-cutting concerns (logging, monitoring)
+- Event routing and coordination
+- Transaction boundaries
+
+*** Domain Layer
+- Core business logic and rules
+- Domain entities and value objects
+- Domain events and services
+- Contract definitions and validation
+
+*** Infrastructure Layer
+- External system integrations
+- Browser automation implementations
+- Network communication
+- Data persistence and caching
+
+* TypeScript-EDA Foundation
+
+** Foundation Architecture
+
+Semantest is built on the TypeScript-EDA foundation, providing:
+
+#+BEGIN_SRC typescript
+// Domain modeling foundation
+export abstract class Entity<T> {
+  protected readonly _id: string;
+  protected props: T;
+  
+  protected constructor(props: T, id?: string);
+  get id(): string;
+  equals(entity: Entity<any>): boolean;
+}
+
+export abstract class ValueObject<T> {
+  protected readonly props: T;
+  
+  protected constructor(props: T);
+  equals(obj: ValueObject<T>): boolean;
+}
+
+export abstract class Event {
+  public readonly occurredOn: Date;
+  
+  constructor(occurredOn?: Date);
+  public abstract get type(): string;
+  public abstract get correlationId(): string;
+  public abstract toJSON(): Record<string, unknown>;
+}
+#+END_SRC
+
+** Event-Driven Communication
+
+All inter-component communication uses domain events:
+
+#+BEGIN_SRC typescript
+// Event flow example
+┌──────────────┐    SearchRequestedEvent    ┌─────────────────┐
+│ GoogleClient │ ──────────────────────────▶ │ GoogleApplication│
+└──────────────┘                            └─────────────────┘
+                                                      │
+                                                      ▼
+                                            ┌─────────────────┐
+                                            │  GoogleDOMAdapter│
+                                            └─────────────────┘
+                                                      │
+                 SearchCompletedEvent                 ▼
+┌──────────────┐ ◀──────────────────────────────────────────
+│ GoogleClient │
+└──────────────┘
+#+END_SRC
+
+* Domain Architecture
+
+** Semantic Automation Domain
+
+*** Core Entities
+
+#+BEGIN_SRC typescript
+// SemanTestContract: Defines automation capabilities
+export class SemanTestContract extends Entity<SemanTestContractProps> {
+  static create(
+    id: string,
+    version: string, 
+    domain: string,
+    title: string,
+    capabilities: Record<string, SemanTestCapability>
+  ): SemanTestContract;
+  
+  validate(): ValidationResult;
+  getCapability(name: string): SemanTestCapability | undefined;
+  getDomain(): string;
+}
+
+// SemanTestCapability: Individual automation operation
+export class SemanTestCapability extends ValueObject<SemanTestCapabilityProps> {
+  static create(
+    name: string,
+    description: string,
+    parameters: SemanTestParameter[],
+    returnType: string
+  ): SemanTestCapability;
+  
+  validateParameters(args: Record<string, any>): ValidationResult;
+}
+#+END_SRC
+
+*** Domain-Specific Entities
+
+#+BEGIN_SRC typescript
+// Google Search Domain
+export class GoogleSearch extends Entity<GoogleSearchProps> {
+  static create(query: string, options: SearchOptions): GoogleSearch;
+  
+  get query(): string;
+  get options(): SearchOptions;
+  addResult(result: SearchResult): void;
+  getResults(): SearchResult[];
+}
+
+export class SearchResult extends Entity<SearchResultProps> {
+  static create(
+    title: string,
+    url: string, 
+    snippet: string,
+    position: number
+  ): SearchResult;
+  
+  get title(): string;
+  get url(): string;
+  get snippet(): string;
+  get position(): number;
+}
+
+// ChatGPT Conversation Domain  
+export class ChatGPTConversation extends Entity<ChatGPTConversationProps> {
+  static create(
+    id: string,
+    title: string,
+    projectId?: string
+  ): ChatGPTConversation;
+  
+  get title(): string;
+  get messages(): ConversationMessage[];
+  addMessage(message: ConversationMessage): void;
+  getLatestMessage(): ConversationMessage | undefined;
+}
+
+export class ConversationMessage extends Entity<ConversationMessageProps> {
+  static create(
+    content: string,
+    role: 'user' | 'assistant' | 'system',
+    conversationId: string
+  ): ConversationMessage;
+  
+  get content(): string;
+  get role(): 'user' | 'assistant' | 'system';
+  get timestamp(): Date;
+}
+
+// Wikipedia Research Domain
+export class WikiArticle extends Entity<WikiArticleProps> {
+  static create(
+    title: string,
+    url: string,
+    content: string,
+    summary: string,
+    sections: WikiSection[]
+  ): WikiArticle;
+  
+  get title(): string;
+  get sections(): WikiSection[];
+  getWordCount(): number;
+  getSection(title: string): WikiSection | undefined;
+}
+#+END_SRC
+
+*** Value Objects
+
+#+BEGIN_SRC typescript
+// Domain-specific value objects provide type safety and validation
+
+export class ConversationId extends ValueObject<ConversationIdProps> {
+  static create(value: string): ConversationId;
+  static generate(): ConversationId;
+  
+  get value(): string;
+  isValid(): boolean;
+}
+
+export class ArticleId extends ValueObject<ArticleIdProps> {
+  static fromTitle(title: string): ArticleId;
+  static fromURL(url: string): ArticleId;
+  
+  get value(): string;
+  get normalizedTitle(): string;
+}
+
+export class WikiURL extends ValueObject<WikiURLProps> {
+  static forArticle(articleId: ArticleId, language?: string): WikiURL;
+  static forSearch(query: string, language?: string): WikiURL;
+  
+  get value(): string;
+  get language(): string;
+  extractArticleId(): ArticleId;
+}
+#+END_SRC
+
+*** Domain Events
+
+#+BEGIN_SRC typescript
+// Google Search Events
+export class SearchRequestedEvent extends Event {
+  constructor(
+    private readonly query: string,
+    private readonly options: SearchOptions,
+    private readonly _correlationId: string
+  );
+  
+  get type(): string { return 'SearchRequestedEvent'; }
+  get correlationId(): string { return this._correlationId; }
+  get query(): string { return this.query; }
+  get options(): SearchOptions { return this.options; }
+}
+
+export class SearchCompletedEvent extends Event {
+  constructor(
+    private readonly search: GoogleSearch,
+    private readonly results: SearchResult[],
+    private readonly _correlationId: string
+  );
+  
+  get type(): string { return 'SearchCompletedEvent'; }
+  get search(): GoogleSearch { return this.search; }
+  get results(): SearchResult[] { return this.results; }
+}
+
+// ChatGPT Conversation Events
+export class ConversationStartedEvent extends Event {
+  constructor(
+    private readonly conversation: ChatGPTConversation,
+    private readonly _correlationId: string
+  );
+  
+  get type(): string { return 'ConversationStartedEvent'; }
+  get conversation(): ChatGPTConversation { return this.conversation; }
+}
+
+export class PromptSubmittedEvent extends Event {
+  constructor(
+    private readonly conversationId: string,
+    private readonly prompt: string,
+    private readonly _correlationId: string
+  );
+  
+  get type(): string { return 'PromptSubmittedEvent'; }
+  get conversationId(): string { return this.conversationId; }
+  get prompt(): string { return this.prompt; }
+}
+
+// Wikipedia Research Events
+export class ArticleRequestedEvent extends Event {
+  constructor(
+    private readonly title: string,
+    private readonly language: string,
+    private readonly _correlationId: string
+  );
+  
+  get type(): string { return 'ArticleRequestedEvent'; }
+  get title(): string { return this.title; }
+  get language(): string { return this.language; }
+}
+#+END_SRC
+
+* Application Architecture
+
+** Application Orchestration
+
+Each domain has an Application class that orchestrates domain operations:
+
+#+BEGIN_SRC typescript
+export class GoogleApplication extends Application {
+  constructor(
+    eventBus: EventBus,
+    private domAdapter: GoogleDOMAdapter,
+    private communicationAdapter: GoogleCommunicationAdapter
+  ) {
+    super(eventBus, new Map([
+      ['domAdapter', domAdapter],
+      ['communicationAdapter', communicationAdapter]
+    ]));
+  }
+  
+  @Listen('SearchRequestedEvent')
+  async handleSearchRequested(event: SearchRequestedEvent): Promise<void> {
+    try {
+      // 1. Create domain object
+      const search = GoogleSearch.create(event.query, event.options);
+      
+      // 2. Execute search via infrastructure
+      const rawResults = await this.domAdapter.performSearch(
+        event.query, 
+        event.options
+      );
+      
+      // 3. Create domain entities
+      const results = rawResults.map((raw, index) =>
+        SearchResult.create(raw.title, raw.url, raw.snippet, index + 1)
+      );
+      
+      // 4. Update search with results
+      results.forEach(result => search.addResult(result));
+      
+      // 5. Publish completion event
+      await this.publishEvent(new SearchCompletedEvent(
+        search,
+        results,
+        event.correlationId
+      ));
+      
+    } catch (error) {
+      await this.publishEvent(new SearchFailedEvent(
+        event.query,
+        error,
+        event.correlationId
+      ));
+    }
+  }
+  
+  @Listen('ImageSearchRequestedEvent')
+  async handleImageSearchRequested(event: ImageSearchRequestedEvent): Promise<void> {
+    // Similar pattern for image search
+  }
+}
+#+END_SRC
+
+** Application Benefits
+
+- **Separation of Concerns**: Domain logic isolated from infrastructure
+- **Event-Driven**: Loose coupling between components  
+- **Testability**: Easy to test with mocked adapters
+- **Extensibility**: New capabilities added through event handlers
+- **Monitoring**: All operations flow through observable events
+
+* Infrastructure Architecture
+
+** Communication Layer
+
+#+BEGIN_SRC typescript
+// Base communication adapter
+export class WebSocketCommunicationAdapter {
+  constructor(private url: string, private options: WebSocketOptions) {}
+  
+  async connect(): Promise<void>;
+  async disconnect(): Promise<void>;
+  
+  async sendMessage(
+    type: string,
+    payload: Record<string, any>,
+    options?: SendOptions
+  ): Promise<any>;
+  
+  async publishEvent(event: Event): Promise<void>;
+  
+  on(eventType: string, listener: Function): void;
+  off(eventType: string, listener: Function): void;
+}
+
+// Domain-specific communication adapters
+export class GoogleCommunicationAdapter extends WebSocketCommunicationAdapter {
+  async sendSearchRequest(query: string, options: SearchOptions): Promise<any>;
+  async sendImageSearchRequest(query: string): Promise<any>;
+}
+
+export class ChatGPTCommunicationAdapter extends WebSocketCommunicationAdapter {
+  async sendPrompt(conversationId: string, prompt: string): Promise<any>;
+  async createConversation(title: string): Promise<any>;
+  async uploadFile(file: File, description?: string): Promise<any>;
+}
+#+END_SRC
+
+** DOM Interaction Layer
+
+#+BEGIN_SRC typescript
+// Base DOM adapter
+export class DOMAdapter {
+  constructor(protected page: Page) {}
+  
+  protected async waitForSelector(selector: string, timeout?: number): Promise<ElementHandle>;
+  protected async click(selector: string): Promise<void>;
+  protected async type(selector: string, text: string): Promise<void>;
+  protected async getText(selector: string): Promise<string>;
+  
+  // Semantic element matching
+  protected async findByText(text: string): Promise<ElementHandle[]>;
+  protected async findByRole(role: string): Promise<ElementHandle[]>;
+  protected async findByLabel(label: string): Promise<ElementHandle[]>;
+}
+
+// Domain-specific DOM adapters
+export class GoogleDOMAdapter extends DOMAdapter {
+  private selectors = {
+    searchBox: '[name="q"]',
+    searchButton: '[name="btnK"]',
+    resultContainer: '#search',
+    resultItem: '[data-ved]',
+    resultTitle: 'h3',
+    resultSnippet: '.VwiC3b'
+  };
+  
+  async performSearch(query: string, options: SearchOptions): Promise<RawSearchResult[]> {
+    await this.navigateToGoogle();
+    await this.enterSearchQuery(query);
+    await this.submitSearch();
+    return await this.extractResults(options.maxResults);
+  }
+  
+  private async navigateToGoogle(): Promise<void> {
+    await this.page.goto('https://www.google.com');
+  }
+  
+  private async enterSearchQuery(query: string): Promise<void> {
+    await this.type(this.selectors.searchBox, query);
+  }
+  
+  private async submitSearch(): Promise<void> {
+    await this.click(this.selectors.searchButton);
+    await this.waitForSelector(this.selectors.resultContainer);
+  }
+  
+  private async extractResults(maxResults: number): Promise<RawSearchResult[]> {
+    const resultElements = await this.page.$$(this.selectors.resultItem);
+    const results: RawSearchResult[] = [];
+    
+    for (let i = 0; i < Math.min(resultElements.length, maxResults); i++) {
+      const element = resultElements[i];
+      
+      const title = await element.$eval(this.selectors.resultTitle, el => el.textContent);
+      const link = await element.$eval('a', el => el.href);
+      const snippet = await element.$eval(this.selectors.resultSnippet, el => el.textContent);
+      
+      results.push({ title, url: link, snippet });
+    }
+    
+    return results;
+  }
+}
+
+export class ChatGPTDOMAdapter extends DOMAdapter {
+  private selectors = {
+    newChatButton: '[data-testid="new-chat-button"]',
+    promptInput: '#prompt-textarea',
+    sendButton: '[data-testid="send-button"]',
+    messageContainer: '[data-testid="conversation-turn"]',
+    responseText: '.markdown'
+  };
+  
+  async sendPrompt(prompt: string): Promise<void> {
+    await this.type(this.selectors.promptInput, prompt);
+    await this.click(this.selectors.sendButton);
+    await this.waitForResponse();
+  }
+  
+  async getLatestResponse(): Promise<string> {
+    const messages = await this.page.$$(this.selectors.messageContainer);
+    const lastMessage = messages[messages.length - 1];
+    return await lastMessage.$eval(this.selectors.responseText, el => el.textContent);
+  }
+  
+  private async waitForResponse(): Promise<void> {
+    // Wait for response indicators to appear and disappear
+    await this.page.waitForSelector('[data-testid="loading-indicator"]');
+    await this.page.waitForSelector('[data-testid="loading-indicator"]', { state: 'hidden' });
+  }
+}
+#+END_SRC
+
+** Browser Automation Layer
+
+#+BEGIN_SRC typescript
+export class BrowserAutomationAdapter {
+  private browser: Browser | null = null;
+  private context: BrowserContext | null = null;
+  private page: Page | null = null;
+  
+  async initialize(options: BrowserOptions): Promise<void> {
+    this.browser = await playwright[options.browser].launch({
+      headless: options.headless,
+      devtools: options.devtools
+    });
+    
+    this.context = await this.browser.newContext({
+      viewport: options.viewport,
+      userAgent: options.userAgent
+    });
+    
+    this.page = await this.context.newPage();
+  }
+  
+  async cleanup(): Promise<void> {
+    if (this.page) await this.page.close();
+    if (this.context) await this.context.close();
+    if (this.browser) await this.browser.close();
+  }
+  
+  getPage(): Page {
+    if (!this.page) throw new Error('Browser not initialized');
+    return this.page;
+  }
+}
+#+END_SRC
+
+* Client Architecture
+
+** Client Design Patterns
+
+Clients provide high-level APIs while delegating to the application layer:
+
+#+BEGIN_SRC typescript
+export class GoogleClient {
+  private application: GoogleApplication;
+  private communicationAdapter: GoogleCommunicationAdapter;
+  private browserAdapter: BrowserAutomationAdapter;
+  private eventBus: EventBus;
+  
+  constructor(options?: GoogleClientOptions) {
+    this.eventBus = new EventBus();
+    this.browserAdapter = new BrowserAutomationAdapter();
+    this.communicationAdapter = new GoogleCommunicationAdapter();
+    
+    const domAdapter = new GoogleDOMAdapter(this.browserAdapter.getPage());
+    
+    this.application = new GoogleApplication(
+      this.eventBus,
+      domAdapter,
+      this.communicationAdapter
+    );
+  }
+  
+  async initialize(): Promise<void> {
+    await this.browserAdapter.initialize({
+      browser: 'chromium',
+      headless: true,
+      viewport: { width: 1280, height: 720 }
+    });
+    
+    await this.communicationAdapter.connect();
+  }
+  
+  async search(query: string, options?: SearchOptions): Promise<SearchResult[]> {
+    const correlationId = this.generateCorrelationId();
+    
+    // Publish request event
+    const event = new SearchRequestedEvent(query, options || {}, correlationId);
+    await this.eventBus.publish(event);
+    
+    // Wait for completion event
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error('Search timeout'));
+      }, this.options.timeout);
+      
+      this.eventBus.subscribe('SearchCompletedEvent', (event: SearchCompletedEvent) => {
+        if (event.correlationId === correlationId) {
+          clearTimeout(timeout);
+          resolve(event.results);
+        }
+      });
+      
+      this.eventBus.subscribe('SearchFailedEvent', (event: SearchFailedEvent) => {
+        if (event.correlationId === correlationId) {
+          clearTimeout(timeout);
+          reject(event.error);
+        }
+      });
+    });
+  }
+  
+  async cleanup(): Promise<void> {
+    await this.communicationAdapter.disconnect();
+    await this.browserAdapter.cleanup();
+  }
+  
+  private generateCorrelationId(): string {
+    return `search-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  }
+}
+#+END_SRC
+
+** Backward Compatibility Layer
+
+#+BEGIN_SRC typescript
+// Legacy API wrapper for smooth migration
+export class GoogleBuddyClient {
+  private modernClient: GoogleClient;
+  
+  constructor(options?: any) {
+    // Map legacy options to modern options
+    const modernOptions = this.mapLegacyOptions(options);
+    this.modernClient = new GoogleClient(modernOptions);
+  }
+  
+  async initialize(): Promise<void> {
+    return await this.modernClient.initialize();
+  }
+  
+  async search(query: string): Promise<any> {
+    const results = await this.modernClient.search(query);
+    
+    // Convert modern results to legacy format
+    return results.map(result => ({
+      title: result.title,
+      link: result.url,
+      description: result.snippet
+    }));
+  }
+  
+  async getResults(): Promise<any[]> {
+    // Legacy method - maintain compatibility
+    throw new Error('getResults() is deprecated. Use search() directly.');
+  }
+  
+  async cleanup(): Promise<void> {
+    return await this.modernClient.cleanup();
+  }
+  
+  private mapLegacyOptions(legacyOptions: any): GoogleClientOptions {
+    return {
+      timeout: legacyOptions?.timeout || 30000,
+      retryAttempts: legacyOptions?.retries || 3,
+      headless: legacyOptions?.headless !== false
+    };
+  }
+}
+#+END_SRC
+
+* Testing Architecture
+
+** Multi-Layer Testing Strategy
+
+#+BEGIN_SRC typescript
+// Unit Tests - Domain Layer
+describe('GoogleSearch Entity', () => {
+  test('should create search with query and options', () => {
+    const search = GoogleSearch.create('TypeScript', { maxResults: 10 });
+    
+    expect(search.query).toBe('TypeScript');
+    expect(search.options.maxResults).toBe(10);
+    expect(search.getResults()).toHaveLength(0);
+  });
+  
+  test('should add results correctly', () => {
+    const search = GoogleSearch.create('test', {});
+    const result = SearchResult.create('Title', 'http://example.com', 'snippet', 1);
+    
+    search.addResult(result);
+    
+    expect(search.getResults()).toHaveLength(1);
+    expect(search.getResults()[0]).toBe(result);
+  });
+});
+
+// Integration Tests - Application Layer
+describe('GoogleApplication', () => {
+  let application: GoogleApplication;
+  let mockDomAdapter: jest.Mocked<GoogleDOMAdapter>;
+  let mockCommAdapter: jest.Mocked<GoogleCommunicationAdapter>;
+  let eventBus: EventBus;
+  
+  beforeEach(() => {
+    eventBus = new EventBus();
+    mockDomAdapter = createMockDomAdapter();
+    mockCommAdapter = createMockCommunicationAdapter();
+    
+    application = new GoogleApplication(eventBus, mockDomAdapter, mockCommAdapter);
+  });
+  
+  test('should handle search requested event', async () => {
+    const mockResults = [
+      { title: 'Result 1', url: 'http://example1.com', snippet: 'Snippet 1' },
+      { title: 'Result 2', url: 'http://example2.com', snippet: 'Snippet 2' }
+    ];
+    
+    mockDomAdapter.performSearch.mockResolvedValue(mockResults);
+    
+    const event = new SearchRequestedEvent('test query', {}, 'corr-123');
+    
+    const completedEvents: SearchCompletedEvent[] = [];
+    eventBus.subscribe('SearchCompletedEvent', (event: SearchCompletedEvent) => {
+      completedEvents.push(event);
+    });
+    
+    await application.accept(event);
+    
+    expect(completedEvents).toHaveLength(1);
+    expect(completedEvents[0].results).toHaveLength(2);
+    expect(completedEvents[0].correlationId).toBe('corr-123');
+  });
+});
+
+// End-to-End Tests - Client Layer
+describe('GoogleClient E2E', () => {
+  let client: GoogleClient;
+  
+  beforeEach(async () => {
+    client = new GoogleClient({
+      timeout: 30000,
+      retryAttempts: 2
+    });
+    await client.initialize();
+  });
+  
+  afterEach(async () => {
+    await client.cleanup();
+  });
+  
+  test('should perform real search', async () => {
+    const results = await client.search('TypeScript programming');
+    
+    expect(results.length).toBeGreaterThan(0);
+    results.forEach(result => {
+      expect(result.title).toBeTruthy();
+      expect(result.url).toMatch(/^https?:\/\//);
+      expect(result.snippet).toBeTruthy();
+    });
+  });
+  
+  test('should handle search options', async () => {
+    const results = await client.search('machine learning', {
+      maxResults: 5,
+      language: 'en'
+    });
+    
+    expect(results.length).toBeLessThanOrEqual(5);
+  });
+});
+
+// Contract Tests - Semantic Validation
+describe('Google Search Contract', () => {
+  test('should validate search capability contract', async () => {
+    const client = new SemanTestClient();
+    await client.initialize();
+    
+    const contracts = await client.discoverCapabilities('google.com');
+    const searchContract = contracts.find(c => c.capabilities.search);
+    
+    expect(searchContract).toBeDefined();
+    
+    const validation = await client.validateContract(searchContract!);
+    expect(validation.isValid).toBe(true);
+    
+    await client.cleanup();
+  });
+});
+#+END_SRC
+
+* Performance Architecture
+
+** Optimization Strategies
+
+#+BEGIN_SRC typescript
+// Caching Layer
+export class CacheAdapter {
+  private cache: Map<string, { data: any; timestamp: number; ttl: number }> = new Map();
+  
+  async get<T>(key: string): Promise<T | null> {
+    const cached = this.cache.get(key);
+    
+    if (!cached) return null;
+    
+    if (Date.now() - cached.timestamp > cached.ttl) {
+      this.cache.delete(key);
+      return null;
+    }
+    
+    return cached.data;
+  }
+  
+  async set<T>(key: string, data: T, ttl: number = 300000): Promise<void> {
+    this.cache.set(key, {
+      data,
+      timestamp: Date.now(),
+      ttl
+    });
+  }
+  
+  async clear(): Promise<void> {
+    this.cache.clear();
+  }
+}
+
+// Performance Monitoring
+export class PerformanceMonitor {
+  private metrics: Map<string, PerformanceMetric[]> = new Map();
+  
+  startTimer(operation: string): () => void {
+    const startTime = performance.now();
+    
+    return () => {
+      const duration = performance.now() - startTime;
+      this.recordMetric(operation, duration);
+    };
+  }
+  
+  private recordMetric(operation: string, duration: number): void {
+    if (!this.metrics.has(operation)) {
+      this.metrics.set(operation, []);
+    }
+    
+    this.metrics.get(operation)!.push({
+      duration,
+      timestamp: Date.now()
+    });
+  }
+  
+  getAverageTime(operation: string): number {
+    const metrics = this.metrics.get(operation) || [];
+    if (metrics.length === 0) return 0;
+    
+    const total = metrics.reduce((sum, metric) => sum + metric.duration, 0);
+    return total / metrics.length;
+  }
+}
+
+// Optimized Client with Performance Features
+export class OptimizedGoogleClient extends GoogleClient {
+  private cache: CacheAdapter;
+  private performanceMonitor: PerformanceMonitor;
+  
+  constructor(options?: GoogleClientOptions) {
+    super(options);
+    this.cache = new CacheAdapter();
+    this.performanceMonitor = new PerformanceMonitor();
+  }
+  
+  async search(query: string, options?: SearchOptions): Promise<SearchResult[]> {
+    const endTimer = this.performanceMonitor.startTimer('google-search');
+    
+    try {
+      // Check cache first
+      const cacheKey = `search:${query}:${JSON.stringify(options)}`;
+      const cached = await this.cache.get<SearchResult[]>(cacheKey);
+      
+      if (cached) {
+        endTimer();
+        return cached;
+      }
+      
+      // Perform search
+      const results = await super.search(query, options);
+      
+      // Cache results
+      await this.cache.set(cacheKey, results, 300000); // 5 minutes
+      
+      endTimer();
+      return results;
+      
+    } catch (error) {
+      endTimer();
+      throw error;
+    }
+  }
+  
+  getPerformanceMetrics(): Record<string, number> {
+    return {
+      averageSearchTime: this.performanceMonitor.getAverageTime('google-search')
+    };
+  }
+}
+#+END_SRC
+
+* Security Architecture
+
+** Security Measures
+
+#+BEGIN_SRC typescript
+// Input Validation
+export class InputValidator {
+  static validateSearchQuery(query: string): ValidationResult {
+    if (!query || query.trim().length === 0) {
+      return { isValid: false, errors: ['Query cannot be empty'] };
+    }
+    
+    if (query.length > 1000) {
+      return { isValid: false, errors: ['Query too long'] };
+    }
+    
+    // Check for potentially dangerous content
+    const dangerousPatterns = [
+      /<script/i,
+      /javascript:/i,
+      /data:text\/html/i
+    ];
+    
+    for (const pattern of dangerousPatterns) {
+      if (pattern.test(query)) {
+        return { isValid: false, errors: ['Query contains unsafe content'] };
+      }
+    }
+    
+    return { isValid: true, errors: [] };
+  }
+  
+  static validateURL(url: string): ValidationResult {
+    try {
+      const parsed = new URL(url);
+      
+      // Only allow HTTP(S) protocols
+      if (!['http:', 'https:'].includes(parsed.protocol)) {
+        return { isValid: false, errors: ['Invalid protocol'] };
+      }
+      
+      return { isValid: true, errors: [] };
+      
+    } catch (error) {
+      return { isValid: false, errors: ['Invalid URL format'] };
+    }
+  }
+}
+
+// Rate Limiting
+export class RateLimiter {
+  private requests: Map<string, number[]> = new Map();
+  
+  async checkLimit(identifier: string, maxRequests: number, timeWindow: number): Promise<boolean> {
+    const now = Date.now();
+    const windowStart = now - timeWindow;
+    
+    if (!this.requests.has(identifier)) {
+      this.requests.set(identifier, []);
+    }
+    
+    const requests = this.requests.get(identifier)!;
+    
+    // Remove old requests outside time window
+    const recentRequests = requests.filter(timestamp => timestamp > windowStart);
+    this.requests.set(identifier, recentRequests);
+    
+    if (recentRequests.length >= maxRequests) {
+      return false; // Rate limit exceeded
+    }
+    
+    // Add current request
+    recentRequests.push(now);
+    return true;
+  }
+}
+
+// Secure Communication
+export class SecureWebSocketAdapter extends WebSocketCommunicationAdapter {
+  private rateLimiter: RateLimiter;
+  
+  constructor(url: string, options: WebSocketOptions) {
+    super(url, {
+      ...options,
+      // Force secure connection in production
+      forceSecure: process.env.NODE_ENV === 'production'
+    });
+    
+    this.rateLimiter = new RateLimiter();
+  }
+  
+  async sendMessage(
+    type: string,
+    payload: Record<string, any>,
+    options?: SendOptions
+  ): Promise<any> {
+    // Rate limiting
+    const canSend = await this.rateLimiter.checkLimit(
+      'websocket-messages',
+      100, // 100 messages
+      60000 // per minute
+    );
+    
+    if (!canSend) {
+      throw new Error('Rate limit exceeded');
+    }
+    
+    // Input validation
+    const sanitizedPayload = this.sanitizePayload(payload);
+    
+    return super.sendMessage(type, sanitizedPayload, options);
+  }
+  
+  private sanitizePayload(payload: Record<string, any>): Record<string, any> {
+    // Remove potentially dangerous properties
+    const dangerous = ['__proto__', 'constructor', 'prototype'];
+    const sanitized = { ...payload };
+    
+    for (const key of dangerous) {
+      delete sanitized[key];
+    }
+    
+    return sanitized;
+  }
+}
+#+END_SRC
+
+* Deployment Architecture
+
+** Container Strategy
+
+#+BEGIN_SRC dockerfile
+# Dockerfile for Semantest Server
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+COPY tsconfig.json ./
+
+# Install dependencies
+RUN npm ci --only=production
+
+# Copy source code
+COPY src/ ./src/
+
+# Build application
+RUN npm run build
+
+# Create non-root user
+RUN addgroup -S semantest && adduser -S semantest -G semantest
+USER semantest
+
+# Expose port
+EXPOSE 3000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD curl -f http://localhost:3000/health || exit 1
+
+# Start application
+CMD ["npm", "start"]
+#+END_SRC
+
+** Kubernetes Deployment
+
+#+BEGIN_SRC yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: semantest-server
+  labels:
+    app: semantest-server
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: semantest-server
+  template:
+    metadata:
+      labels:
+        app: semantest-server
+    spec:
+      containers:
+      - name: semantest-server
+        image: semantest/server:1.0.0
+        ports:
+        - containerPort: 3000
+        env:
+        - name: NODE_ENV
+          value: "production"
+        - name: PORT
+          value: "3000"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 3000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: semantest-server-service
+spec:
+  selector:
+    app: semantest-server
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 3000
+  type: LoadBalancer
+#+END_SRC
+
+* Monitoring Architecture
+
+** Observability Stack
+
+#+BEGIN_SRC typescript
+// OpenTelemetry Integration
+import { NodeTracerProvider } from '@opentelemetry/sdk-node';
+import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node';
+import { JaegerExporter } from '@opentelemetry/exporter-jaeger';
+
+export class TelemetryService {
+  private provider: NodeTracerProvider;
+  
+  initialize(): void {
+    this.provider = new NodeTracerProvider({
+      instrumentations: [getNodeAutoInstrumentations()],
+    });
+    
+    const exporter = new JaegerExporter({
+      endpoint: process.env.JAEGER_ENDPOINT || 'http://localhost:14268/api/traces',
+    });
+    
+    this.provider.addSpanProcessor(
+      new BatchSpanProcessor(exporter)
+    );
+    
+    this.provider.register();
+  }
+  
+  createSpan(name: string, attributes?: Record<string, any>): Span {
+    const tracer = trace.getTracer('semantest');
+    return tracer.startSpan(name, { attributes });
+  }
+}
+
+// Metrics Collection
+export class MetricsCollector {
+  private metrics: Map<string, number> = new Map();
+  
+  increment(name: string, value: number = 1): void {
+    const current = this.metrics.get(name) || 0;
+    this.metrics.set(name, current + value);
+  }
+  
+  gauge(name: string, value: number): void {
+    this.metrics.set(name, value);
+  }
+  
+  getMetrics(): Record<string, number> {
+    return Object.fromEntries(this.metrics);
+  }
+  
+  reset(): void {
+    this.metrics.clear();
+  }
+}
+
+// Health Check System
+export class HealthChecker {
+  private checks: Map<string, () => Promise<boolean>> = new Map();
+  
+  addCheck(name: string, check: () => Promise<boolean>): void {
+    this.checks.set(name, check);
+  }
+  
+  async runHealthChecks(): Promise<HealthCheckResult> {
+    const results: Record<string, boolean> = {};
+    let overallHealthy = true;
+    
+    for (const [name, check] of this.checks) {
+      try {
+        const result = await check();
+        results[name] = result;
+        if (!result) overallHealthy = false;
+      } catch (error) {
+        results[name] = false;
+        overallHealthy = false;
+      }
+    }
+    
+    return {
+      healthy: overallHealthy,
+      checks: results,
+      timestamp: new Date().toISOString()
+    };
+  }
+}
+#+END_SRC
+
+* Future Architecture Considerations
+
+** Plugin Marketplace Integration
+
+#+BEGIN_SRC typescript
+// Plugin Architecture for Extensibility
+export interface SemanTestPlugin {
+  name: string;
+  version: string;
+  capabilities: PluginCapability[];
+  
+  initialize(context: PluginContext): Promise<void>;
+  cleanup(): Promise<void>;
+}
+
+export class PluginManager {
+  private plugins: Map<string, SemanTestPlugin> = new Map();
+  
+  async loadPlugin(pluginPath: string): Promise<void> {
+    const plugin = await import(pluginPath);
+    await plugin.initialize(this.createPluginContext());
+    this.plugins.set(plugin.name, plugin);
+  }
+  
+  private createPluginContext(): PluginContext {
+    return {
+      eventBus: this.eventBus,
+      logger: this.logger,
+      config: this.config
+    };
+  }
+}
+#+END_SRC
+
+** AI Learning Integration
+
+#+BEGIN_SRC typescript
+// AI Learning System Integration
+export class LearningSystem {
+  async analyzeAutomationPatterns(
+    executions: AutomationExecution[]
+  ): Promise<LearnedPattern[]> {
+    // AI analysis of automation patterns
+  }
+  
+  async suggestOptimizations(
+    contract: SemanTestContract
+  ): Promise<ContractOptimization[]> {
+    // AI-suggested contract improvements
+  }
+  
+  async generateNewCapabilities(
+    domain: string,
+    examples: AutomationExample[]
+  ): Promise<SemanTestCapability[]> {
+    // AI-generated automation capabilities
+  }
+}
+#+END_SRC
+
+* Conclusion
+
+The Semantest architecture provides a robust, scalable, and maintainable foundation for semantic web automation. Key architectural strengths include:
+
+- **Clean Architecture**: Proper separation of concerns across all layers
+- **Event-Driven Design**: Loose coupling and high observability
+- **Domain-Driven Design**: Rich domain models that reflect business needs
+- **Type Safety**: Comprehensive TypeScript typing throughout
+- **Testability**: Architecture designed for easy testing at all levels
+- **Extensibility**: Plugin system ready for community contributions
+- **Performance**: Built-in caching, monitoring, and optimization
+- **Security**: Input validation, rate limiting, and secure communication
+
+This architecture positions Semantest as a professional, enterprise-ready platform for the next generation of web automation while maintaining the flexibility for community-driven innovation.
+
+---
+
+For more detailed information about specific architectural components, see:
+- [[file:../api-reference/README.org][API Reference Documentation]]
+- [[file:../examples/README.org][Example Applications]]
+- [[file:../contributing/README.org][Contributing Guide]]

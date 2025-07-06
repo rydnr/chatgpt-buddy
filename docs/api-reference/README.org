@@ -1,0 +1,937 @@
+# Semantest API Reference
+
+#+TITLE: Semantest API Reference
+#+AUTHOR: Semantest Development Team  
+#+DATE: 2025-07-06
+
+* Overview
+
+This comprehensive API reference covers all Semantest packages and their public interfaces. The Semantest ecosystem provides semantic web automation through a layered architecture built on TypeScript-EDA patterns.
+
+* Core Architecture
+
+** Package Organization
+
+The Semantest ecosystem follows a DNS-style naming convention:
+
+- =@semantest/browser= - Core semantic automation framework
+- =@semantest/domain.com= - Domain-specific automation packages
+- =@semantest/nodejs.server= - Server-side coordination
+- =typescript-eda-*= - Foundation libraries
+
+** Event-Driven Foundation
+
+All Semantest packages use event-driven architecture:
+
+#+BEGIN_SRC typescript
+// All domain events extend the base Event class
+export abstract class Event {
+  public abstract readonly type: string;
+  public abstract get correlationId(): string;
+  public abstract get timestamp(): Date;
+  public abstract toJSON(): Record<string, unknown>;
+}
+
+// All domain entities extend the base Entity class
+export abstract class Entity<T> {
+  protected constructor(props: T, id?: string);
+  public get id(): string;
+  public equals(entity: Entity<any>): boolean;
+}
+#+END_SRC
+
+* @semantest/browser
+
+The core semantic automation framework providing browser-agnostic automation capabilities.
+
+** SemanTestClient
+
+The main entry point for semantic automation.
+
+#+BEGIN_SRC typescript
+export class SemanTestClient {
+  constructor(options?: SemanTestClientOptions);
+  
+  // Lifecycle management
+  async initialize(): Promise<void>;
+  async cleanup(): Promise<void>;
+  
+  // Contract discovery
+  async discoverCapabilities(domain: string): Promise<SemanTestContract[]>;
+  async validateContract(contract: SemanTestContract): Promise<ValidationResult>;
+  
+  // Event handling
+  on(eventType: string, listener: Function): void;
+  off(eventType: string, listener: Function): void;
+  emit(event: Event): Promise<void>;
+}
+#+END_SRC
+
+*** Constructor Options
+
+#+BEGIN_SRC typescript
+interface SemanTestClientOptions {
+  timeout?: number;                    // Default: 30000ms
+  retryAttempts?: number;             // Default: 3
+  headless?: boolean;                 // Default: true
+  browser?: 'chromium' | 'firefox' | 'webkit'; // Default: 'chromium'
+  viewport?: { width: number; height: number }; // Default: 1280x720
+  userAgent?: string;                 // Default: auto-detected
+}
+#+END_SRC
+
+*** Contract Discovery
+
+#+BEGIN_SRC typescript
+// Discover available automation capabilities
+const client = new SemanTestClient();
+await client.initialize();
+
+const contracts = await client.discoverCapabilities('google.com');
+contracts.forEach(contract => {
+  console.log(`Contract: ${contract.title}`);
+  console.log(`Version: ${contract.version}`);
+  console.log(`Capabilities: ${Object.keys(contract.capabilities).join(', ')}`);
+});
+#+END_SRC
+
+** SemanTestContract
+
+Represents an automation contract with semantic capabilities.
+
+#+BEGIN_SRC typescript
+export class SemanTestContract extends Entity<SemanTestContractProps> {
+  static create(
+    id: string,
+    version: string,
+    domain: string,
+    title: string,
+    capabilities: Record<string, SemanTestCapability>
+  ): SemanTestContract;
+  
+  // Contract properties
+  get version(): string;
+  get domain(): string;
+  get title(): string;
+  get capabilities(): Record<string, SemanTestCapability>;
+  
+  // Contract operations
+  validate(): ValidationResult;
+  getCapability(name: string): SemanTestCapability | undefined;
+  hasCapability(name: string): boolean;
+  
+  // Serialization
+  toJSON(): SemanTestContractJSON;
+  static fromJSON(json: SemanTestContractJSON): SemanTestContract;
+}
+#+END_SRC
+
+** SemanTestCapability
+
+Defines a specific automation capability within a contract.
+
+#+BEGIN_SRC typescript
+export class SemanTestCapability extends ValueObject<SemanTestCapabilityProps> {
+  static create(
+    name: string,
+    description: string,
+    parameters: SemanTestParameter[],
+    returnType: string
+  ): SemanTestCapability;
+  
+  get name(): string;
+  get description(): string;
+  get parameters(): SemanTestParameter[];
+  get returnType(): string;
+  
+  // Validation
+  validateParameters(args: Record<string, any>): ValidationResult;
+  getParameterByName(name: string): SemanTestParameter | undefined;
+}
+#+END_SRC
+
+* @semantest/google.com
+
+Google Search automation with semantic capabilities.
+
+** GoogleClient
+
+#+BEGIN_SRC typescript
+export class GoogleClient {
+  constructor(options?: GoogleClientOptions);
+  
+  // Lifecycle
+  async initialize(): Promise<void>;
+  async cleanup(): Promise<void>;
+  
+  // Search operations
+  async search(query: string, options?: SearchOptions): Promise<SearchResult[]>;
+  async batchSearch(queries: string[]): Promise<SearchResult[][]>;
+  async searchImages(query: string): Promise<ImageResult[]>;
+  async searchNews(query: string): Promise<NewsResult[]>;
+  
+  // Navigation
+  async navigateToResult(result: SearchResult): Promise<void>;
+  async goBack(): Promise<void>;
+  async goForward(): Promise<void>;
+  
+  // Event handling
+  on(eventType: string, listener: Function): void;
+  emit(event: Event): Promise<void>;
+}
+#+END_SRC
+
+*** Search Options
+
+#+BEGIN_SRC typescript
+interface SearchOptions {
+  maxResults?: number;        // Default: 10
+  language?: string;          // Default: 'en'
+  country?: string;          // Default: 'US'
+  safeSearch?: 'strict' | 'moderate' | 'off'; // Default: 'moderate'
+  timeRange?: 'hour' | 'day' | 'week' | 'month' | 'year';
+  resultType?: 'web' | 'images' | 'news' | 'videos';
+}
+#+END_SRC
+
+*** Search Results
+
+#+BEGIN_SRC typescript
+interface SearchResult {
+  title: string;
+  url: string;
+  snippet: string;
+  displayUrl: string;
+  position: number;
+  metadata?: {
+    cached?: string;
+    related?: string[];
+    sitelinks?: SiteLink[];
+  };
+}
+
+interface ImageResult extends SearchResult {
+  thumbnailUrl: string;
+  originalUrl: string;
+  dimensions: { width: number; height: number };
+  fileSize?: string;
+  imageType?: string;
+}
+
+interface NewsResult extends SearchResult {
+  source: string;
+  publishedAt: Date;
+  imageUrl?: string;
+  category?: string;
+}
+#+END_SRC
+
+*** Example Usage
+
+#+BEGIN_SRC typescript
+import { GoogleClient } from '@semantest/google.com';
+
+const client = new GoogleClient({
+  timeout: 30000,
+  retryAttempts: 2
+});
+
+await client.initialize();
+
+// Basic search
+const results = await client.search('TypeScript tutorials');
+console.log(`Found ${results.length} results`);
+
+// Advanced search with options
+const advancedResults = await client.search('machine learning', {
+  maxResults: 20,
+  language: 'en',
+  timeRange: 'month'
+});
+
+// Batch search
+const queries = ['AI', 'ML', 'Deep Learning'];
+const batchResults = await client.batchSearch(queries);
+
+// Image search
+const images = await client.searchImages('TypeScript logo');
+images.forEach(img => console.log(img.originalUrl));
+
+await client.cleanup();
+#+END_SRC
+
+** Domain Events
+
+#+BEGIN_SRC typescript
+// Search events
+export class SearchRequestedEvent extends Event {
+  constructor(query: string, options?: SearchOptions);
+  get query(): string;
+  get options(): SearchOptions;
+}
+
+export class SearchCompletedEvent extends Event {
+  constructor(query: string, results: SearchResult[], duration: number);
+  get query(): string;
+  get results(): SearchResult[];
+  get duration(): number;
+}
+
+export class SearchFailedEvent extends Event {
+  constructor(query: string, error: Error);
+  get query(): string;
+  get error(): Error;
+}
+#+END_SRC
+
+** Backward Compatibility
+
+#+BEGIN_SRC typescript
+// Legacy GoogleBuddyClient interface remains available
+export class GoogleBuddyClient {
+  async search(query: string): Promise<any>;
+  async getResults(): Promise<any[]>;
+  // ... other legacy methods
+}
+#+END_SRC
+
+* @semantest/chatgpt.com
+
+ChatGPT conversation management with advanced workflow capabilities.
+
+** ChatGPTClient
+
+#+BEGIN_SRC typescript
+export class ChatGPTClient {
+  constructor(options?: ChatGPTClientOptions);
+  
+  // Lifecycle
+  async initialize(): Promise<void>;
+  async cleanup(): Promise<void>;
+  
+  // Conversation management
+  async startConversation(title?: string): Promise<ChatGPTConversation>;
+  async switchToConversation(conversationId: string): Promise<void>;
+  async deleteConversation(conversationId: string): Promise<void>;
+  async listConversations(): Promise<ChatGPTConversation[]>;
+  
+  // Message operations
+  async sendPrompt(message: string): Promise<ConversationMessage>;
+  async getLatestResponse(): Promise<string>;
+  async getConversationHistory(): Promise<ConversationMessage[]>;
+  async regenerateResponse(): Promise<ConversationMessage>;
+  
+  // Project management
+  async selectProject(projectId: string): Promise<ChatGPTProject>;
+  async createProject(name: string, description?: string): Promise<ChatGPTProject>;
+  async listProjects(): Promise<ChatGPTProject[]>;
+  
+  // File operations
+  async uploadFile(filePath: string, description?: string): Promise<string>;
+  async listUploadedFiles(): Promise<UploadedFile[]>;
+  
+  // Export/Import
+  async exportConversation(format: 'json' | 'markdown' | 'txt'): Promise<string>;
+  async importConversation(data: string, format: string): Promise<ChatGPTConversation>;
+}
+#+END_SRC
+
+*** Client Options
+
+#+BEGIN_SRC typescript
+interface ChatGPTClientOptions {
+  timeout?: number;           // Default: 60000ms (longer for AI responses)
+  retryAttempts?: number;     // Default: 3
+  model?: string;            // Default: auto-detected
+  temperature?: number;       // Default: model default
+  autoSave?: boolean;        // Default: true
+  waitForResponse?: number;   // Default: 30000ms
+}
+#+END_SRC
+
+### Domain Entities
+
+#+BEGIN_SRC typescript
+// Conversation entity
+export class ChatGPTConversation extends Entity<ChatGPTConversationProps> {
+  static create(
+    id: string,
+    title: string,
+    projectId?: string,
+    model?: string
+  ): ChatGPTConversation;
+  
+  get title(): string;
+  get projectId(): string | undefined;
+  get model(): string;
+  get messages(): ConversationMessage[];
+  get createdAt(): Date;
+  get updatedAt(): Date;
+  
+  addMessage(message: ConversationMessage): void;
+  updateTitle(title: string): void;
+  getLatestMessage(): ConversationMessage | undefined;
+  getMessageCount(): number;
+}
+
+// Message entity
+export class ConversationMessage extends Entity<ConversationMessageProps> {
+  static create(
+    content: string,
+    role: 'user' | 'assistant' | 'system',
+    conversationId: string
+  ): ConversationMessage;
+  
+  get content(): string;
+  get role(): 'user' | 'assistant' | 'system';
+  get conversationId(): string;
+  get timestamp(): Date;
+  get metadata(): Record<string, any>;
+  
+  updateContent(content: string): void;
+  addMetadata(key: string, value: any): void;
+}
+
+// Project entity
+export class ChatGPTProject extends Entity<ChatGPTProjectProps> {
+  static create(
+    name: string,
+    description?: string,
+    metadata?: Record<string, any>
+  ): ChatGPTProject;
+  
+  get name(): string;
+  get description(): string | undefined;
+  get metadata(): Record<string, any>;
+  get conversationIds(): string[];
+  
+  addConversation(conversationId: string): void;
+  removeConversation(conversationId: string): void;
+  updateDescription(description: string): void;
+}
+#+END_SRC
+
+*** Example Usage
+
+#+BEGIN_SRC typescript
+import { ChatGPTClient } from '@semantest/chatgpt.com';
+
+const client = new ChatGPTClient({
+  timeout: 60000,
+  autoSave: true
+});
+
+await client.initialize();
+
+// Create a new project
+const project = await client.createProject(
+  'Research Project',
+  'AI and machine learning research'
+);
+
+// Start a conversation
+const conversation = await client.startConversation('Technical Discussion');
+
+// Send prompts and get responses
+await client.sendPrompt('Explain TypeScript decorators');
+const response = await client.getLatestResponse();
+console.log('AI Response:', response);
+
+// Upload a file for analysis
+const fileId = await client.uploadFile('./research-data.pdf', 'Research data for analysis');
+
+// Export conversation
+const exportData = await client.exportConversation('markdown');
+console.log('Exported conversation:', exportData);
+
+await client.cleanup();
+#+END_SRC
+
+*** Domain Events
+
+#+BEGIN_SRC typescript
+export class ProjectSelectedEvent extends Event {
+  constructor(projectId: string, projectName: string);
+  get projectId(): string;
+  get projectName(): string;
+}
+
+export class ConversationStartedEvent extends Event {
+  constructor(conversationId: string, title: string);
+  get conversationId(): string;
+  get title(): string;
+}
+
+export class PromptSubmittedEvent extends Event {
+  constructor(conversationId: string, prompt: string);
+  get conversationId(): string;
+  get prompt(): string;
+}
+
+export class ResponseReceivedEvent extends Event {
+  constructor(conversationId: string, response: string, duration: number);
+  get conversationId(): string;
+  get response(): string;
+  get duration(): number;
+}
+
+export class FileUploadedEvent extends Event {
+  constructor(fileId: string, fileName: string, description?: string);
+  get fileId(): string;
+  get fileName(): string;
+  get description(): string | undefined;
+}
+#+END_SRC
+
+* @semantest/wikipedia.org
+
+Wikipedia content extraction and article management.
+
+** WikipediaClient
+
+#+BEGIN_SRC typescript
+export class WikipediaClient {
+  constructor(options?: WikipediaClientOptions);
+  
+  // Lifecycle
+  async initialize(): Promise<void>;
+  async cleanup(): Promise<void>;
+  
+  // Navigation
+  async navigateToArticle(title: string): Promise<WikiArticle>;
+  async navigateToUrl(url: string): Promise<WikiArticle>;
+  async search(query: string): Promise<SearchSuggestion[]>;
+  
+  // Content extraction
+  async extractCurrentArticle(): Promise<WikiArticle | null>;
+  async extractSection(sectionId: string): Promise<WikiSection | null>;
+  async extractReferences(): Promise<Reference[]>;
+  async extractImages(): Promise<WikiImage[]>;
+  
+  // Article analysis
+  async getRelatedArticles(): Promise<RelatedArticle[]>;
+  async getArticleCategories(): Promise<string[]>;
+  async getArticleLanguages(): Promise<LanguageLink[]>;
+  
+  // Cache management
+  async cacheArticle(article: WikiArticle): Promise<void>;
+  async getCachedArticle(title: string): Promise<WikiArticle | null>;
+  async clearCache(): Promise<void>;
+}
+#+END_SRC
+
+*** Client Options
+
+#+BEGIN_SRC typescript
+interface WikipediaClientOptions {
+  language?: string;          // Default: 'en'
+  timeout?: number;          // Default: 30000ms
+  cacheEnabled?: boolean;    // Default: true
+  maxCacheSize?: number;     // Default: 100 articles
+  followRedirects?: boolean; // Default: true
+}
+#+END_SRC
+
+*** Domain Entities
+
+#+BEGIN_SRC typescript
+// Wikipedia article entity
+export class WikiArticle extends Entity<WikiArticleProps> {
+  static create(
+    title: string,
+    url: string,
+    content: string,
+    summary: string,
+    sections: WikiSection[]
+  ): WikiArticle;
+  
+  get title(): string;
+  get url(): string;
+  get content(): string;
+  get summary(): string;
+  get sections(): WikiSection[];
+  get lastModified(): Date;
+  get categories(): string[];
+  get images(): WikiImage[];
+  
+  // Content analysis
+  getWordCount(): number;
+  getSection(title: string): WikiSection | undefined;
+  getSectionById(id: string): WikiSection | undefined;
+  extractMainContent(): string;
+  getInfobox(): Record<string, string> | null;
+}
+
+// Wikipedia section entity
+export class WikiSection extends Entity<WikiSectionProps> {
+  static create(
+    id: string,
+    title: string,
+    content: string,
+    level: number
+  ): WikiSection;
+  
+  get title(): string;
+  get content(): string;
+  get level(): number;
+  get subsections(): WikiSection[];
+  
+  addSubsection(subsection: WikiSection): void;
+  getPlainText(): string;
+  getWordCount(): number;
+}
+#+END_SRC
+
+*** Value Objects
+
+#+BEGIN_SRC typescript
+// Article ID value object
+export class ArticleId extends ValueObject<ArticleIdProps> {
+  static fromTitle(title: string): ArticleId;
+  static fromURL(url: string): ArticleId;
+  
+  get value(): string;
+  get normalizedTitle(): string;
+  
+  toURL(language?: string): string;
+  equals(other: ArticleId): boolean;
+}
+
+// Wikipedia URL value object
+export class WikiURL extends ValueObject<WikiURLProps> {
+  static forArticle(articleId: ArticleId, language?: string): WikiURL;
+  static forSearch(query: string, language?: string): WikiURL;
+  
+  get value(): string;
+  get language(): string;
+  get domain(): string;
+  
+  isValid(): boolean;
+  extractArticleId(): ArticleId;
+}
+#+END_SRC
+
+*** Example Usage
+
+#+BEGIN_SRC typescript
+import { WikipediaClient } from '@semantest/wikipedia.org';
+import { ArticleId, WikiURL } from '@semantest/wikipedia.org';
+
+const client = new WikipediaClient({
+  language: 'en',
+  cacheEnabled: true
+});
+
+await client.initialize();
+
+// Navigate to an article
+const article = await client.navigateToArticle('Artificial Intelligence');
+console.log(`Article: ${article.title}`);
+console.log(`Summary: ${article.summary}`);
+
+// Extract specific sections
+const introSection = article.getSection('Introduction');
+if (introSection) {
+  console.log(`Introduction: ${introSection.content}`);
+}
+
+// Search for articles
+const suggestions = await client.search('machine learning');
+suggestions.forEach(suggestion => {
+  console.log(`- ${suggestion.title}: ${suggestion.snippet}`);
+});
+
+// Work with value objects
+const articleId = ArticleId.fromTitle('Deep Learning');
+const url = WikiURL.forArticle(articleId, 'en');
+console.log(`Article URL: ${url.value}`);
+
+// Extract related content
+const related = await client.getRelatedArticles();
+const categories = await client.getArticleCategories();
+
+await client.cleanup();
+#+END_SRC
+
+*** Domain Events
+
+#+BEGIN_SRC typescript
+export class ArticleRequestedEvent extends Event {
+  constructor(title: string, language: string);
+  get title(): string;
+  get language(): string;
+}
+
+export class ArticleLoadedEvent extends Event {
+  constructor(article: WikiArticle, loadTime: number);
+  get article(): WikiArticle;
+  get loadTime(): number;
+}
+
+export class SectionExtractedEvent extends Event {
+  constructor(sectionId: string, section: WikiSection);
+  get sectionId(): string;
+  get section(): WikiSection;
+}
+#+END_SRC
+
+* @semantest/nodejs.server
+
+Server-side coordination and API gateway for Semantest ecosystem.
+
+** WebBuddyServer
+
+#+BEGIN_SRC typescript
+export class WebBuddyServer {
+  constructor(options?: ServerOptions);
+  
+  // Server lifecycle
+  async start(): Promise<void>;
+  async stop(): Promise<void>;
+  
+  // Client management
+  async registerClient(clientId: string, metadata?: Record<string, any>): Promise<void>;
+  async unregisterClient(clientId: string): Promise<void>;
+  getConnectedClients(): ClientInfo[];
+  
+  // Message routing
+  async routeMessage(message: Message): Promise<void>;
+  async broadcastMessage(message: Message): Promise<void>;
+  
+  // Extension coordination
+  async connectExtension(extensionId: string): Promise<void>;
+  async disconnectExtension(extensionId: string): Promise<void>;
+  getConnectedExtensions(): ExtensionInfo[];
+  
+  // Event handling
+  on(eventType: string, listener: Function): void;
+  emit(event: Event): Promise<void>;
+}
+#+END_SRC
+
+*** Server Configuration
+
+#+BEGIN_SRC typescript
+interface ServerOptions {
+  port?: number;              // Default: 3000
+  host?: string;             // Default: 'localhost'
+  cors?: CorsOptions;        // CORS configuration
+  websocket?: WebSocketOptions; // WebSocket configuration
+  auth?: AuthOptions;        // Authentication options
+  logging?: LoggingOptions;  // Logging configuration
+}
+
+interface WebSocketOptions {
+  path?: string;             // Default: '/ws'
+  pingInterval?: number;     // Default: 30000ms
+  pongTimeout?: number;      // Default: 5000ms
+  maxConnections?: number;   // Default: 1000
+}
+#+END_SRC
+
+* TypeScript-EDA Foundation
+
+The underlying event-driven architecture foundation used by all Semantest packages.
+
+** typescript-eda-domain
+
+*** Base Entity Class
+
+#+BEGIN_SRC typescript
+export abstract class Entity<T> {
+  protected readonly _id: string;
+  protected props: T;
+  
+  protected constructor(props: T, id?: string);
+  
+  get id(): string;
+  equals(entity: Entity<any>): boolean;
+  
+  protected static isEntity(obj: any): obj is Entity<any>;
+}
+#+END_SRC
+
+*** Base Event Class
+
+#+BEGIN_SRC typescript
+export abstract class Event {
+  public readonly occurredOn: Date;
+  
+  constructor(occurredOn?: Date);
+  
+  public abstract get type(): string;
+  public abstract get correlationId(): string;
+  public abstract toJSON(): Record<string, unknown>;
+}
+#+END_SRC
+
+*** Base Value Object Class
+
+#+BEGIN_SRC typescript
+export abstract class ValueObject<T> {
+  protected readonly props: T;
+  
+  protected constructor(props: T);
+  
+  equals(obj: ValueObject<T>): boolean;
+  
+  protected static isValueObject(obj: any): obj is ValueObject<any>;
+}
+#+END_SRC
+
+** typescript-eda-infrastructure
+
+*** Communication Adapters
+
+#+BEGIN_SRC typescript
+// WebSocket communication adapter
+export class WebSocketCommunicationAdapter {
+  constructor(url: string, options?: WebSocketOptions);
+  
+  async connect(): Promise<void>;
+  async disconnect(): Promise<void>;
+  
+  async sendMessage(
+    type: string, 
+    payload: Record<string, any>,
+    options?: SendOptions
+  ): Promise<any>;
+  
+  async publishEvent(event: Event): Promise<void>;
+  
+  on(eventType: string, listener: Function): void;
+  off(eventType: string, listener: Function): void;
+}
+
+// DOM interaction adapter
+export class DOMAdapter {
+  constructor(page: Page);
+  
+  async waitForSelector(selector: string, timeout?: number): Promise<ElementHandle>;
+  async click(selector: string): Promise<void>;
+  async type(selector: string, text: string): Promise<void>;
+  async getText(selector: string): Promise<string>;
+  async getAttribute(selector: string, attribute: string): Promise<string>;
+  
+  // Semantic element matching
+  async findByText(text: string): Promise<ElementHandle[]>;
+  async findByRole(role: string): Promise<ElementHandle[]>;
+  async findByLabel(label: string): Promise<ElementHandle[]>;
+}
+#+END_SRC
+
+** typescript-eda-application
+
+*** Application Base Class
+
+#+BEGIN_SRC typescript
+export abstract class Application {
+  protected constructor(
+    private eventBus: EventBus,
+    private adapters: Map<string, any>
+  );
+  
+  async accept(event: Event): Promise<void>;
+  
+  protected getAdapter<T>(name: string): T;
+  protected publishEvent(event: Event): Promise<void>;
+}
+#+END_SRC
+
+*** Event Decorators
+
+#+BEGIN_SRC typescript
+// Listen decorator for event handling
+export function Listen(eventType: string) {
+  return function (target: any, propertyName: string, descriptor: PropertyDescriptor) {
+    // Decorator implementation
+  };
+}
+
+// Usage example
+export class GoogleApplication extends Application {
+  @Listen('SearchRequestedEvent')
+  async handleSearchRequested(event: SearchRequestedEvent): Promise<void> {
+    // Handle search request
+  }
+}
+#+END_SRC
+
+* Error Handling
+
+All Semantest packages provide comprehensive error types:
+
+#+BEGIN_SRC typescript
+// Base error classes
+export abstract class SemanTestError extends Error {
+  constructor(message: string, public readonly code: string) {
+    super(message);
+    this.name = this.constructor.name;
+  }
+}
+
+export class AutomationError extends SemanTestError {
+  constructor(message: string, public readonly selector?: string) {
+    super(message, 'AUTOMATION_ERROR');
+  }
+}
+
+export class NetworkError extends SemanTestError {
+  constructor(message: string, public readonly url?: string) {
+    super(message, 'NETWORK_ERROR');
+  }
+}
+
+export class ContractValidationError extends SemanTestError {
+  constructor(message: string, public readonly contractId?: string) {
+    super(message, 'CONTRACT_VALIDATION_ERROR');
+  }
+}
+
+export class TimeoutError extends SemanTestError {
+  constructor(message: string, public readonly timeout: number) {
+    super(message, 'TIMEOUT_ERROR');
+  }
+}
+#+END_SRC
+
+* Versioning and Compatibility
+
+** Semantic Versioning
+
+All Semantest packages follow semantic versioning (SemVer):
+
+- =MAJOR.MINOR.PATCH= (e.g., =1.2.3=)
+- =MAJOR=: Breaking changes
+- =MINOR=: New features, backward compatible
+- =PATCH=: Bug fixes, backward compatible
+
+** Compatibility Matrix
+
+#+BEGIN_SRC text
+| Package Version | Node.js | TypeScript | Browser |
+|-----------------|---------|------------|---------|
+| 1.x             | 18+     | 5.0+       | Modern  |
+| 2.x             | 20+     | 5.2+       | Modern  |
+#+END_SRC
+
+** Migration Guides
+
+Breaking changes include migration guides:
+
+- [[file:../migration/v1-to-v2.org][v1.x to v2.x Migration Guide]]
+- [[file:../migration/web-buddy-to-semantest.org][Web-Buddy to Semantest Migration]]
+
+* Contributing to the API
+
+See the [[file:../contributing/README.org][Contributing Guide]] for information about:
+
+- Adding new API methods
+- Creating domain-specific packages
+- Extending the TypeScript-EDA foundation
+- Writing comprehensive tests
+- Documentation standards
+
+---
+
+This API reference is automatically generated from TypeScript definitions and updated with each release. For the most current API documentation, see the TypeScript declaration files included with each package.

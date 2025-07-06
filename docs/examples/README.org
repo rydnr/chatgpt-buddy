@@ -1,0 +1,1548 @@
+# Semantest Example Applications
+
+#+TITLE: Semantest Example Applications
+#+AUTHOR: Semantest Development Team
+#+DATE: 2025-07-06
+
+* Overview
+
+This collection demonstrates the power and flexibility of the Semantest platform through real-world automation scenarios. Each example showcases different aspects of semantic web automation, from simple single-domain tasks to complex multi-domain workflows.
+
+* Quick Start Examples
+
+** Basic Google Search
+
+A simple example to get you started with semantic search automation.
+
+#+BEGIN_SRC typescript
+// examples/basic-search/index.ts
+import { GoogleClient } from '@semantest/google.com';
+
+async function basicSearchExample() {
+  const client = new GoogleClient();
+  await client.initialize();
+
+  try {
+    console.log('🔍 Searching for TypeScript tutorials...');
+    
+    const results = await client.search('TypeScript beginner tutorials', {
+      maxResults: 5,
+      language: 'en'
+    });
+
+    console.log(`\n📊 Found ${results.length} results:\n`);
+    
+    results.forEach((result, index) => {
+      console.log(`${index + 1}. ${result.title}`);
+      console.log(`   🔗 ${result.url}`);
+      console.log(`   📝 ${result.snippet.substring(0, 100)}...\n`);
+    });
+
+  } catch (error) {
+    console.error('❌ Search failed:', error.message);
+  } finally {
+    await client.cleanup();
+  }
+}
+
+basicSearchExample().catch(console.error);
+#+END_SRC
+
+*** Running the Example
+
+#+BEGIN_SRC bash
+cd examples/basic-search
+npm install
+npm run start
+#+END_SRC
+
+** ChatGPT Conversation
+
+Demonstrates semantic conversation management with ChatGPT.
+
+#+BEGIN_SRC typescript
+// examples/chatgpt-conversation/index.ts
+import { ChatGPTClient } from '@semantest/chatgpt.com';
+
+async function chatgptConversationExample() {
+  const client = new ChatGPTClient({
+    timeout: 60000,
+    autoSave: true
+  });
+
+  await client.initialize();
+
+  try {
+    // Create a new project for this conversation
+    const project = await client.createProject(
+      'Code Review Assistant',
+      'AI-powered code review and suggestions'
+    );
+    
+    await client.selectProject(project.id);
+
+    // Start a conversation
+    console.log('🤖 Starting ChatGPT conversation...');
+    const conversation = await client.startConversation('TypeScript Best Practices');
+
+    // Send a series of prompts
+    const prompts = [
+      'What are the top 5 TypeScript best practices for large projects?',
+      'Can you provide code examples for each practice?',
+      'How do these practices improve code maintainability?'
+    ];
+
+    for (const prompt of prompts) {
+      console.log(`\n👤 User: ${prompt}`);
+      
+      await client.sendPrompt(prompt);
+      const response = await client.getLatestResponse();
+      
+      console.log(`🤖 Assistant: ${response.substring(0, 200)}...\n`);
+    }
+
+    // Export the conversation
+    const exportedData = await client.exportConversation('markdown');
+    console.log('💾 Conversation exported successfully');
+
+  } catch (error) {
+    console.error('❌ Conversation failed:', error.message);
+  } finally {
+    await client.cleanup();
+  }
+}
+
+chatgptConversationExample().catch(console.error);
+#+END_SRC
+
+** Wikipedia Research
+
+Shows how to extract and analyze Wikipedia content semantically.
+
+#+BEGIN_SRC typescript
+// examples/wikipedia-research/index.ts
+import { WikipediaClient } from '@semantest/wikipedia.org';
+
+async function wikipediaResearchExample() {
+  const client = new WikipediaClient({
+    language: 'en',
+    cacheEnabled: true
+  });
+
+  await client.initialize();
+
+  try {
+    const topic = 'Machine Learning';
+    console.log(`📚 Researching: ${topic}`);
+
+    // Navigate to the article
+    const article = await client.navigateToArticle(topic);
+    
+    console.log(`\n📄 Article: ${article.title}`);
+    console.log(`🔗 URL: ${article.url}`);
+    console.log(`📊 Word count: ${article.getWordCount()}`);
+    console.log(`📑 Sections: ${article.sections.length}`);
+
+    // Extract key sections
+    const introduction = article.getSection('Introduction');
+    if (introduction) {
+      console.log(`\n📖 Introduction:\n${introduction.content.substring(0, 300)}...\n`);
+    }
+
+    // Get related articles
+    const related = await client.getRelatedArticles();
+    console.log('🔗 Related articles:');
+    related.slice(0, 5).forEach(rel => console.log(`  • ${rel.title}`));
+
+    // Get article categories
+    const categories = await client.getArticleCategories();
+    console.log('\n🏷️ Categories:');
+    categories.slice(0, 5).forEach(cat => console.log(`  • ${cat}`));
+
+  } catch (error) {
+    console.error('❌ Research failed:', error.message);
+  } finally {
+    await client.cleanup();
+  }
+}
+
+wikipediaResearchExample().catch(console.error);
+#+END_SRC
+
+* Advanced Examples
+
+** Multi-Domain Research Workflow
+
+A comprehensive example that combines Google Search, Wikipedia research, and ChatGPT analysis.
+
+#+BEGIN_SRC typescript
+// examples/research-workflow/index.ts
+import { GoogleClient } from '@semantest/google.com';
+import { WikipediaClient } from '@semantest/wikipedia.org';
+import { ChatGPTClient } from '@semantest/chatgpt.com';
+
+interface ResearchResult {
+  topic: string;
+  searchResults: any[];
+  wikipediaArticle?: any;
+  aiSummary?: string;
+  relatedTopics: string[];
+}
+
+async function comprehensiveResearchWorkflow(topic: string): Promise<ResearchResult> {
+  console.log(`🔬 Starting comprehensive research on: ${topic}`);
+
+  // Initialize all clients
+  const google = new GoogleClient();
+  const wikipedia = new WikipediaClient();
+  const chatgpt = new ChatGPTClient({ timeout: 90000 });
+
+  await Promise.all([
+    google.initialize(),
+    wikipedia.initialize(), 
+    chatgpt.initialize()
+  ]);
+
+  const result: ResearchResult = {
+    topic,
+    searchResults: [],
+    relatedTopics: []
+  };
+
+  try {
+    // Phase 1: Google Search for current information
+    console.log('\n📊 Phase 1: Google Search');
+    const searchResults = await google.search(`${topic} latest developments 2024`, {
+      maxResults: 10,
+      timeRange: 'year'
+    });
+    
+    result.searchResults = searchResults;
+    console.log(`Found ${searchResults.length} recent articles`);
+
+    // Phase 2: Wikipedia for foundational knowledge
+    console.log('\n📚 Phase 2: Wikipedia Research');
+    try {
+      const article = await wikipedia.navigateToArticle(topic);
+      result.wikipediaArticle = {
+        title: article.title,
+        summary: article.summary,
+        wordCount: article.getWordCount(),
+        sections: article.sections.map(s => s.title)
+      };
+      
+      console.log(`Extracted Wikipedia article: ${article.title}`);
+      
+      // Get related topics
+      const related = await wikipedia.getRelatedArticles();
+      result.relatedTopics = related.slice(0, 5).map(r => r.title);
+      
+    } catch (wikiError) {
+      console.log('Wikipedia article not found, continuing...');
+    }
+
+    // Phase 3: AI Analysis and Summary
+    console.log('\n🤖 Phase 3: AI Analysis');
+    
+    // Create research project
+    const project = await chatgpt.createProject(
+      `${topic} Research`,
+      `Comprehensive research analysis on ${topic}`
+    );
+    await chatgpt.selectProject(project.id);
+
+    // Start analysis conversation
+    await chatgpt.startConversation(`${topic} Analysis`);
+
+    // Prepare data for AI analysis
+    const searchSummary = searchResults
+      .slice(0, 5)
+      .map(r => `• ${r.title}: ${r.snippet}`)
+      .join('\n');
+
+    const wikiSummary = result.wikipediaArticle 
+      ? `Wikipedia summary: ${result.wikipediaArticle.summary}`
+      : 'No Wikipedia article found';
+
+    const analysisPrompt = `
+Please analyze this research data about "${topic}" and provide:
+1. Key trends and developments
+2. Important concepts and definitions
+3. Future outlook and implications
+4. Recommended further reading
+
+Google Search Results:
+${searchSummary}
+
+${wikiSummary}
+
+Related topics: ${result.relatedTopics.join(', ')}
+`;
+
+    await chatgpt.sendPrompt(analysisPrompt);
+    const aiAnalysis = await chatgpt.getLatestResponse();
+    result.aiSummary = aiAnalysis;
+
+    console.log(`AI analysis completed (${aiAnalysis.length} characters)`);
+
+    // Phase 4: Generate Report
+    console.log('\n📝 Phase 4: Generate Report');
+    await generateResearchReport(result);
+
+  } catch (error) {
+    console.error('❌ Research workflow failed:', error.message);
+  } finally {
+    await Promise.all([
+      google.cleanup(),
+      wikipedia.cleanup(),
+      chatgpt.cleanup()
+    ]);
+  }
+
+  return result;
+}
+
+async function generateResearchReport(research: ResearchResult): Promise<void> {
+  const report = `
+# Research Report: ${research.topic}
+
+Generated on: ${new Date().toLocaleDateString()}
+
+## Executive Summary
+${research.aiSummary?.substring(0, 500)}...
+
+## Search Results Summary
+Found ${research.searchResults.length} recent articles from Google Search.
+
+Top 3 Results:
+${research.searchResults.slice(0, 3).map((r, i) => 
+  `${i + 1}. [${r.title}](${r.url})\n   ${r.snippet}`
+).join('\n\n')}
+
+## Wikipedia Analysis
+${research.wikipediaArticle ? `
+- Article: ${research.wikipediaArticle.title}
+- Word Count: ${research.wikipediaArticle.wordCount}
+- Sections: ${research.wikipediaArticle.sections.length}
+- Summary: ${research.wikipediaArticle.summary.substring(0, 300)}...
+` : 'No Wikipedia article found for this topic.'}
+
+## Related Topics
+${research.relatedTopics.map(topic => `- ${topic}`).join('\n')}
+
+## AI Analysis
+${research.aiSummary}
+
+---
+*Generated by Semantest Research Workflow*
+`;
+
+  console.log('📄 Research Report Generated:');
+  console.log(report.substring(0, 500) + '...');
+  
+  // In a real implementation, you might save this to a file
+  // const fs = require('fs').promises;
+  // await fs.writeFile(`research-${research.topic.toLowerCase().replace(/\s+/g, '-')}.md`, report);
+}
+
+// Run the workflow
+const topic = process.argv[2] || 'Artificial Intelligence';
+comprehensiveResearchWorkflow(topic)
+  .then(result => {
+    console.log('\n✅ Research workflow completed successfully!');
+    console.log(`📊 Collected ${result.searchResults.length} search results`);
+    console.log(`📚 ${result.wikipediaArticle ? 'Retrieved' : 'No'} Wikipedia data`);
+    console.log(`🤖 Generated ${result.aiSummary?.length || 0} character AI analysis`);
+  })
+  .catch(console.error);
+#+END_SRC
+
+*** Running the Research Workflow
+
+#+BEGIN_SRC bash
+cd examples/research-workflow
+npm install
+npm run start "Quantum Computing"
+#+END_SRC
+
+** Competitive Intelligence Automation
+
+Automated competitor analysis across multiple domains.
+
+#+BEGIN_SRC typescript
+// examples/competitive-intelligence/index.ts
+import { GoogleClient } from '@semantest/google.com';
+import { ChatGPTClient } from '@semantest/chatgpt.com';
+
+interface CompetitorAnalysis {
+  company: string;
+  searchResults: any[];
+  newsAnalysis: string;
+  marketPosition: string;
+  keyTrends: string[];
+}
+
+class CompetitiveIntelligenceAgent {
+  private google: GoogleClient;
+  private chatgpt: ChatGPTClient;
+
+  constructor() {
+    this.google = new GoogleClient();
+    this.chatgpt = new ChatGPTClient({ timeout: 120000 });
+  }
+
+  async initialize(): Promise<void> {
+    console.log('🕵️ Initializing Competitive Intelligence Agent...');
+    
+    await Promise.all([
+      this.google.initialize(),
+      this.chatgpt.initialize()
+    ]);
+
+    // Set up analysis project
+    const project = await this.chatgpt.createProject(
+      'Competitive Intelligence',
+      'Automated competitor analysis and market research'
+    );
+    await this.chatgpt.selectProject(project.id);
+  }
+
+  async analyzeCompetitor(company: string): Promise<CompetitorAnalysis> {
+    console.log(`\n🔍 Analyzing competitor: ${company}`);
+
+    const analysis: CompetitorAnalysis = {
+      company,
+      searchResults: [],
+      newsAnalysis: '',
+      marketPosition: '',
+      keyTrends: []
+    };
+
+    try {
+      // 1. Recent news and developments
+      console.log('📰 Gathering recent news...');
+      const newsResults = await this.google.searchNews(`${company} news`, {
+        maxResults: 15,
+        timeRange: 'month'
+      });
+      
+      analysis.searchResults = newsResults;
+
+      // 2. Product/service searches
+      console.log('🛍️ Analyzing products and services...');
+      const productResults = await this.google.search(`${company} products services features`, {
+        maxResults: 10
+      });
+
+      // 3. AI-powered analysis
+      console.log('🤖 Generating AI analysis...');
+      await this.chatgpt.startConversation(`${company} Competitive Analysis`);
+
+      const newsData = newsResults
+        .slice(0, 10)
+        .map(news => `${news.publishedAt.toLocaleDateString()}: ${news.title} - ${news.snippet}`)
+        .join('\n');
+
+      const productData = productResults
+        .slice(0, 5)
+        .map(result => `${result.title}: ${result.snippet}`)
+        .join('\n');
+
+      const analysisPrompt = `
+Analyze this competitive intelligence data for ${company}:
+
+RECENT NEWS (last month):
+${newsData}
+
+PRODUCT/SERVICE INFORMATION:
+${productData}
+
+Please provide:
+1. Market position analysis (2-3 sentences)
+2. Key trends and developments (bullet points)
+3. Competitive advantages and weaknesses
+4. Strategic recommendations for competing against them
+
+Format your response clearly with headers.
+`;
+
+      await this.chatgpt.sendPrompt(analysisPrompt);
+      const aiResponse = await this.chatgpt.getLatestResponse();
+
+      // Parse AI response
+      analysis.newsAnalysis = aiResponse;
+      analysis.marketPosition = this.extractSection(aiResponse, 'Market position') || 
+                              'Unable to determine market position';
+      analysis.keyTrends = this.extractTrends(aiResponse);
+
+      console.log(`✅ Analysis completed for ${company}`);
+
+    } catch (error) {
+      console.error(`❌ Failed to analyze ${company}:`, error.message);
+    }
+
+    return analysis;
+  }
+
+  async generateCompetitiveReport(analyses: CompetitorAnalysis[]): Promise<string> {
+    console.log('\n📊 Generating comprehensive competitive report...');
+
+    await this.chatgpt.startConversation('Competitive Landscape Report');
+
+    const competitorSummaries = analyses.map(analysis => `
+## ${analysis.company}
+Market Position: ${analysis.marketPosition}
+Recent News Items: ${analysis.searchResults.length}
+Key Trends: ${analysis.keyTrends.join(', ')}
+`).join('\n');
+
+    const reportPrompt = `
+Generate a comprehensive competitive landscape report based on this data:
+
+${competitorSummaries}
+
+Include:
+1. Executive Summary
+2. Market Landscape Overview
+3. Competitive Positioning Matrix
+4. Threats and Opportunities
+5. Strategic Recommendations
+
+Make it professional and actionable.
+`;
+
+    await this.chatgpt.sendPrompt(reportPrompt);
+    const report = await this.chatgpt.getLatestResponse();
+
+    return report;
+  }
+
+  private extractSection(text: string, sectionName: string): string | null {
+    const regex = new RegExp(`${sectionName}[^\\n]*\\n([^\\n]+)`, 'i');
+    const match = text.match(regex);
+    return match ? match[1].trim() : null;
+  }
+
+  private extractTrends(text: string): string[] {
+    const trendsSection = text.match(/trends[^:]*:([^#]+)/i);
+    if (!trendsSection) return [];
+
+    return trendsSection[1]
+      .split('\n')
+      .filter(line => line.trim().startsWith('-') || line.trim().startsWith('•'))
+      .map(line => line.replace(/^[-•]\s*/, '').trim())
+      .filter(trend => trend.length > 0)
+      .slice(0, 5);
+  }
+
+  async cleanup(): Promise<void> {
+    await Promise.all([
+      this.google.cleanup(),
+      this.chatgpt.cleanup()
+    ]);
+  }
+}
+
+// Usage example
+async function runCompetitiveAnalysis() {
+  const agent = new CompetitiveIntelligenceAgent();
+  await agent.initialize();
+
+  try {
+    const competitors = [
+      'OpenAI',
+      'Anthropic', 
+      'Google DeepMind',
+      'Microsoft AI'
+    ];
+
+    console.log(`🎯 Analyzing ${competitors.length} competitors in AI space`);
+
+    const analyses: CompetitorAnalysis[] = [];
+
+    for (const competitor of competitors) {
+      const analysis = await agent.analyzeCompetitor(competitor);
+      analyses.push(analysis);
+      
+      // Brief pause between analyses to be respectful
+      await new Promise(resolve => setTimeout(resolve, 2000));
+    }
+
+    // Generate comprehensive report
+    const report = await agent.generateCompetitiveReport(analyses);
+    
+    console.log('\n📄 COMPETITIVE INTELLIGENCE REPORT');
+    console.log('=====================================');
+    console.log(report.substring(0, 1000) + '...');
+
+    // Summary statistics
+    console.log('\n📊 ANALYSIS SUMMARY');
+    console.log('==================');
+    console.log(`Companies analyzed: ${analyses.length}`);
+    console.log(`Total news items: ${analyses.reduce((sum, a) => sum + a.searchResults.length, 0)}`);
+    console.log(`Average trends per company: ${analyses.reduce((sum, a) => sum + a.keyTrends.length, 0) / analyses.length}`);
+
+  } catch (error) {
+    console.error('❌ Competitive analysis failed:', error);
+  } finally {
+    await agent.cleanup();
+  }
+}
+
+runCompetitiveAnalysis().catch(console.error);
+#+END_SRC
+
+** Contract Validation Demo
+
+Demonstrates the ATDD (Acceptance Test-Driven Development) framework for validating semantic contracts.
+
+#+BEGIN_SRC typescript
+// examples/contract-validation/index.ts
+import { SemanTestClient } from '@semantest/browser';
+import { GoogleClient } from '@semantest/google.com';
+import { ChatGPTClient } from '@semantest/chatgpt.com';
+import { WikipediaClient } from '@semantest/wikipedia.org';
+
+interface ContractValidationResult {
+  contractId: string;
+  domain: string;
+  capabilities: string[];
+  validationResults: CapabilityValidation[];
+  overallScore: number;
+  recommendations: string[];
+}
+
+interface CapabilityValidation {
+  capability: string;
+  passed: boolean;
+  responseTime: number;
+  errorMessage?: string;
+  performance: 'excellent' | 'good' | 'fair' | 'poor';
+}
+
+class ContractValidationSuite {
+  private semantest: SemanTestClient;
+  private clients: Map<string, any> = new Map();
+
+  constructor() {
+    this.semantest = new SemanTestClient({
+      timeout: 60000,
+      retryAttempts: 2
+    });
+  }
+
+  async initialize(): Promise<void> {
+    console.log('🧪 Initializing Contract Validation Suite...');
+    
+    await this.semantest.initialize();
+
+    // Initialize domain clients
+    const google = new GoogleClient();
+    const chatgpt = new ChatGPTClient();
+    const wikipedia = new WikipediaClient();
+
+    await Promise.all([
+      google.initialize(),
+      chatgpt.initialize(),
+      wikipedia.initialize()
+    ]);
+
+    this.clients.set('google.com', google);
+    this.clients.set('chatgpt.com', chatgpt);
+    this.clients.set('wikipedia.org', wikipedia);
+
+    console.log('✅ All clients initialized');
+  }
+
+  async validateDomainContract(domain: string): Promise<ContractValidationResult> {
+    console.log(`\n🔍 Validating contract for domain: ${domain}`);
+
+    const result: ContractValidationResult = {
+      contractId: `${domain}-contract-v1`,
+      domain,
+      capabilities: [],
+      validationResults: [],
+      overallScore: 0,
+      recommendations: []
+    };
+
+    try {
+      // 1. Discover capabilities
+      const contracts = await this.semantest.discoverCapabilities(domain);
+      const contract = contracts[0]; // Use primary contract
+
+      if (!contract) {
+        throw new Error(`No contract found for domain: ${domain}`);
+      }
+
+      result.capabilities = Object.keys(contract.capabilities);
+      console.log(`📋 Found ${result.capabilities.length} capabilities to validate`);
+
+      // 2. Validate each capability
+      for (const capabilityName of result.capabilities) {
+        const validation = await this.validateCapability(domain, capabilityName);
+        result.validationResults.push(validation);
+        
+        console.log(`  ${validation.passed ? '✅' : '❌'} ${capabilityName}: ${validation.responseTime}ms`);
+      }
+
+      // 3. Calculate overall score
+      const passedTests = result.validationResults.filter(v => v.passed).length;
+      result.overallScore = (passedTests / result.validationResults.length) * 100;
+
+      // 4. Generate recommendations
+      result.recommendations = this.generateRecommendations(result.validationResults);
+
+      console.log(`📊 Overall validation score: ${result.overallScore.toFixed(1)}%`);
+
+    } catch (error) {
+      console.error(`❌ Contract validation failed for ${domain}:`, error.message);
+    }
+
+    return result;
+  }
+
+  private async validateCapability(domain: string, capability: string): Promise<CapabilityValidation> {
+    const startTime = Date.now();
+    const client = this.clients.get(domain);
+
+    try {
+      let success = false;
+
+      // Test capability based on domain and type
+      switch (domain) {
+        case 'google.com':
+          success = await this.testGoogleCapability(client, capability);
+          break;
+        case 'chatgpt.com':
+          success = await this.testChatGPTCapability(client, capability);
+          break;
+        case 'wikipedia.org':
+          success = await this.testWikipediaCapability(client, capability);
+          break;
+        default:
+          throw new Error(`Unknown domain: ${domain}`);
+      }
+
+      const responseTime = Date.now() - startTime;
+      
+      return {
+        capability,
+        passed: success,
+        responseTime,
+        performance: this.categorizePerformance(responseTime)
+      };
+
+    } catch (error) {
+      const responseTime = Date.now() - startTime;
+      
+      return {
+        capability,
+        passed: false,
+        responseTime,
+        errorMessage: error.message,
+        performance: 'poor'
+      };
+    }
+  }
+
+  private async testGoogleCapability(client: GoogleClient, capability: string): Promise<boolean> {
+    switch (capability) {
+      case 'search':
+        const results = await client.search('test query');
+        return results.length > 0;
+      
+      case 'searchImages':
+        const images = await client.searchImages('test image');
+        return images.length > 0;
+      
+      case 'searchNews':
+        const news = await client.searchNews('test news');
+        return news.length > 0;
+      
+      default:
+        return false;
+    }
+  }
+
+  private async testChatGPTCapability(client: ChatGPTClient, capability: string): Promise<boolean> {
+    switch (capability) {
+      case 'sendPrompt':
+        await client.sendPrompt('Test prompt for validation');
+        const response = await client.getLatestResponse();
+        return response.length > 0;
+      
+      case 'startConversation':
+        const conversation = await client.startConversation('Test Conversation');
+        return conversation.id.length > 0;
+      
+      case 'createProject':
+        const project = await client.createProject('Test Project');
+        return project.id.length > 0;
+      
+      default:
+        return false;
+    }
+  }
+
+  private async testWikipediaCapability(client: WikipediaClient, capability: string): Promise<boolean> {
+    switch (capability) {
+      case 'navigateToArticle':
+        const article = await client.navigateToArticle('Test');
+        return article.title.length > 0;
+      
+      case 'search':
+        const suggestions = await client.search('test query');
+        return suggestions.length > 0;
+      
+      case 'extractCurrentArticle':
+        await client.navigateToArticle('Wikipedia');
+        const currentArticle = await client.extractCurrentArticle();
+        return currentArticle !== null;
+      
+      default:
+        return false;
+    }
+  }
+
+  private categorizePerformance(responseTime: number): 'excellent' | 'good' | 'fair' | 'poor' {
+    if (responseTime < 1000) return 'excellent';
+    if (responseTime < 3000) return 'good';
+    if (responseTime < 10000) return 'fair';
+    return 'poor';
+  }
+
+  private generateRecommendations(validations: CapabilityValidation[]): string[] {
+    const recommendations: string[] = [];
+    
+    const failedTests = validations.filter(v => !v.passed);
+    if (failedTests.length > 0) {
+      recommendations.push(`Fix ${failedTests.length} failing capabilities: ${failedTests.map(t => t.capability).join(', ')}`);
+    }
+
+    const slowTests = validations.filter(v => v.performance === 'poor' || v.performance === 'fair');
+    if (slowTests.length > 0) {
+      recommendations.push(`Optimize performance for: ${slowTests.map(t => t.capability).join(', ')}`);
+    }
+
+    const avgResponseTime = validations.reduce((sum, v) => sum + v.responseTime, 0) / validations.length;
+    if (avgResponseTime > 5000) {
+      recommendations.push('Consider implementing response caching to improve overall performance');
+    }
+
+    if (recommendations.length === 0) {
+      recommendations.push('All capabilities are performing well - consider adding more advanced test scenarios');
+    }
+
+    return recommendations;
+  }
+
+  async generateValidationReport(results: ContractValidationResult[]): Promise<string> {
+    const totalCapabilities = results.reduce((sum, r) => sum + r.capabilities.length, 0);
+    const totalPassed = results.reduce((sum, r) => sum + r.validationResults.filter(v => v.passed).length, 0);
+    const overallPassRate = (totalPassed / totalCapabilities) * 100;
+
+    const report = `
+# Semantest Contract Validation Report
+
+Generated: ${new Date().toLocaleString()}
+
+## Executive Summary
+- **Domains Tested**: ${results.length}
+- **Total Capabilities**: ${totalCapabilities}
+- **Overall Pass Rate**: ${overallPassRate.toFixed(1)}%
+
+## Domain Results
+
+${results.map(result => `
+### ${result.domain}
+- **Contract ID**: ${result.contractId}
+- **Capabilities**: ${result.capabilities.length}
+- **Pass Rate**: ${result.overallScore.toFixed(1)}%
+- **Performance**: ${this.summarizePerformance(result.validationResults)}
+
+**Detailed Results**:
+${result.validationResults.map(v => 
+  `- ${v.passed ? '✅' : '❌'} ${v.capability} (${v.responseTime}ms) ${v.errorMessage ? `- Error: ${v.errorMessage}` : ''}`
+).join('\n')}
+
+**Recommendations**:
+${result.recommendations.map(rec => `- ${rec}`).join('\n')}
+`).join('\n')}
+
+## Performance Analysis
+
+### Response Time Distribution
+${this.generatePerformanceChart(results)}
+
+### Critical Issues
+${this.identifyCriticalIssues(results)}
+
+## Recommendations for Improvement
+
+${this.generateGlobalRecommendations(results)}
+
+---
+*Generated by Semantest Contract Validation Suite*
+`;
+
+    return report;
+  }
+
+  private summarizePerformance(validations: CapabilityValidation[]): string {
+    const performanceCounts = validations.reduce((counts, v) => {
+      counts[v.performance] = (counts[v.performance] || 0) + 1;
+      return counts;
+    }, {} as Record<string, number>);
+
+    return Object.entries(performanceCounts)
+      .map(([perf, count]) => `${count} ${perf}`)
+      .join(', ');
+  }
+
+  private generatePerformanceChart(results: ContractValidationResult[]): string {
+    const allValidations = results.flatMap(r => r.validationResults);
+    const avgResponseTime = allValidations.reduce((sum, v) => sum + v.responseTime, 0) / allValidations.length;
+    
+    return `
+- Average Response Time: ${avgResponseTime.toFixed(0)}ms
+- Fastest: ${Math.min(...allValidations.map(v => v.responseTime))}ms
+- Slowest: ${Math.max(...allValidations.map(v => v.responseTime))}ms
+`;
+  }
+
+  private identifyCriticalIssues(results: ContractValidationResult[]): string {
+    const criticalIssues: string[] = [];
+    
+    results.forEach(result => {
+      if (result.overallScore < 50) {
+        criticalIssues.push(`${result.domain} has failing validation score: ${result.overallScore.toFixed(1)}%`);
+      }
+      
+      const criticalFailures = result.validationResults.filter(v => !v.passed && v.capability.includes('core'));
+      if (criticalFailures.length > 0) {
+        criticalIssues.push(`${result.domain} has core capability failures: ${criticalFailures.map(f => f.capability).join(', ')}`);
+      }
+    });
+
+    return criticalIssues.length > 0 
+      ? criticalIssues.map(issue => `- ⚠️ ${issue}`).join('\n')
+      : '- No critical issues identified';
+  }
+
+  private generateGlobalRecommendations(results: ContractValidationResult[]): string {
+    const allRecommendations = results.flatMap(r => r.recommendations);
+    const uniqueRecommendations = [...new Set(allRecommendations)];
+    
+    return uniqueRecommendations.map(rec => `- ${rec}`).join('\n');
+  }
+
+  async cleanup(): Promise<void> {
+    await this.semantest.cleanup();
+    
+    for (const client of this.clients.values()) {
+      if (client.cleanup) {
+        await client.cleanup();
+      }
+    }
+  }
+}
+
+// Run the validation suite
+async function runContractValidation() {
+  const validator = new ContractValidationSuite();
+  await validator.initialize();
+
+  try {
+    const domains = ['google.com', 'chatgpt.com', 'wikipedia.org'];
+    const results: ContractValidationResult[] = [];
+
+    console.log(`🧪 Running contract validation for ${domains.length} domains`);
+
+    for (const domain of domains) {
+      const result = await validator.validateDomainContract(domain);
+      results.push(result);
+    }
+
+    // Generate and display report
+    const report = await validator.generateValidationReport(results);
+    
+    console.log('\n📊 VALIDATION REPORT');
+    console.log('==================');
+    console.log(report.substring(0, 1500) + '...');
+
+    // Summary
+    const totalScore = results.reduce((sum, r) => sum + r.overallScore, 0) / results.length;
+    console.log(`\n🎯 Overall System Health: ${totalScore.toFixed(1)}%`);
+    
+    if (totalScore >= 90) console.log('🟢 Excellent - All systems performing optimally');
+    else if (totalScore >= 75) console.log('🟡 Good - Minor issues detected');
+    else if (totalScore >= 50) console.log('🟠 Fair - Several issues need attention');
+    else console.log('🔴 Poor - Critical issues require immediate attention');
+
+  } catch (error) {
+    console.error('❌ Validation suite failed:', error);
+  } finally {
+    await validator.cleanup();
+  }
+}
+
+runContractValidation().catch(console.error);
+#+END_SRC
+
+* Event-Driven Examples
+
+** Real-Time Monitoring Dashboard
+
+Shows how to build event-driven automation monitoring.
+
+#+BEGIN_SRC typescript
+// examples/monitoring-dashboard/index.ts
+import { SemanTestClient } from '@semantest/browser';
+import { GoogleClient } from '@semantest/google.com';
+import { ChatGPTClient } from '@semantest/chatgpt.com';
+
+class AutomationMonitor {
+  private clients: Map<string, any> = new Map();
+  private eventLog: Array<{ timestamp: Date; domain: string; event: string; data: any }> = [];
+  private metrics: Map<string, { total: number; successful: number; errors: number; avgResponseTime: number }> = new Map();
+
+  async initialize(): Promise<void> {
+    console.log('📊 Initializing Automation Monitor...');
+
+    const google = new GoogleClient();
+    const chatgpt = new ChatGPTClient();
+
+    await Promise.all([
+      google.initialize(),
+      chatgpt.initialize()
+    ]);
+
+    // Set up event listeners
+    this.setupEventListeners(google, 'google.com');
+    this.setupEventListeners(chatgpt, 'chatgpt.com');
+
+    this.clients.set('google.com', google);
+    this.clients.set('chatgpt.com', chatgpt);
+
+    // Start real-time dashboard
+    this.startDashboard();
+  }
+
+  private setupEventListeners(client: any, domain: string): void {
+    // Initialize metrics for domain
+    this.metrics.set(domain, { total: 0, successful: 0, errors: 0, avgResponseTime: 0 });
+
+    // Listen for all events
+    client.on('*', (eventType: string, data: any) => {
+      this.logEvent(domain, eventType, data);
+      this.updateMetrics(domain, eventType, data);
+    });
+
+    // Specific event handlers
+    client.on('searchCompleted', (data: any) => {
+      console.log(`🔍 [${domain}] Search completed: ${data.query} (${data.results?.length || 0} results)`);
+    });
+
+    client.on('error', (error: any) => {
+      console.log(`❌ [${domain}] Error: ${error.message}`);
+    });
+  }
+
+  private logEvent(domain: string, event: string, data: any): void {
+    this.eventLog.push({
+      timestamp: new Date(),
+      domain,
+      event,
+      data
+    });
+
+    // Keep only last 1000 events
+    if (this.eventLog.length > 1000) {
+      this.eventLog = this.eventLog.slice(-1000);
+    }
+  }
+
+  private updateMetrics(domain: string, eventType: string, data: any): void {
+    const metrics = this.metrics.get(domain)!;
+    
+    metrics.total++;
+    
+    if (eventType.includes('completed') || eventType.includes('success')) {
+      metrics.successful++;
+      
+      if (data.duration || data.responseTime) {
+        const responseTime = data.duration || data.responseTime;
+        metrics.avgResponseTime = (metrics.avgResponseTime + responseTime) / 2;
+      }
+    }
+    
+    if (eventType.includes('error') || eventType.includes('failed')) {
+      metrics.errors++;
+    }
+  }
+
+  private startDashboard(): void {
+    console.log('🖥️ Starting real-time dashboard...\n');
+
+    // Update dashboard every 5 seconds
+    setInterval(() => {
+      this.displayDashboard();
+    }, 5000);
+
+    // Initial display
+    this.displayDashboard();
+  }
+
+  private displayDashboard(): void {
+    console.clear();
+    console.log('📊 SEMANTEST AUTOMATION MONITOR');
+    console.log('================================');
+    console.log(`Last Updated: ${new Date().toLocaleTimeString()}\n`);
+
+    // Domain metrics
+    for (const [domain, metrics] of this.metrics) {
+      const successRate = metrics.total > 0 ? (metrics.successful / metrics.total * 100).toFixed(1) : '0.0';
+      const errorRate = metrics.total > 0 ? (metrics.errors / metrics.total * 100).toFixed(1) : '0.0';
+
+      console.log(`🌐 ${domain.toUpperCase()}`);
+      console.log(`   Total Operations: ${metrics.total}`);
+      console.log(`   Success Rate: ${successRate}%`);
+      console.log(`   Error Rate: ${errorRate}%`);
+      console.log(`   Avg Response: ${metrics.avgResponseTime.toFixed(0)}ms`);
+      console.log('');
+    }
+
+    // Recent events
+    console.log('📝 RECENT EVENTS (Last 5)');
+    console.log('========================');
+    
+    const recentEvents = this.eventLog.slice(-5).reverse();
+    recentEvents.forEach(event => {
+      const timeStr = event.timestamp.toLocaleTimeString();
+      console.log(`${timeStr} [${event.domain}] ${event.event}`);
+    });
+
+    console.log('\n⚡ Live monitoring active - Press Ctrl+C to stop');
+  }
+
+  async simulateAutomationWorkload(): Promise<void> {
+    console.log('🤖 Starting simulated automation workload...\n');
+
+    const google = this.clients.get('google.com');
+    const chatgpt = this.clients.get('chatgpt.com');
+
+    // Simulate various operations
+    const operations = [
+      () => google.search('TypeScript tutorial'),
+      () => google.search('JavaScript frameworks'),
+      () => google.searchNews('tech news'),
+      () => chatgpt.sendPrompt('Explain async/await'),
+      () => chatgpt.startConversation('AI Discussion'),
+      () => google.searchImages('programming')
+    ];
+
+    // Run operations randomly
+    const interval = setInterval(async () => {
+      try {
+        const operation = operations[Math.floor(Math.random() * operations.length)];
+        await operation();
+      } catch (error) {
+        // Errors are handled by event listeners
+      }
+    }, 3000);
+
+    // Run for 30 seconds
+    setTimeout(() => {
+      clearInterval(interval);
+      console.log('\n✅ Simulation completed');
+    }, 30000);
+  }
+
+  async cleanup(): Promise<void> {
+    for (const client of this.clients.values()) {
+      if (client.cleanup) {
+        await client.cleanup();
+      }
+    }
+  }
+}
+
+// Run the monitoring example
+async function runMonitoringDemo() {
+  const monitor = new AutomationMonitor();
+  await monitor.initialize();
+
+  try {
+    // Start simulation
+    await monitor.simulateAutomationWorkload();
+    
+    // Keep monitoring for a bit longer
+    await new Promise(resolve => setTimeout(resolve, 10000));
+
+  } catch (error) {
+    console.error('❌ Monitoring demo failed:', error);
+  } finally {
+    await monitor.cleanup();
+  }
+}
+
+runMonitoringDemo().catch(console.error);
+#+END_SRC
+
+* Testing Examples
+
+** Unit Testing with Jest
+
+#+BEGIN_SRC typescript
+// examples/testing/google-client.test.ts
+import { GoogleClient } from '@semantest/google.com';
+
+describe('GoogleClient Integration Tests', () => {
+  let client: GoogleClient;
+
+  beforeEach(async () => {
+    client = new GoogleClient({
+      timeout: 30000,
+      retryAttempts: 2
+    });
+    await client.initialize();
+  });
+
+  afterEach(async () => {
+    await client.cleanup();
+  });
+
+  describe('search functionality', () => {
+    test('should return search results for common queries', async () => {
+      const results = await client.search('TypeScript programming');
+      
+      expect(results).toBeDefined();
+      expect(Array.isArray(results)).toBe(true);
+      expect(results.length).toBeGreaterThan(0);
+      
+      // Validate result structure
+      results.forEach(result => {
+        expect(result).toHaveProperty('title');
+        expect(result).toHaveProperty('url');
+        expect(result).toHaveProperty('snippet');
+        expect(typeof result.title).toBe('string');
+        expect(typeof result.url).toBe('string');
+        expect(result.title.length).toBeGreaterThan(0);
+      });
+    });
+
+    test('should handle search options correctly', async () => {
+      const results = await client.search('machine learning', {
+        maxResults: 5,
+        language: 'en',
+        timeRange: 'week'
+      });
+      
+      expect(results.length).toBeLessThanOrEqual(5);
+    });
+
+    test('should handle empty results gracefully', async () => {
+      const results = await client.search('xyznonexistentquery123456789');
+      
+      expect(Array.isArray(results)).toBe(true);
+      // Should not throw an error even if no results
+    });
+  });
+
+  describe('image search functionality', () => {
+    test('should return image results', async () => {
+      const images = await client.searchImages('TypeScript logo');
+      
+      expect(Array.isArray(images)).toBe(true);
+      
+      if (images.length > 0) {
+        expect(images[0]).toHaveProperty('thumbnailUrl');
+        expect(images[0]).toHaveProperty('originalUrl');
+        expect(images[0]).toHaveProperty('dimensions');
+      }
+    });
+  });
+
+  describe('performance and reliability', () => {
+    test('should complete searches within timeout', async () => {
+      const startTime = Date.now();
+      
+      await client.search('test query');
+      
+      const duration = Date.now() - startTime;
+      expect(duration).toBeLessThan(30000); // Should complete within 30s
+    });
+
+    test('should handle concurrent searches', async () => {
+      const promises = [
+        client.search('query 1'),
+        client.search('query 2'),
+        client.search('query 3')
+      ];
+      
+      const results = await Promise.all(promises);
+      
+      expect(results).toHaveLength(3);
+      results.forEach(result => {
+        expect(Array.isArray(result)).toBe(true);
+      });
+    });
+  });
+});
+#+END_SRC
+
+** End-to-End Testing with Playwright
+
+#+BEGIN_SRC typescript
+// examples/testing/e2e-workflow.test.ts
+import { test, expect } from '@playwright/test';
+import { GoogleClient } from '@semantest/google.com';
+import { WikipediaClient } from '@semantest/wikipedia.org';
+
+test.describe('End-to-End Semantic Automation', () => {
+  test('complete research workflow', async () => {
+    const google = new GoogleClient();
+    const wikipedia = new WikipediaClient();
+
+    await google.initialize();
+    await wikipedia.initialize();
+
+    try {
+      // Step 1: Search for a topic
+      const searchResults = await google.search('quantum computing basics');
+      expect(searchResults.length).toBeGreaterThan(0);
+
+      // Step 2: Get Wikipedia information
+      const article = await wikipedia.navigateToArticle('Quantum computing');
+      expect(article.title).toContain('Quantum');
+
+      // Step 3: Extract content
+      const sections = article.sections;
+      expect(sections.length).toBeGreaterThan(0);
+
+      // Step 4: Verify we can navigate between domains
+      const relatedArticles = await wikipedia.getRelatedArticles();
+      expect(relatedArticles.length).toBeGreaterThan(0);
+
+    } finally {
+      await google.cleanup();
+      await wikipedia.cleanup();
+    }
+  });
+
+  test('cross-browser compatibility', async () => {
+    const browsers = ['chromium', 'firefox', 'webkit'];
+    
+    for (const browserName of browsers) {
+      const client = new GoogleClient({ 
+        browser: browserName as any,
+        timeout: 45000 
+      });
+      
+      await client.initialize();
+      
+      try {
+        const results = await client.search('test query');
+        expect(results.length).toBeGreaterThan(0);
+      } finally {
+        await client.cleanup();
+      }
+    }
+  });
+});
+#+END_SRC
+
+* Performance Examples
+
+** Batch Operations
+
+#+BEGIN_SRC typescript
+// examples/performance/batch-operations.ts
+import { GoogleClient } from '@semantest/google.com';
+
+async function batchSearchExample() {
+  const client = new GoogleClient({
+    timeout: 60000,
+    parallelRequests: 3 // Limit concurrent requests
+  });
+
+  await client.initialize();
+
+  try {
+    const queries = [
+      'artificial intelligence',
+      'machine learning',
+      'deep learning',
+      'neural networks',
+      'computer vision',
+      'natural language processing'
+    ];
+
+    console.log(`🚀 Starting batch search for ${queries.length} queries`);
+    const startTime = Date.now();
+
+    // Batch search - more efficient than individual searches
+    const allResults = await client.batchSearch(queries);
+
+    const totalTime = Date.now() - startTime;
+    const totalResults = allResults.reduce((sum, results) => sum + results.length, 0);
+
+    console.log(`✅ Batch search completed:`);
+    console.log(`   Total time: ${totalTime}ms`);
+    console.log(`   Total results: ${totalResults}`);
+    console.log(`   Average per query: ${(totalTime / queries.length).toFixed(0)}ms`);
+    console.log(`   Results per query: ${(totalResults / queries.length).toFixed(1)}`);
+
+    // Display sample results
+    allResults.forEach((results, index) => {
+      console.log(`\n📊 Query "${queries[index]}": ${results.length} results`);
+      if (results.length > 0) {
+        console.log(`   Top result: ${results[0].title}`);
+      }
+    });
+
+  } finally {
+    await client.cleanup();
+  }
+}
+
+batchSearchExample().catch(console.error);
+#+END_SRC
+
+** Caching and Optimization
+
+#+BEGIN_SRC typescript
+// examples/performance/caching-demo.ts
+import { WikipediaClient } from '@semantest/wikipedia.org';
+
+async function cachingDemo() {
+  const client = new WikipediaClient({
+    cacheEnabled: true,
+    maxCacheSize: 50
+  });
+
+  await client.initialize();
+
+  try {
+    const articles = ['Python', 'JavaScript', 'TypeScript', 'React', 'Node.js'];
+
+    console.log('🐌 First run (no cache):');
+    const firstRunStart = Date.now();
+    
+    for (const articleName of articles) {
+      const startTime = Date.now();
+      await client.navigateToArticle(articleName);
+      const article = await client.extractCurrentArticle();
+      const duration = Date.now() - startTime;
+      
+      console.log(`   ${articleName}: ${duration}ms (${article?.getWordCount()} words)`);
+    }
+    
+    const firstRunTotal = Date.now() - firstRunStart;
+
+    console.log('\n⚡ Second run (with cache):');
+    const secondRunStart = Date.now();
+    
+    for (const articleName of articles) {
+      const startTime = Date.now();
+      await client.navigateToArticle(articleName);
+      const article = await client.extractCurrentArticle();
+      const duration = Date.now() - startTime;
+      
+      console.log(`   ${articleName}: ${duration}ms (cached)`);
+    }
+    
+    const secondRunTotal = Date.now() - secondRunStart;
+
+    console.log(`\n📊 Performance improvement:`);
+    console.log(`   First run: ${firstRunTotal}ms`);
+    console.log(`   Second run: ${secondRunTotal}ms`);
+    console.log(`   Speedup: ${(firstRunTotal / secondRunTotal).toFixed(1)}x faster`);
+
+  } finally {
+    await client.cleanup();
+  }
+}
+
+cachingDemo().catch(console.error);
+#+END_SRC
+
+* Package Configuration
+
+Each example includes its own package.json for easy setup:
+
+#+BEGIN_SRC json
+{
+  "name": "semantest-example",
+  "version": "1.0.0",
+  "scripts": {
+    "start": "ts-node index.ts",
+    "build": "tsc",
+    "test": "jest"
+  },
+  "dependencies": {
+    "@semantest/browser": "^1.0.0",
+    "@semantest/google.com": "^1.0.0",
+    "@semantest/chatgpt.com": "^1.0.0",
+    "@semantest/wikipedia.org": "^1.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0",
+    "ts-node": "^10.9.0",
+    "jest": "^29.0.0",
+    "@types/jest": "^29.0.0",
+    "ts-jest": "^29.0.0"
+  }
+}
+#+END_SRC
+
+* Running the Examples
+
+** Prerequisites
+
+1. Node.js 18+ installed
+2. Modern browser (Chrome, Firefox, or Safari)
+3. Git for cloning the repository
+
+** Quick Setup
+
+#+BEGIN_SRC bash
+# Clone the repository
+git clone https://github.com/rydnr/chatgpt-buddy.git
+cd chatgpt-buddy
+
+# Install dependencies
+npm install
+
+# Run a specific example
+cd docs/examples/basic-search
+npm install
+npm run start
+#+END_SRC
+
+** Available Examples
+
+- `basic-search/` - Simple Google search automation
+- `chatgpt-conversation/` - ChatGPT interaction patterns
+- `wikipedia-research/` - Wikipedia content extraction
+- `research-workflow/` - Multi-domain research automation
+- `competitive-intelligence/` - Automated competitor analysis
+- `contract-validation/` - ATDD framework demonstration
+- `monitoring-dashboard/` - Real-time event monitoring
+- `testing/` - Unit and E2E testing examples
+- `performance/` - Optimization and caching demos
+
+* Community Contributions
+
+We welcome community-contributed examples! See our [[file:../contributing/README.org][Contributing Guide]] for guidelines on:
+
+- Creating new example applications
+- Documenting complex workflows
+- Sharing performance optimizations
+- Building domain-specific demonstrations
+
+---
+
+These examples demonstrate the power and flexibility of the Semantest platform. Each one can be used as a starting point for your own semantic automation projects. Happy automating! 🚀
