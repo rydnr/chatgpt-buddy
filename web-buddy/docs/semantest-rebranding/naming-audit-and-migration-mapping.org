@@ -1,0 +1,309 @@
+#+TITLE: Semantest Rebranding: Comprehensive Naming Audit and Migration Mapping
+#+AUTHOR: Web-Buddy Team  
+#+DATE: 2025-07-06
+#+DESCRIPTION: Complete audit of current package structure and mapping to Semantest DNS-style naming convention
+
+* Executive Summary
+This document provides a comprehensive audit of the current Web-Buddy framework package structure and maps it to the new Semantest DNS-style naming convention. The migration represents a strategic transformation from informal "-buddy" branding to enterprise-ready, hierarchical naming that scales with ecosystem growth.
+
+* Strategic Context
+
+** Current Limitations
+- =Informal Branding=: "-buddy" suffix creates perception barriers for enterprise adoption
+- =Flat Structure=: No hierarchical organization for related packages
+- =Discovery Issues=: Difficult to categorize and find related components
+- =Scalability Problems=: Naming convention doesn't support ecosystem growth
+
+** Semantest Vision
+- =Professional Branding=: Enterprise-ready naming for production environments
+- =DNS-Style Hierarchy=: Clear service relationships and dependencies
+- =Semantic Intelligence=: Reflects contract-driven automation approach
+- =Developer Experience=: Intuitive package discovery and organization
+
+* Current Package Inventory
+
+** Core Framework Packages
+| Current Name | Location | Purpose | Dependencies |
+|--------------|----------|---------|--------------|
+| =@web-buddy/core= | =packages/core/= | Generic messaging infrastructure | None |
+| =@web-buddy/server= | =packages/server/= | HTTP/WebSocket server | =@web-buddy/core= |
+| =@web-buddy/testing= | =packages/testing/= | ATDD framework | =@playwright/test= |
+| =@web-buddy/browser-extension= | =packages/browser-extension/= | Browser automation | =@web-buddy/core= |
+
+** Domain Implementation Packages  
+| Current Name | Location | Purpose | Dependencies |
+|--------------|----------|---------|--------------|
+| =@web-buddy/google-buddy= | =implementations/google-buddy/= | Google search automation | =@web-buddy/core= |
+| =@web-buddy/chatgpt-buddy= | =implementations/chatgpt-buddy/= | ChatGPT conversation mgmt | =@web-buddy/core= |
+| =@web-buddy/wikipedia-buddy= | =implementations/wikipedia-buddy/= | Wikipedia research | =@web-buddy/core= |
+
+** Utility and Support Packages
+| Current Name | Location | Purpose | Dependencies |
+|--------------|----------|---------|--------------|
+| =chatgpt-buddy-client-ts= | =client/typescript/= | TypeScript client SDK | =@web-buddy/core= |
+| =chatgpt-buddy-client-python= | =client/python/= | Python client SDK | None (HTTP only) |
+| =typescript-eda-*= | =typescript-eda*/= | Event-driven architecture base | None |
+
+* Semantest DNS-Style Naming Mapping
+
+** Core Infrastructure Layer
+#+BEGIN_SRC ascii
+Current Structure          →    Semantest DNS-Style Structure
+├── @web-buddy/core        →    @semantest/browser
+├── @web-buddy/server      →    @semantest/nodejs.server  
+├── @web-buddy/testing     →    @semantest/testing.framework
+└── browser-extension      →    @semantest/browser.extension
+#+END_SRC
+
+** Domain Implementation Layer
+#+BEGIN_SRC ascii
+Current Structure              →    Semantest DNS-Style Structure
+├── google-buddy               →    @semantest/google.com
+├── chatgpt-buddy              →    @semantest/chatgpt.com  
+├── wikipedia-buddy            →    @semantest/wikipedia.org
+└── [future domains]           →    @semantest/github.com
+                               →    @semantest/linkedin.com
+                               →    @semantest/images.google.com
+#+END_SRC
+
+** Client SDK Layer
+#+BEGIN_SRC ascii
+Current Structure              →    Semantest DNS-Style Structure
+├── client-ts                  →    @semantest/typescript.client
+├── client-python              →    @semantest/python.client
+└── [domain-specific clients]  →    @semantest/typescript.client.google.com
+                               →    @semantest/python.client.chatgpt.com
+#+END_SRC
+
+** Specialized Service Layer  
+#+BEGIN_SRC ascii
+Current Structure              →    Semantest DNS-Style Structure
+├── typescript-eda            →    @semantest/typescript.eda
+├── contract-library           →    @semantest/contracts.library
+└── [future specialized]       →    @semantest/ai.learning.engine
+                               →    @semantest/security.sandbox
+#+END_SRC
+
+* Detailed Package Migration Plan
+
+** Tier 1: Core Infrastructure (Critical Path)
+*** @semantest/browser (from @web-buddy/core)
+- =Purpose=: Generic browser automation messaging framework
+- =Breaking Changes=: Package name, import paths
+- =Dependencies=: None (foundation package)
+- =Migration Complexity=: High (used by all other packages)
+- =Rollout Priority=: Phase 1 (Week 14)
+
+*** @semantest/nodejs.server (from @web-buddy/server)  
+- =Purpose=: HTTP/WebSocket coordination server
+- =Breaking Changes=: Package name, server endpoint naming
+- =Dependencies=: =@semantest/browser=
+- =Migration Complexity=: Medium
+- =Rollout Priority=: Phase 1 (Week 14)
+
+*** @semantest/testing.framework (from @web-buddy/testing)
+- =Purpose=: ATDD contract validation framework
+- =Breaking Changes=: Package name, test runner imports
+- =Dependencies=: =@playwright/test=, =@semantest/browser=
+- =Migration Complexity=: Medium
+- =Rollout Priority=: Phase 2 (Week 15)
+
+** Tier 2: Domain Implementations (Parallel Migration)
+*** @semantest/google.com (from google-buddy)
+- =Purpose=: Google search and services automation
+- =Breaking Changes=: Package name, client class names
+- =Dependencies=: =@semantest/browser=
+- =Migration Complexity=: Low (isolated domain logic)
+- =Rollout Priority=: Phase 2 (Week 15)
+
+*** @semantest/chatgpt.com (from chatgpt-buddy)
+- =Purpose=: ChatGPT conversation management automation
+- =Breaking Changes=: Package name, legacy naming references
+- =Dependencies=: =@semantest/browser=
+- =Migration Complexity=: Medium (legacy compatibility needed)
+- =Rollout Priority=: Phase 2 (Week 15)
+
+*** @semantest/wikipedia.org (from wikipedia-buddy)
+- =Purpose=: Wikipedia research and navigation automation
+- =Breaking Changes=: Package name, research workflow APIs
+- =Dependencies=: =@semantest/browser=
+- =Migration Complexity=: Low
+- =Rollout Priority=: Phase 2 (Week 15)
+
+** Tier 3: Client SDKs (Developer Interface)
+*** @semantest/typescript.client (from client-ts)
+- =Purpose=: TypeScript SDK for Semantest automation
+- =Breaking Changes=: Package name, class exports, method signatures
+- =Dependencies=: =@semantest/browser=
+- =Migration Complexity=: High (public API changes)
+- =Rollout Priority=: Phase 3 (Week 16)
+
+*** @semantest/python.client (from client-python)
+- =Purpose=: Python SDK for Semantest automation
+- =Breaking Changes=: Package name, HTTP client endpoints
+- =Dependencies=: None (HTTP-based)
+- =Migration Complexity=: Medium
+- =Rollout Priority=: Phase 3 (Week 16)
+
+* DNS-Style Naming Convention Rules
+
+** Hierarchical Structure Patterns
+#+BEGIN_SRC ascii
+@semantest/{domain}.{service}.{technology}
+
+Examples:
+- @semantest/google.com              # Domain automation
+- @semantest/nodejs.server           # Technology + service  
+- @semantest/typescript.client       # Technology + role
+- @semantest/python.client.google.com # Tech + role + domain
+- @semantest/browser.extension       # Technology + component
+#+END_SRC
+
+** Domain Classification
+- =.com domains=: Commercial services (google.com, chatgpt.com, github.com)
+- =.org domains=: Non-profit/open services (wikipedia.org, mozilla.org)
+- =Generic services=: browser, server, client, testing, contracts
+
+** Technology Markers
+- =nodejs.*=: Node.js based packages
+- =python.*=: Python based packages  
+- =typescript.*=: TypeScript specific packages
+- =browser.*=: Browser extension components
+
+** Service Type Indicators
+- =*.server=: Server-side services and coordination
+- =*.client=: Client SDKs and libraries
+- =*.testing=: Testing frameworks and utilities
+- =*.extension=: Browser extension components
+
+* Breaking Changes Analysis
+
+** High Impact Changes (Require Code Updates)
+1. =Import Path Changes=: All =@web-buddy/*= imports become =@semantest/*=
+2. =Class Name Updates=: =WebBuddyClient= → =SemanTestClient=
+3. =Message Type Prefixes=: =WEB_BUDDY_*= → =SEMANTEST_*=
+4. =Configuration Keys=: =webBuddy.*= → =semantest.*=
+5. =HTTP Endpoints=: =/web-buddy/*= → =/semantest/*=
+
+** Medium Impact Changes (May Require Updates)
+1. =Environment Variables=: =WEB_BUDDY_*= → =SEMANTEST_*=
+2. =File Naming=: =web-buddy.*= → =semantest.*=
+3. =Documentation Links=: Update all internal references
+4. =Test Descriptions=: Update test naming and descriptions
+
+** Low Impact Changes (Mostly Transparent)
+1. =Package Dependencies=: Handled by package.json updates
+2. =Build Scripts=: Updated build configurations
+3. =Development Tools=: IDE configurations and tooling
+
+* Backward Compatibility Strategy
+
+** NPM Package Aliases (6-month transition)
+#+BEGIN_SRC json
+{
+  "@web-buddy/core": {
+    "alias": "@semantest/browser",
+    "deprecationNotice": "Moved to @semantest/browser",
+    "migrationGuide": "https://docs.semantest.com/migration/core"
+  },
+  "@web-buddy/google-buddy": {
+    "alias": "@semantest/google.com", 
+    "deprecationNotice": "Moved to @semantest/google.com",
+    "migrationGuide": "https://docs.semantest.com/migration/google"
+  }
+}
+#+END_SRC
+
+** Code-Level Compatibility Shims
+#+BEGIN_SRC typescript
+// Backward compatibility for 6 months
+export { SemanTestClient as WebBuddyClient } from '@semantest/browser';
+export { GoogleSemanTestClient as GoogleBuddyClient } from '@semantest/google.com';
+
+// Deprecation warnings
+import { deprecated } from '@semantest/migration-utils';
+
+@deprecated('Use SemanTestClient from @semantest/browser instead')
+export class WebBuddyClient extends SemanTestClient {
+  constructor(options: any) {
+    console.warn('WebBuddyClient is deprecated. Use SemanTestClient from @semantest/browser');
+    super(options);
+  }
+}
+#+END_SRC
+
+** Documentation Migration Strategy
+- =Parallel Documentation=: Maintain both naming conventions during transition
+- =Migration Guides=: Step-by-step conversion instructions
+- =Community Support=: Dedicated migration assistance channels
+- =Timeline Communication=: Clear deprecation and EOL dates
+
+* Risk Assessment and Mitigation
+
+** High Risk: Ecosystem Fragmentation
+- =Risk=: Community splits between old and new naming
+- =Mitigation=: Strong communication, clear benefits messaging, gradual transition
+- =Timeline=: 6-month parallel support period
+
+** Medium Risk: Enterprise Adoption Delays  
+- =Risk=: Enterprise users delay adoption due to migration overhead
+- =Mitigation=: Automated migration tools, professional support, clear ROI messaging
+- =Timeline=: Enterprise-first rollout strategy
+
+** Low Risk: Technical Migration Issues
+- =Risk=: Breaking changes cause integration failures
+- =Mitigation=: Comprehensive test suites, backward compatibility shims
+- =Timeline=: Phased rollout with rollback capability
+
+* Success Metrics
+
+** Adoption Metrics
+- =New Package Downloads=: Track @semantest/* package adoption
+- =Migration Rate=: Percentage of users migrating from @web-buddy/*
+- =Community Feedback=: Survey results and GitHub issue sentiment
+
+** Technical Metrics  
+- =Build Success Rate=: Ensure migration doesn't break builds
+- =Performance Impact=: No performance regression during transition
+- =Support Ticket Volume=: Track migration-related support requests
+
+** Business Metrics
+- =Enterprise Inquiries=: Track professional service interest
+- =Contributor Growth=: Monitor open source contribution increases
+- =Market Position=: Brand perception improvements
+
+* Implementation Timeline
+
+** Week 13: Strategic Planning (This Document)
+- ✅ Complete naming audit and mapping
+- ✅ Define DNS-style naming convention
+- ✅ Risk assessment and mitigation planning
+- 📋 NPM organization setup preparation
+
+** Week 14: Infrastructure Transformation  
+- 📋 Migrate core packages (@semantest/browser, nodejs.server)
+- 📋 Set up NPM scoped organization
+- 📋 Create backward compatibility aliases
+- 📋 Update build and CI/CD configurations
+
+** Week 15: Domain Implementation Migration
+- 📋 Migrate domain packages (google.com, chatgpt.com, wikipedia.org)
+- 📋 Update all internal dependencies and references
+- 📋 Create comprehensive migration documentation
+- 📋 Begin community communication campaign
+
+** Week 16: Client SDK and Community Launch
+- 📋 Migrate client SDKs (typescript.client, python.client)
+- 📋 Launch semantest.com website
+- 📋 Publish migration guides and tooling
+- 📋 Community launch and feedback collection
+
+* Next Steps
+
+1. =NPM Organization Setup=: Reserve @semantest scope and configure permissions
+2. =Domain Acquisition=: Secure semantest.com domain and set up hosting
+3. =Visual Identity=: Design logo and brand guidelines
+4. =Migration Tooling=: Create automated migration scripts
+5. =Community Preparation=: Draft announcement and migration timeline
+
+This comprehensive audit and mapping provides the foundation for the Semantest rebranding initiative, ensuring a strategic, well-planned transformation that enhances the framework's professional positioning while maintaining ecosystem stability.
