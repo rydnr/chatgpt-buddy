@@ -28,5 +28,4 @@ There are other secondary components: WebUI, clients and language SDKs.
 
 - Never use markdown but for the top-level README files. Always use org-mode.
 - `private` methods are not recommended. Use `protected` instead.
-
-[Rest of the document remains the same...]
+- Scripts should use `/usr/bin/env bash`, never `/bin/bash`.
