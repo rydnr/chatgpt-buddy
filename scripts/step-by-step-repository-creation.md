@@ -192,12 +192,12 @@ cd ~/github/rydnr/chatgpt-buddy
 
 git subtree split --prefix=client -b client-branch
 
-gh repo create semantest/client.typescript --public \
+gh repo create semantest/typescript.client --public \
   --description "TypeScript client SDK for Semantest"
 
 cd ~/github/rydnr/semantest-workspace
-git clone https://github.com/semantest/client.typescript.git
-cd client.typescript
+git clone https://github.com/semantest/typescript.client.git
+cd typescript.client
 git pull ~/github/rydnr/chatgpt-buddy client-branch
 git push origin main
 ```
@@ -268,7 +268,7 @@ Your directory structure should now look like:
     ├── google.com/
     ├── chatgpt.com/
     ├── extension.chrome/
-    ├── client.typescript/
+    ├── typescript.client/
     ├── docs/
     └── deploy/
 ```

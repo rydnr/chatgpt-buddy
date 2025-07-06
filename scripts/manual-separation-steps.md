@@ -79,7 +79,7 @@ Here's the list of components to extract:
 | Google Implementation | web-buddy/packages/semantest-google | semantest/google.com | Google search automation |
 | ChatGPT Implementation | web-buddy/packages/semantest-chatgpt.com | semantest/chatgpt.com | ChatGPT automation |
 | Chrome Extension | extension | semantest/extension.chrome | Chrome extension |
-| TypeScript Client | client | semantest/client.typescript | TypeScript client SDK |
+| TypeScript Client | client | semantest/typescript.client | TypeScript client SDK |
 | Documentation | docs | semantest/docs | Documentation site |
 | Deploy Configs | deploy | semantest/deploy | Deployment configurations |
 
@@ -130,7 +130,7 @@ rm -rf .git
     ├── google.com/
     ├── chatgpt.com/
     ├── extension.chrome/
-    ├── client.typescript/
+    ├── typescript.client/
     ├── docs/
     └── deploy/
 ```

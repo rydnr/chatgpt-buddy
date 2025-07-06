@@ -136,7 +136,7 @@ main() {
     extract_component "web-buddy/packages/semantest-google" "google-only" "$SEMANTEST_ORG" "google.com" "Google search automation for Semantest"
     extract_component "web-buddy/packages/semantest-chatgpt.com" "chatgpt-only" "$SEMANTEST_ORG" "chatgpt.com" "ChatGPT automation for Semantest"
     extract_component "extension" "extension-chrome-only" "$SEMANTEST_ORG" "extension.chrome" "Chrome extension for Semantest"
-    extract_component "client" "client-typescript-only" "$SEMANTEST_ORG" "client.typescript" "TypeScript client SDK for Semantest"
+    extract_component "client" "client-typescript-only" "$SEMANTEST_ORG" "typescript.client" "TypeScript client SDK for Semantest"
     extract_component "docs" "docs-only" "$SEMANTEST_ORG" "docs" "Documentation for Semantest ecosystem"
     extract_component "deploy" "deploy-only" "$SEMANTEST_ORG" "deploy" "Deployment configurations for Semantest"
     
@@ -165,7 +165,7 @@ This directory contains all Semantest repositories for local development.
 - `chatgpt.com/` - ChatGPT automation
 
 ### SDKs and Tools
-- `client.typescript/` - TypeScript client SDK
+- `typescript.client/` - TypeScript client SDK
 - `docs/` - Documentation site
 - `deploy/` - Deployment configurations
 

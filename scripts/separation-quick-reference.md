@@ -63,7 +63,7 @@ gh repo create semantest/extension.chrome --public
 
 # TypeScript Client
 git subtree split --prefix=client -b ts-client
-gh repo create semantest/client.typescript --public
+gh repo create semantest/typescript.client --public
 
 # Documentation
 git subtree split --prefix=docs -b docs
@@ -95,7 +95,7 @@ rm -rf ~/github/rydnr/chatgpt-buddy/.git
 ├── google.com/         # semantest/google.com
 ├── chatgpt.com/        # semantest/chatgpt.com
 ├── extension.chrome/   # semantest/extension.chrome
-├── client.typescript/  # semantest/client.typescript
+├── typescript.client/  # semantest/typescript.client
 ├── docs/               # semantest/docs
 └── deploy/             # semantest/deploy
 ```
