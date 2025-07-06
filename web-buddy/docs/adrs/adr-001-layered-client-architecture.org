@@ -1,0 +1,205 @@
+#+TITLE: ADR-001: Layered Client Architecture
+#+AUTHOR: Web-Buddy Team
+#+DATE: 2025-07-06
+#+DESCRIPTION: Architecture Decision Record for the three-layer client architecture in Web-Buddy framework
+
+* Status
+=ACCEPTED= - 2025-07-06
+
+* Context
+The Web-Buddy framework evolved from a single-purpose ChatGPT automation tool into a generic web automation platform. Early implementations mixed site-specific logic with generic messaging infrastructure, leading to code duplication and maintenance challenges across different domain implementations.
+
+Key challenges that led to this decision:
+
+** Code Duplication
+- Similar WebSocket connection logic repeated in ChatGPT, Google, and Wikipedia implementations
+- Duplicate message correlation ID management across domains
+- Repeated error handling and retry logic
+
+** Tight Coupling
+- Domain-specific logic directly embedded in core messaging classes
+- Hard to test individual components in isolation
+- Difficult to add new domain implementations without modifying existing code
+
+** Developer Experience
+- Complex API surface requiring knowledge of low-level messaging details
+- No clear separation between "what to do" (business intent) and "how to do it" (technical implementation)
+- Inconsistent interfaces across different domain implementations
+
+* Decision
+We adopt a three-layer client architecture that provides clear separation of concerns:
+
+** Layer 1: Core Infrastructure (~@web-buddy/core~)
+Generic messaging framework providing:
+- WebSocket connection management
+- Message correlation and routing
+- Event-driven communication patterns
+- Error handling and retry logic
+- Browser extension coordination
+
+=Key API=: ~WebBuddyClient.sendMessage(message: WebBuddyMessage)~
+
+** Layer 2: Domain Implementations (~implementations/*~)
+Site-specific logic and message definitions:
+- Domain-specific message types (e.g., ~ENTER_SEARCH_TERM~, ~SELECT_PROJECT~)
+- Business logic handlers for each capability
+- DOM interaction patterns specific to each website
+- Validation rules for domain operations
+
+=Key API=: Domain-specific message handlers and type definitions
+
+** Layer 3: Client Wrappers (~*-buddy~ packages)
+Developer-friendly APIs that abstract complexity:
+- Convenient method names matching business intent
+- Parameter validation and type safety
+- Documentation and examples
+- Higher-level abstractions for common workflows
+
+=Key API=: ~GoogleBuddyClient.enterSearchTerm(term: string)~
+
+* Architecture Diagram
+
+#+BEGIN_SRC ascii
+┌─────────────────────────────────────────────────┐
+│                API LAYER                        │ ← Developer-friendly methods
+│         GoogleBuddyClient.enterSearchTerm()    │   chatGPTClient.selectProject()
+├─────────────────────────────────────────────────┤
+│               DOMAIN LAYER                      │ ← Site-specific messages & handlers
+│      {'ENTER_SEARCH_TERM': ...}                │   {'SELECT_PROJECT': ...}
+├─────────────────────────────────────────────────┤
+│               CORE LAYER                        │ ← Generic messaging infrastructure
+│         WebBuddyClient.sendMessage()           │   WebBuddyServer, WebBuddyExtension
+└─────────────────────────────────────────────────┘
+#+END_SRC
+
+* Implementation Guidelines
+
+** Core Layer Responsibilities
+- MUST remain domain-agnostic
+- MUST NOT contain site-specific logic or selectors
+- MUST provide stable APIs for message passing
+- MUST handle infrastructure concerns (connections, correlation, retries)
+
+=Example=:
+#+BEGIN_SRC typescript
+// ✅ Core layer - generic and reusable
+await webBuddyClient.sendMessage({
+  type: 'AUTOMATION_REQUEST',
+  payload: { action: 'ENTER_SEARCH_TERM', params: { term: 'web automation' } },
+  correlationId: generateId()
+});
+
+// ❌ Core layer - domain-specific logic
+await webBuddyClient.searchGoogle('web automation'); // Too specific
+#+END_SRC
+
+** Domain Layer Responsibilities
+- MUST define domain-specific message types and schemas
+- MUST implement business logic for each automation capability
+- MUST handle DOM interactions and site-specific patterns
+- MUST remain focused on single domain (no cross-site logic)
+
+=Example=:
+#+BEGIN_SRC typescript
+// ✅ Domain layer - site-specific but clean
+export interface EnterSearchTermMessage extends WebBuddyMessage {
+  type: 'ENTER_SEARCH_TERM';
+  payload: {
+    searchTerm: string;
+    submitImmediately?: boolean;
+  };
+}
+
+export class GoogleSearchHandler {
+  async handle(message: EnterSearchTermMessage): Promise<void> {
+    const searchBox = await this.page.$('input[name="q"]');
+    await searchBox.type(message.payload.searchTerm);
+    if (message.payload.submitImmediately) {
+      await searchBox.press('Enter');
+    }
+  }
+}
+#+END_SRC
+
+** Client Wrapper Responsibilities
+- MUST provide intuitive, business-focused APIs
+- MUST translate high-level calls to appropriate domain messages
+- MUST validate parameters and provide meaningful error messages
+- MUST include comprehensive documentation and examples
+
+=Example=:
+#+BEGIN_SRC typescript
+// ✅ Client wrapper - developer-friendly
+export class GoogleBuddyClient {
+  /**
+   * Enter a search term in Google's search box
+   * @param term The search term to enter
+   * @param submit Whether to immediately submit the search (default: true)
+   */
+  async enterSearchTerm(term: string, submit: boolean = true): Promise<void> {
+    if (!term || term.trim().length === 0) {
+      throw new Error('Search term cannot be empty');
+    }
+    
+    await this.webBuddyClient.sendMessage({
+      type: 'ENTER_SEARCH_TERM',
+      payload: { searchTerm: term.trim(), submitImmediately: submit },
+      correlationId: this.generateCorrelationId()
+    });
+  }
+}
+#+END_SRC
+
+* Consequences
+
+** Positive
+- =Clear Separation of Concerns=: Each layer has well-defined responsibilities
+- =Improved Testability=: Layers can be tested in isolation with clear interfaces
+- =Enhanced Reusability=: Core infrastructure can be shared across all domains
+- =Better Developer Experience=: Client wrappers provide intuitive APIs
+- =Simplified Maintenance=: Changes in one layer don't affect others
+- =Scalable Architecture=: New domains can be added without modifying existing code
+
+** Negative
+- =Increased Complexity=: More layers mean more abstractions to understand
+- =Initial Development Overhead=: Three layers require more upfront design work
+- =Potential Over-Engineering=: Simple automation tasks now require multiple files
+
+** Mitigation Strategies
+- Comprehensive documentation and examples for each layer
+- Strong TypeScript typing to guide developers through the architecture
+- Template generators to speed up new domain implementation
+- Clear naming conventions and architectural guidelines
+
+* Examples
+
+** Adding a New Domain (LinkedIn automation)
+1. =Core Layer=: No changes needed (reuse existing ~WebBuddyClient~)
+2. =Domain Layer=: Create ~linkedin-buddy/messages.ts~ and ~linkedin-buddy/handlers.ts~
+3. =Client Wrapper=: Create ~LinkedInBuddyClient~ with business-focused methods
+
+** Cross-Domain Workflow
+#+BEGIN_SRC typescript
+// Each client handles its domain while sharing infrastructure
+const googleClient = new GoogleBuddyClient();
+const chatgptClient = new ChatGPTBuddyClient();
+
+// 1. Search Google for information
+await googleClient.enterSearchTerm('TypeScript best practices');
+const results = await googleClient.getSearchResults();
+
+// 2. Send findings to ChatGPT for analysis
+await chatgptClient.selectProject('code-review');
+await chatgptClient.sendMessage(`Analyze these TypeScript resources: ${results.join(', ')}`);
+#+END_SRC
+
+* Related Decisions
+- ADR-002: Event-Driven Communication Protocol (planned)
+- ADR-003: Contract-Based Testing Framework (planned)
+- ADR-004: Browser Extension Security Model (planned)
+
+* References
+- Web-Buddy Framework Roadmap (~specs/web-buddy-framework-roadmap.md~)
+- Hexagonal Architecture (Ports and Adapters) principles
+- Domain-Driven Design patterns for bounded contexts
+- TypeScript-EDA event-driven architecture patterns
