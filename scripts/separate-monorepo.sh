@@ -12,7 +12,8 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 # Configuration
-ORG_NAME="semantest"
+SEMANTEST_ORG="semantest"
+TYPESCRIPT_EDA_ORG="typescript-eda"
 BASE_DIR="$PWD"
 WORKSPACE_DIR="$HOME/github/rydnr/semantest-workspace"
 
@@ -58,10 +59,11 @@ check_prerequisites() {
 extract_component() {
     local prefix=$1
     local branch_name=$2
-    local repo_name=$3
-    local description=$4
+    local org_name=$3
+    local repo_name=$4
+    local description=$5
     
-    echo -e "\n${YELLOW}Extracting $repo_name...${NC}"
+    echo -e "\n${YELLOW}Extracting $org_name/$repo_name...${NC}"
     
     # Create branch with component history
     echo "Creating branch with $prefix history..."
@@ -72,10 +74,10 @@ extract_component() {
     
     # Create GitHub repository
     echo "Creating GitHub repository..."
-    if gh repo view $ORG_NAME/$repo_name &> /dev/null; then
-        echo -e "${YELLOW}Repository $ORG_NAME/$repo_name already exists, skipping creation${NC}"
+    if gh repo view $org_name/$repo_name &> /dev/null; then
+        echo -e "${YELLOW}Repository $org_name/$repo_name already exists, skipping creation${NC}"
     else
-        gh repo create $ORG_NAME/$repo_name --public --description "$description"
+        gh repo create $org_name/$repo_name --public --description "$description"
     fi
     
     # Clone and push
@@ -84,12 +86,12 @@ extract_component() {
     if [ -d "$repo_name" ]; then
         rm -rf "$repo_name"
     fi
-    git clone https://github.com/$ORG_NAME/$repo_name.git
+    git clone https://github.com/$org_name/$repo_name.git
     cd $repo_name
     git pull $BASE_DIR $branch_name
     git push origin main
     
-    echo -e "${GREEN}✓ Successfully created $ORG_NAME/$repo_name${NC}"
+    echo -e "${GREEN}✓ Successfully created $org_name/$repo_name${NC}"
     cd $BASE_DIR
 }
 
@@ -106,7 +108,10 @@ main() {
     
     echo -e "\n${YELLOW}Current directory: $BASE_DIR${NC}"
     echo -e "${YELLOW}Workspace will be created at: $WORKSPACE_DIR${NC}"
-    echo -e "\n${RED}Warning: This will create multiple new repositories under the '$ORG_NAME' organization${NC}"
+    echo -e "\n${RED}Warning: This will create repositories under two organizations:${NC}"
+    echo -e "${RED}- typescript-eda (for TypeScript-EDA framework)${NC}"
+    echo -e "${RED}- semantest (for Semantest browser automation)${NC}"
+    echo -e "\n${YELLOW}Make sure both organizations exist on GitHub before proceeding!${NC}"
     read -p "Do you want to continue? (y/n) " -n 1 -r
     echo
     if [[ ! $REPLY =~ ^[Yy]$ ]]; then
@@ -120,18 +125,20 @@ main() {
     echo -e "\n${YELLOW}Pushing current changes to origin...${NC}"
     git push origin main || echo -e "${YELLOW}Warning: Could not push to origin${NC}"
     
-    # Extract TypeScript-EDA components (3 separate repositories)
-    extract_component "typescript-eda-domain" "ts-eda-domain-only" "typescript-eda-domain" "Core domain primitives for event-driven architecture"
-    extract_component "typescript-eda-infrastructure" "ts-eda-infra-only" "typescript-eda-infrastructure" "Infrastructure adapters for TypeScript-EDA"
-    extract_component "typescript-eda-application" "ts-eda-app-only" "typescript-eda-application" "Application layer orchestration for TypeScript-EDA"
-    extract_component "web-buddy/packages/core" "browser-only" "browser" "Core browser automation framework for Semantest"
-    extract_component "web-buddy-nodejs-server" "nodejs-server-only" "nodejs.server" "Node.js server for Semantest browser automation"
-    extract_component "web-buddy/packages/semantest-google" "google-only" "google.com" "Google search automation for Semantest"
-    extract_component "web-buddy/packages/semantest-chatgpt.com" "chatgpt-only" "chatgpt.com" "ChatGPT automation for Semantest"
-    extract_component "extension" "extension-chrome-only" "extension.chrome" "Chrome extension for Semantest"
-    extract_component "client" "client-typescript-only" "client.typescript" "TypeScript client SDK for Semantest"
-    extract_component "docs" "docs-only" "docs" "Documentation for Semantest ecosystem"
-    extract_component "deploy" "deploy-only" "deploy" "Deployment configurations for Semantest"
+    # Extract TypeScript-EDA components (3 separate repositories under typescript-eda org)
+    extract_component "typescript-eda-domain" "ts-eda-domain-only" "$TYPESCRIPT_EDA_ORG" "domain" "Core domain primitives for event-driven architecture"
+    extract_component "typescript-eda-infrastructure" "ts-eda-infra-only" "$TYPESCRIPT_EDA_ORG" "infrastructure" "Infrastructure adapters for TypeScript-EDA"
+    extract_component "typescript-eda-application" "ts-eda-app-only" "$TYPESCRIPT_EDA_ORG" "application" "Application layer orchestration for TypeScript-EDA"
+    
+    # Extract Semantest components (under semantest org)
+    extract_component "web-buddy/packages/core" "browser-only" "$SEMANTEST_ORG" "browser" "Core browser automation framework for Semantest"
+    extract_component "web-buddy-nodejs-server" "nodejs-server-only" "$SEMANTEST_ORG" "nodejs.server" "Node.js server for Semantest browser automation"
+    extract_component "web-buddy/packages/semantest-google" "google-only" "$SEMANTEST_ORG" "google.com" "Google search automation for Semantest"
+    extract_component "web-buddy/packages/semantest-chatgpt.com" "chatgpt-only" "$SEMANTEST_ORG" "chatgpt.com" "ChatGPT automation for Semantest"
+    extract_component "extension" "extension-chrome-only" "$SEMANTEST_ORG" "extension.chrome" "Chrome extension for Semantest"
+    extract_component "client" "client-typescript-only" "$SEMANTEST_ORG" "client.typescript" "TypeScript client SDK for Semantest"
+    extract_component "docs" "docs-only" "$SEMANTEST_ORG" "docs" "Documentation for Semantest ecosystem"
+    extract_component "deploy" "deploy-only" "$SEMANTEST_ORG" "deploy" "Deployment configurations for Semantest"
     
     # Create workspace readme
     echo -e "\n${YELLOW}Creating workspace README...${NC}"
@@ -143,12 +150,12 @@ This directory contains all Semantest repositories for local development.
 
 ## Repositories
 
-### TypeScript-EDA Framework
-- `typescript-eda-domain/` - Core domain primitives (Entity, Event, ValueObject)
-- `typescript-eda-infrastructure/` - Infrastructure adapters and ports
-- `typescript-eda-application/` - Application layer orchestration
+### TypeScript-EDA Framework (under typescript-eda organization)
+- `domain/` - Core domain primitives (Entity, Event, ValueObject)
+- `infrastructure/` - Infrastructure adapters and ports
+- `application/` - Application layer orchestration
 
-### Browser Automation
+### Browser Automation (under semantest organization)
 - `browser/` - Core browser automation framework  
 - `nodejs.server/` - Node.js server component
 - `extension.chrome/` - Chrome browser extension

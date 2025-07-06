@@ -31,15 +31,15 @@ git push origin main
 ```bash
 # TypeScript-EDA Domain
 git subtree split --prefix=typescript-eda-domain -b ts-eda-domain
-gh repo create semantest/typescript-eda-domain --public
+gh repo create typescript-eda/domain --public
 
 # TypeScript-EDA Infrastructure
 git subtree split --prefix=typescript-eda-infrastructure -b ts-eda-infra
-gh repo create semantest/typescript-eda-infrastructure --public
+gh repo create typescript-eda/infrastructure --public
 
 # TypeScript-EDA Application
 git subtree split --prefix=typescript-eda-application -b ts-eda-app
-gh repo create semantest/typescript-eda-application --public
+gh repo create typescript-eda/application --public
 
 # Browser Core
 git subtree split --prefix=web-buddy/packages/core -b browser
@@ -77,7 +77,7 @@ gh repo create semantest/deploy --public
 ### 4. Clean Up
 ```bash
 # Delete temporary branches
-git branch -D ts-eda browser nodejs-server google chatgpt chrome-ext ts-client docs deploy
+git branch -D ts-eda-domain ts-eda-infra ts-eda-app browser nodejs-server google chatgpt chrome-ext ts-client docs deploy
 
 # Make original directory git-less
 rm -rf ~/github/rydnr/chatgpt-buddy/.git
@@ -87,15 +87,17 @@ rm -rf ~/github/rydnr/chatgpt-buddy/.git
 ```bash
 # Your new structure
 ~/github/rydnr/semantest-workspace/
-├── typescript-eda/
-├── browser/
-├── nodejs.server/
-├── google.com/
-├── chatgpt.com/
-├── extension.chrome/
-├── client.typescript/
-├── docs/
-└── deploy/
+├── domain/              # typescript-eda/domain
+├── infrastructure/      # typescript-eda/infrastructure
+├── application/         # typescript-eda/application
+├── browser/            # semantest/browser
+├── nodejs.server/      # semantest/nodejs.server
+├── google.com/         # semantest/google.com
+├── chatgpt.com/        # semantest/chatgpt.com
+├── extension.chrome/   # semantest/extension.chrome
+├── client.typescript/  # semantest/client.typescript
+├── docs/               # semantest/docs
+└── deploy/             # semantest/deploy
 ```
 
 ## Post-Separation Tasks
